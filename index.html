@@ -259,7 +259,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <div id="touch" hidden>
       <div class="tjoy" id="tJoy" aria-label="Joystick: ahead, astern and sideways"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><span class="tl t-l">P</span><span class="tl t-r">S</span><div class="tknob" id="tJoyK"></div></div>
       <div class="tright">
-        <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change which end leads">Swap ends</button><button id="tCam" title="Change camera view">View</button></div>
+        <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change direction: the other end leads">Change dir</button><button id="tCam" title="Change camera view">View</button></div>
         <div class="tsteer" id="tSteer" aria-label="Steer"><span class="tl t-l">Port</span><span class="tl t-mid">Steer</span><span class="tl t-r">Stbd</span><div class="tknob" id="tSteerK"></div></div>
       </div>
     </div>
@@ -288,13 +288,13 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
           </fieldset>
           <fieldset>
             <legend>Controls</legend>
-            <label><input type="radio" name="ctl" value="full" checked><span>Full procedure<small>Engines, clutches, hydraulics, pins, ramp and line are all yours.</small></span></label>
-            <label><input type="radio" name="ctl" value="simple"><span>Simple<small>You steer. The crew runs the engines and ramps and holds her on the slip.</small></span></label>
+            <label><input type="radio" name="ctl" value="full"><span>Full procedure<small>Engines, clutches, hydraulics, pins, ramp and line are all yours.</small></span></label>
+            <label><input type="radio" name="ctl" value="simple" checked><span>Simple<small>You steer. The crew runs the engines and ramps and holds her on the slip.</small></span></label>
           </fieldset>
           <fieldset>
             <legend>Weather</legend>
-            <label><input type="radio" name="wx" value="calm"><span>Calm<small>Light airs, slack-ish stream.</small></span></label>
-            <label><input type="radio" name="wx" value="moderate" checked><span>Moderate south-westerly<small>16 kn, about 1 kn of stream.</small></span></label>
+            <label><input type="radio" name="wx" value="calm" checked><span>Calm<small>Light airs, slack-ish stream.</small></span></label>
+            <label><input type="radio" name="wx" value="moderate"><span>Moderate south-westerly<small>16 kn, about 1 kn of stream.</small></span></label>
             <label><input type="radio" name="wx" value="fresh"><span>Fresh westerly<small>26 kn gusting, a lumpy sea on the beam.</small></span></label>
           </fieldset>
         </div>
@@ -323,14 +323,14 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
           <kbd>+ / −</kbd><span>Both throttles up / down</span>
           <kbd>Individual</kbd><span>W A S D move the leading unit's pitch, arrow keys the trailing unit's</span>
           <kbd>H</kbd><span>Horn (hold)</span>
-          <kbd>C</kbd><span>Change ends: the other end leads, and in the wheelhouse you walk to its station</span>
+          <kbd>C</kbd><span>Change direction: the other end leads, and in the wheelhouse you walk to its station</span>
           <kbd>V · T · M</kbd><span>Camera · time compression · mute</span>
           <kbd>Touch</kbd><span>Left pad: drag up for ahead, down for astern, sideways to crab; speed stays where you leave it and sideways recentres. Right bar: drag to steer, it recentres when you let go. Both work at once. Pinch the view with two fingers to zoom; View changes camera.</span>
           <kbd>Mouse</kbd><span>Drag to orbit the camera, scroll to zoom (in chase view it closes in on the ship, then narrows the lens), double-click to reset</span>
         </div>
         <p class="fine">Map data © OpenStreetMap contributors (ODbL). Outer coastline: GSHHG (Wessel &amp; Smith, LGPL). Depths are modelled, not charted.</p>
         <h3>Simple controls</h3>
-        <p>Pick Simple on the start screen, or switch with the Controls button at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes ends for you, so the end facing the next slip leads; to change ends yourself press C, tap Swap ends on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
+        <p>Pick Simple on the start screen, or switch with the Controls button at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
         <h3>Wheelhouse view</h3>
         <p>Press V for the wheelhouse. You stand at the conning station of the leading end; changing which end leads walks you to the other station. On the main desk, from left to right: engine start, stop and clutch for each unit, the two throttles, the joystick (ahead, astern and sideways), the steering wheel, the two individual unit pitch sticks, then mode, conning-end and utility buttons. The amber dot beside each unit stick shows where the pitch actually is while the servo catches up. Look left for the deck console: hydraulics, mooring line, and pins, Raise, Hold, Lower and Float for each ramp, with the deck display above it.</p>
         <h3>Sailing from a slip</h3>
@@ -2218,9 +2218,9 @@ function setDir(d) {
   if (S.dir === d) { S.pendDir = 0; return; }
   const busy = S.units.some(U => Math.hypot(U.cmd.x, U.cmd.y) > 0.05 || Math.hypot(U.p.x, U.p.y) > 0.12);
   if (busy) {
-    if (!S.simple) return msg('Bring both units to zero pitch before changing ends');
+    if (!S.simple) return msg('Bring both units to zero pitch before changing direction');
     // in simple mode the crew takes the pitch off and swaps ends as soon as the units are still
-    if (S.pendDir !== d) { zeroPitch(); S.pendDir = d; msg(`Taking the pitch off, then changing to the No.${d === 1 ? 1 : 2} end`); }
+    if (S.pendDir !== d) { zeroPitch(); S.pendDir = d; msg(`Taking the pitch off, then changing direction: No.${d === 1 ? 1 : 2} end leads`); }
     return;
   }
   S.pendDir = 0; S.dir = d; cam.az = 0; syncControls(); log(`Conning from the No.${d === 1 ? 1 : 2} end`);
@@ -2403,8 +2403,22 @@ function buildWheelhouse() {
   defineControls();
   const DS = THREE.DoubleSide;
   const M = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
-  const mWall = M(0x37444d, { side: DS }), mFloor = M(0x1f272b), mCeil = M(0xc6cbca, { side: DS }), mDesk = M(0x27333b), mTop = M(0x1a2227),
-    mPanel = M(0x141b20), mMetal = M(0x87919a), mKnob = M(0x101315), mFrame = M(0x4a5761), mHit = new THREE.MeshBasicMaterial({ visible: false, side: DS });
+  // light painted bulkheads and deckhead, teak planked floor, wooden console casings and sills
+  const woodTex = (base, dark, planks, rw, rh) => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d');
+    const ph = 256 / planks;
+    for (let i = 0; i < planks; i++) {
+      const v = (hash(i, 7) - 0.5) * 18; g.fillStyle = `rgb(${base[0] + v},${base[1] + v * 0.7},${base[2] + v * 0.5})`; g.fillRect(0, i * ph, 256, ph);
+      g.strokeStyle = `rgba(${dark},0.18)`; g.lineWidth = 1;
+      for (let k = 0; k < 5; k++) { const y = i * ph + 2 + hash(i, k) * (ph - 4); g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(85, y + 2, 170, y - 2, 256, y + 1); g.stroke(); }
+      g.fillStyle = `rgba(${dark},0.55)`; g.fillRect(0, i * ph, 256, 1.5);
+      const jx = hash(i, 3) * 256; g.fillRect(jx, i * ph, 1.5, ph);
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rw, rh); return t;
+  };
+  const mWall = M(0xe2dfd6, { side: DS }), mFloor = new THREE.MeshLambertMaterial({ map: woodTex([150, 98, 58], '40,22,10', 8, 1, 2) }),
+    mCeil = M(0xf2f1ec, { side: DS }), mDesk = new THREE.MeshLambertMaterial({ map: woodTex([128, 80, 46], '40,22,10', 6, 1, 1) }), mTop = M(0x2a3237),
+    mPanel = M(0x1d2428), mMetal = M(0xa9b0b5), mKnob = M(0x101315), mFrame = M(0xd8dbd9), mWood = M(0x9a6438), mHit = new THREE.MeshBasicMaterial({ visible: false, side: DS });
   const box = (p, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); p.add(o); return o; };
   const tag = (o, id) => { o.userData.ctrl = id; WH.hits.push(o); return o; };
   const label = (p, text, x, z, w = 0.1) => {
@@ -2421,8 +2435,10 @@ function buildWheelhouse() {
     box(wh, 0.04, TOP - WIN1, IL * 2, mWall, s * IW, (WIN1 + TOP) / 2, 0);
     box(wh, IW * 2, WIN0, 0.04, mWall, 0, WIN0 / 2, s * IL);
     box(wh, IW * 2, TOP - WIN1, 0.04, mWall, 0, (WIN1 + TOP) / 2, s * IL);
-    box(wh, 0.12, 0.03, IL * 2, mFrame, s * (IW - 0.05), WIN0, 0);
-    box(wh, IW * 2, 0.03, 0.12, mFrame, 0, WIN0, s * (IL - 0.05));
+    box(wh, 0.16, 0.04, IL * 2, mWood, s * (IW - 0.07), WIN0, 0);   // wooden sills under the windows
+    box(wh, IW * 2, 0.04, 0.16, mWood, 0, WIN0, s * (IL - 0.07));
+    box(wh, 0.03, 0.08, IL * 2, mWood, s * (IW - 0.03), 0.06, 0);   // skirting
+    box(wh, IW * 2, 0.08, 0.03, mWood, 0, 0.06, s * (IL - 0.03));
     for (const z of [-IL, -IL / 2, 0, IL / 2, IL]) box(wh, 0.07, WIN1 - WIN0, 0.07, mFrame, s * IW, (WIN0 + WIN1) / 2, z);
     for (const x of [-0.62, 0.62]) box(wh, 0.07, WIN1 - WIN0, 0.07, mFrame, x, (WIN0 + WIN1) / 2, s * IL);
   }
@@ -2443,6 +2459,7 @@ function buildWheelhouse() {
     box(G, 2.06, 0.8, 0.5, mDesk, 0, 0.4, -1.9);
     const top = new THREE.Group(); top.position.set(0, 0.86, -1.9); top.rotation.x = 0.22; G.add(top);
     box(top, 2.1, 0.03, 0.54, mTop, 0, -0.015, 0);
+    box(top, 2.14, 0.045, 0.06, mWood, 0, -0.01, 0.29);   // wooden rail along the front edge of the desk
     const sp = new THREE.Group(); sp.position.set(0, 1.12, -2.2); sp.rotation.x = -0.18; G.add(sp);
     box(sp, 2.06, 0.3, 0.06, mPanel, 0, 0, 0);
     screen(sp, S_.alarm, -0.8, 0.36, 0.26); screen(sp, S_.prop, -0.33, 0.54, 0.26); screen(sp, S_.nav, 0.25, 0.54, 0.26); screen(sp, S_.chart, 0.74, 0.28, 0.26);
@@ -2504,7 +2521,7 @@ function buildWheelhouse() {
     button(top, 'warp', bx[1], 0.06, 'Time', () => S.warp > 1 ? LAMP.amber : 0);
     button(top, 'panels', bx[2], 0.06, 'Panels', () => $('console').hidden ? 0 : LAMP.amber);
     // helmsman's chair, overhead compass and VHF, wipers on the forward panes
-    const mSeat = M(0x2a2f33);
+    const mSeat = M(0x6b4430);
     box(G, 0.12, 0.5, 0.12, mMetal, 0, 0.28, -0.55);
     box(G, 0.52, 0.1, 0.5, mSeat, 0, 0.58, -0.55);
     box(G, 0.52, 0.62, 0.09, mSeat, 0, 0.95, -0.31);
@@ -2519,6 +2536,7 @@ function buildWheelhouse() {
     const yaw = new THREE.Group(); yaw.position.set(-1.0, 0.86, -1.0); yaw.rotation.y = Math.PI / 2; G.add(yaw);
     const side = new THREE.Group(); side.rotation.x = 0.3; yaw.add(side);
     box(side, 1.0, 0.03, 0.47, mTop, 0, -0.015, 0);
+    box(side, 1.04, 0.045, 0.05, mWood, 0, -0.01, 0.26);
     const wallScr = new THREE.Group(); wallScr.position.set(-IW + 0.05, 1.3, -1.0); wallScr.rotation.y = Math.PI / 2; G.add(wallScr);
     box(wallScr, 0.6, 0.34, 0.04, mPanel, 0, 0, 0);
     screen(wallScr, S_.deck, 0, 0.56, 0.3).position.z = 0.024;
@@ -2890,7 +2908,7 @@ buildSeaLife();
   makeLabel('Cara', GEO.named.Cara[0], GEO.named.Cara[1], 70);
   makeLabel('Gigalum', GEO.named.Gigalum[0], GEO.named.Gigalum[1], 40);
 }
-newGame('cold', 'moderate');
+newGame('cold', 'calm', true);
 S.running = false;
 cam.az = 0.6; cam.el = 0.22; cam.dist = 110;
 $('bGo').onclick = () => {
