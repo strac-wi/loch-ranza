@@ -171,6 +171,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
 .trow{display:flex;gap:8px;pointer-events:auto}
 .trow button{background:var(--glass);padding:8px 12px}
 .trow{flex-wrap:wrap;justify-content:flex-end}
+.trow button.on{background:var(--amber);color:var(--amber-ink);border-color:var(--amber)}
 .tl{position:absolute;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(219,230,235,.65);pointer-events:none}
 .t-top{top:7px;left:50%;transform:translateX(-50%)}.t-bot{bottom:7px;left:50%;transform:translateX(-50%)}
 .t-l{left:13px;top:50%;transform:translateY(-50%)}.t-r{right:13px;top:50%;transform:translateY(-50%)}.t-mid{left:50%;top:5px;transform:translateX(-50%);font-size:10px}
@@ -235,7 +236,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <button id="bCam" title="Cycle camera (V)">View: chase</button>
         <button id="bSound" title="Mute (M)">Sound on</button>
         <button id="bHelp">Help</button>
-        <button id="bConsole">Hide console</button>
+        <button id="bConsole">Show console</button>
         <button id="bSimple" title="Switch between full procedure and simple controls">Controls: full</button>
         <button id="bGfx" title="Shadows, clouds and wildlife">Detail: high</button>
         <button id="bTouch" title="On-screen joystick and steering">Touch controls: off</button>
@@ -350,7 +351,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     </div>
   </div>
 
-  <div id="console">
+  <div id="console" hidden>
     <section class="panel" id="pUnit0"></section>
     <section class="panel" id="pConn">
       <header><b>Conning</b><span id="connSub">Combined control</span></header>
@@ -2233,7 +2234,14 @@ $('bLine').onclick = () => ACT.line();
 function ack() { S.ack = new Set(S.alarms); S.alarmSound = false; }
 $('bAck').onclick = ack; $('bAck2').onclick = ack;
 const WARPS = [1, 2, 4, 8];
-function cycleWarp() { S.warp = WARPS[(WARPS.indexOf(S.warp) + 1) % WARPS.length]; }
+let warpToast = null;
+function cycleWarp() {
+  S.warp = WARPS[(WARPS.indexOf(S.warp) + 1) % WARPS.length];
+  // show the new rate straight away on every time button, and as a toast for the wheelhouse desk and phones
+  setT($('bWarp'), `Time ×${S.warp}`); setT($('tWarp'), `×${S.warp}`); setC($('tWarp'), 'on', S.warp > 1);
+  if (warpToast) warpToast.remove();
+  toast(S.warp > 1 ? `Time ×${S.warp}: ${S.warp} times real speed` : 'Time ×1: real time'); warpToast = $('toasts').firstChild;
+}
 $('bWarp').onclick = cycleWarp;
 const cam = { mode: 'chase', az: 0, el: 0.3, dist: 80, topH: 420 };
 const CAMS = ['chase', 'wheelhouse', 'top'];
@@ -2873,7 +2881,7 @@ $('bGo').onclick = () => {
   newGame(start, wx, simple);
   cam.az = 0; cam.el = 0.3; cam.dist = 80;
   $('menu').hidden = true; S.running = true;
-  setTouch(TOUCH.on); if (TOUCH.on) setConsole(true);
+  setTouch(TOUCH.on); setConsole(true);
   initAudio(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
   toast(simple ? (start === 'cold' ? 'Traffic is boarding. The crew will say when you are clear to sail.' : 'Underway for Gigha. W ahead, A/D turn, Q/E sideways.')
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
