@@ -259,7 +259,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <div id="touch" hidden>
       <div class="tjoy" id="tJoy" aria-label="Joystick: ahead, astern and sideways"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><span class="tl t-l">P</span><span class="tl t-r">S</span><div class="tknob" id="tJoyK"></div></div>
       <div class="tright">
-        <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change which end leads">Swap ends</button></div>
+        <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change which end leads">Swap ends</button><button id="tCam" title="Change camera view">View</button></div>
         <div class="tsteer" id="tSteer" aria-label="Steer"><span class="tl t-l">Port</span><span class="tl t-mid">Steer</span><span class="tl t-r">Stbd</span><div class="tknob" id="tSteerK"></div></div>
       </div>
     </div>
@@ -325,7 +325,8 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
           <kbd>H</kbd><span>Horn (hold)</span>
           <kbd>C</kbd><span>Change ends: the other end leads, and in the wheelhouse you walk to its station</span>
           <kbd>V · T · M</kbd><span>Camera · time compression · mute</span>
-          <kbd>Touch</kbd><span>Left pad: drag up for ahead, down for astern, sideways to crab; speed stays where you leave it and sideways recentres. Right bar: drag to steer, it recentres when you let go. Both work at once.</span>
+          <kbd>Touch</kbd><span>Left pad: drag up for ahead, down for astern, sideways to crab; speed stays where you leave it and sideways recentres. Right bar: drag to steer, it recentres when you let go. Both work at once. Pinch the view with two fingers to zoom; View changes camera.</span>
+          <kbd>Mouse</kbd><span>Drag to orbit the camera, scroll to zoom (in chase view it closes in on the ship, then narrows the lens), double-click to reset</span>
         </div>
         <p class="fine">Map data © OpenStreetMap contributors (ODbL). Outer coastline: GSHHG (Wessel &amp; Smith, LGPL). Depths are modelled, not charted.</p>
         <h3>Simple controls</h3>
@@ -2243,7 +2244,7 @@ function cycleWarp() {
   toast(S.warp > 1 ? `Time ×${S.warp}: ${S.warp} times real speed` : 'Time ×1: real time'); warpToast = $('toasts').firstChild;
 }
 $('bWarp').onclick = cycleWarp;
-const cam = { mode: 'chase', az: 0, el: 0.3, dist: 80, topH: 420 };
+const cam = { mode: 'chase', az: 0, el: 0.3, dist: 80, topH: 420, fov: 55 }, CHASE_MIN = 17;
 const CAMS = ['chase', 'wheelhouse', 'top'];
 function setConsole(hidden) { $('console').hidden = hidden; setT($('bConsole'), hidden ? 'Show console' : 'Hide console'); }
 function setCam(m) {
@@ -2255,6 +2256,7 @@ function setCam(m) {
 }
 function cycleCam() { setCam(CAMS[(CAMS.indexOf(cam.mode) + 1) % CAMS.length]); }
 $('bCam').onclick = cycleCam;
+$('tCam').onclick = cycleCam;
 $('bMapZoom').onclick = () => { mapZoom = mapZoom === 'route' ? 'harbour' : 'route'; setT($('bMapZoom'), mapZoom === 'route' ? 'Harbour' : 'Route'); };
 $('bConsole').onclick = () => setConsole(!$('console').hidden);
 $('bHelp').onclick = () => { $('help').hidden = false; };
@@ -2286,8 +2288,21 @@ function showTip(c, ev) {
   tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
 }
 function hideTip() { tipEl.hidden = true; }
+// zoom: chase pulls in to just off the ship, then narrows the lens; top view changes height; wheelhouse narrows the lens
+function zoomBy(f) {
+  if (cam.mode === 'chase') {
+    if (f < 1) { if (cam.dist > CHASE_MIN) cam.dist = Math.max(CHASE_MIN, cam.dist * f); else cam.fov = Math.max(24, cam.fov * f); }
+    else if (cam.fov < 55) cam.fov = Math.min(55, cam.fov * f); else cam.dist = Math.min(900, cam.dist * f);
+  } else if (cam.mode === 'top') cam.topH = clamp(cam.topH * f, 60, 4000);
+  else if (cam.mode === 'wheelhouse') WH.fov = clamp(WH.fov * f, 28, 75);
+}
+// two fingers on the view pinch to zoom
+const ptrs = new Map(); let pinch = null;
+const pinchDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 canvas.addEventListener('pointerdown', (ev) => {
-  canvas.setPointerCapture(ev.pointerId);
+  try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* pointer already gone */ }
+  ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (ptrs.size === 2 && !WH.active) { drag = null; pinch = pinchDist(); return; }
   if (cam.mode === 'wheelhouse' && S && S.running) {
     const c = pickCtrl(ev);
     if (c) { WH.active = { c, x: ev.clientX, y: ev.clientY }; if (c.down) c.down(); showTip(c, ev); return; }
@@ -2295,6 +2310,8 @@ canvas.addEventListener('pointerdown', (ev) => {
   drag = { x: ev.clientX, y: ev.clientY };
 });
 canvas.addEventListener('pointermove', (ev) => {
+  if (ptrs.has(ev.pointerId)) ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pinch && ptrs.size >= 2) { const d = pinchDist(); if (d > 10) zoomBy(pinch / d); pinch = d; return; }
   if (WH.active) {
     const a = WH.active, dx = ev.clientX - a.x, dy = ev.clientY - a.y; a.x = ev.clientX; a.y = ev.clientY;
     if (a.c.drag) a.c.drag(dx, dy);
@@ -2311,16 +2328,17 @@ canvas.addEventListener('pointermove', (ev) => {
     canvas.style.cursor = c ? (c.drag ? 'grab' : 'pointer') : 'default';
   }
 });
-function endPointer() { if (WH.active) { if (WH.active.c.up) WH.active.c.up(); WH.active = null; } drag = null; }
+function endPointer(ev) {
+  ptrs.delete(ev.pointerId); if (ptrs.size < 2) pinch = null;
+  if (WH.active) { if (WH.active.c.up) WH.active.c.up(); WH.active = null; } drag = null;
+}
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('pointerleave', () => { if (!WH.active) hideTip(); });
-canvas.addEventListener('dblclick', () => { cam.az = 0; WH.yaw = 0; WH.pitch = -0.3; WH.fov = 66; });
+canvas.addEventListener('dblclick', () => { cam.az = 0; cam.fov = 55; WH.yaw = 0; WH.pitch = -0.3; WH.fov = 66; });
 canvas.addEventListener('wheel', (ev) => {
   ev.preventDefault();
-  if (cam.mode === 'chase') cam.dist = clamp(cam.dist * (1 + ev.deltaY * 0.001), 22, 900);
-  else if (cam.mode === 'top') cam.topH = clamp(cam.topH * (1 + ev.deltaY * 0.001), 60, 4000);
-  else if (cam.mode === 'wheelhouse') WH.fov = clamp(WH.fov * (1 + ev.deltaY * 0.001), 28, 75);
+  zoomBy(1 + clamp(ev.deltaY, -200, 200) * 0.001);
 }, { passive: false });
 
 // ================= WHEELHOUSE (first person) =================
@@ -2540,7 +2558,8 @@ function updateWheelhouse() {
 }
 function renderView() {
   if (cam.mode !== 'wheelhouse') {
-    if (camera.near !== 0.5 || camera.fov !== 55) { camera.near = 0.5; camera.fov = 55; camera.updateProjectionMatrix(); }
+    const fov = cam.mode === 'chase' ? cam.fov : 55;
+    if (camera.near !== 0.5 || camera.fov !== fov) { camera.near = 0.5; camera.fov = fov; camera.updateProjectionMatrix(); }
     renderer.render(scene, camera);
     return;
   }
@@ -2879,7 +2898,7 @@ $('bGo').onclick = () => {
   logEl.innerHTML = '';
   const simple = document.querySelector('input[name=ctl]:checked').value === 'simple';
   newGame(start, wx, simple);
-  cam.az = 0; cam.el = 0.3; cam.dist = 80;
+  cam.az = 0; cam.el = 0.3; cam.dist = 80; cam.fov = 55;
   $('menu').hidden = true; S.running = true;
   setTouch(TOUCH.on); setConsole(true);
   initAudio(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
