@@ -662,19 +662,46 @@ function cloudTex() {
 const clouds = new THREE.Group();
 
 // ---------- terrain ----------
-const FIELD_PAL = [[0.40, 0.56, 0.25], [0.47, 0.61, 0.28], [0.35, 0.50, 0.22], [0.56, 0.59, 0.31], [0.63, 0.57, 0.34], [0.42, 0.54, 0.24]];
+// Colours after what aerial views of Gigha and west Kintyre show: muted olive pasture in walled fields,
+// russet bracken and brown heather on the rough ground, grey knolls, a dark wrack fringe on rocky shores,
+// pale sand only in the bays, and dark conifer blocks on the Kintyre hills.
+const FIELD_PAL = [[0.37, 0.46, 0.26], [0.41, 0.49, 0.28], [0.34, 0.43, 0.24], [0.47, 0.49, 0.31], [0.43, 0.45, 0.29], [0.39, 0.47, 0.25]];
+const ACHAMORE = [-4500, 1150];   // the wooded Achamore estate, south-west of Ardminish (approximate)
+const kintyre = (x) => smooth(-2400, -1400, x);
+function forestAt(x, y, h) {
+  // forestry plantations: blocky compartments on the Kintyre hillsides
+  if (h < 40 || h > 165 || x < -1200) return false;
+  const cx = Math.floor((x + 9000) / 420), cy = Math.floor((y + 9000) / 330);
+  return hash(cx + 51, cy + 17) > 0.42 && fbm(x * 0.0012 + 5, y * 0.0012) > 0.38;
+}
+function woodAt(x, y, h) {
+  // broadleaf woodland: the Achamore policies on Gigha and shelter belts in the Kintyre glens
+  if (h < 4 || h > 70) return false;
+  const da = Math.hypot(x - ACHAMORE[0], y - ACHAMORE[1]);
+  if (da < 650) return fbm(x * 0.009, y * 0.009) > 0.5 - (650 - da) / 2600;
+  return x > -1200 && h < 45 && fbm(x * 0.004 + 9, y * 0.004 - 3) > 0.68;
+}
 function landColor(h, x, y) {
-  const n = fbm(x * 0.01, y * 0.01);
-  if (h < -0.6) return [0.33, 0.37, 0.31];
-  if (h < 1.7) return [0.76 + n * 0.06, 0.70 + n * 0.05, 0.53];
-  if (h < 3.5) return [0.52, 0.57, 0.36];
-  if (h > 95) return [0.45 + n * 0.08, 0.40 + n * 0.05, 0.28];
-  if (h < 45 && fbm(x * 0.0015 + 11, y * 0.0015) > 0.42) {
-    const c = FIELD_PAL[Math.floor(hash(Math.floor((x + 9000) / 190), Math.floor((y + 9000) / 150)) * FIELD_PAL.length)];
-    return [c[0] + n * 0.04, c[1] + n * 0.04, c[2]];
+  const n = fbm(x * 0.01, y * 0.01), k = kintyre(x);
+  if (h < -0.6) return [0.24, 0.25, 0.19];
+  if (h < 1.7) {
+    // sandy bays where the noise says so, otherwise bladderwrack over rock, then bare grey rock at the top of the shore
+    if (fbm(x * 0.0035 + 2, y * 0.0035 - 7) > 0.56) return [0.70 + n * 0.05, 0.65 + n * 0.04, 0.50];
+    return h < 0.7 ? [0.22 + n * 0.04, 0.20 + n * 0.03, 0.12] : [0.40 + n * 0.06, 0.39 + n * 0.05, 0.34];
   }
-  const t = clamp((h - 4) / 90, 0, 1);
-  return [lerp(0.33, 0.40, t) + n * 0.07, lerp(0.49, 0.43, t) + n * 0.06, lerp(0.24, 0.26, t)];
+  if (h < 4) return [0.43 + n * 0.04, 0.45 + n * 0.04, 0.30];
+  if (forestAt(x, y, h)) return [0.15 + n * 0.03, 0.21 + n * 0.03, 0.14];
+  if (woodAt(x, y, h)) return [0.22 + n * 0.04, 0.29 + n * 0.04, 0.17];
+  // grey rocky knolls poke through on Gigha's ridges
+  if (h > 22 && fbm(x * 0.012 + 40, y * 0.012) > 0.66 - (1 - k) * 0.04) return [0.44 + n * 0.05, 0.43 + n * 0.05, 0.39];
+  if (h < 60 && fbm(x * 0.0015 + 11, y * 0.0015) > 0.34) {
+    const c = FIELD_PAL[Math.floor(hash(Math.floor((x + 9000) / 190), Math.floor((y + 9000) / 150)) * FIELD_PAL.length)];
+    return [c[0] + n * 0.03, c[1] + n * 0.03, c[2]];
+  }
+  // rough grazing, with bracken patches, grading into heather moor on the tops
+  const br = smooth(0.58, 0.7, fbm(x * 0.004 - 13, y * 0.004 + 21)), t = clamp((h - 30) / 80, 0, 1);
+  const rough = [lerp(0.38, 0.43, br), lerp(0.43, 0.38, br), lerp(0.27, 0.25, br)], moor = [0.37, 0.33, 0.25];
+  return [lerp(rough[0], moor[0], t) + n * 0.05, lerp(rough[1], moor[1], t) + n * 0.04, lerp(rough[2], moor[2], t) + n * 0.02];
 }
 function buildTerrain() {
   const C = 70, K = 4, f = C / K;
@@ -907,20 +934,19 @@ function buildScatter() {
   const tg = new THREE.ConeGeometry(3, 9, 5); tg.translate(0, 4.5, 0);
   const crownG = new THREE.IcosahedronGeometry(3.6, 0); crownG.translate(0, 6.2, 0);
   const trunkG = new THREE.CylinderGeometry(0.35, 0.5, 4.4, 5); trunkG.translate(0, 2.2, 0);
-  const trees = new THREE.InstancedMesh(tg, phong(0x2f4a2a), 900);
+  const trees = new THREE.InstancedMesh(tg, phong(0x22331f), 900);
   const crowns = new THREE.InstancedMesh(crownG, phong(0xffffff), 700), trunks = new THREE.InstancedMesh(trunkG, phong(0x4a3a2a), 700);
   let n = 0, b = 0;
-  for (let tries = 0; tries < 40000 && (n < 900 || b < 700); tries++) {
+  for (let tries = 0; tries < 60000 && (n < 900 || b < 700); tries++) {
     const x = lerp(DOM.x0 + 800, 4000, rnd()), y = lerp(DOM.y0 + 1500, DOM.y1 - 1500, rnd()), h = heightAt(x, y);
-    if (h < 5 || h > 90) continue;
-    const f = fbm(x * 0.003 + 3, y * 0.003);
-    if (f > 0.6 && n < 900) {
-      const sc = 0.7 + rnd() * 0.8; dummy.position.set(x, h - 0.5, -y); dummy.scale.set(sc, sc * (0.8 + rnd() * 0.6), sc); dummy.rotation.set(0, rnd() * 6, 0);
+    if (h < 5 || h > 170) continue;
+    if (forestAt(x, y, h) && n < 900) {
+      const sc = 0.8 + rnd() * 0.6; dummy.position.set(x, h - 0.5, -y); dummy.scale.set(sc, sc * (0.9 + rnd() * 0.4), sc); dummy.rotation.set(0, rnd() * 6, 0);
       dummy.updateMatrix(); trees.setMatrixAt(n++, dummy.matrix);
-    } else if (f > 0.5 && f <= 0.6 && b < 700) {
+    } else if (woodAt(x, y, h) && b < 700) {
       const sc = 0.6 + rnd() * 0.7; dummy.position.set(x, h - 0.3, -y); dummy.scale.set(sc * (0.9 + rnd() * 0.3), sc, sc * (0.9 + rnd() * 0.3)); dummy.rotation.set(0, rnd() * 6, 0);
       dummy.updateMatrix(); crowns.setMatrixAt(b, dummy.matrix); trunks.setMatrixAt(b, dummy.matrix);
-      crowns.setColorAt(b++, col.setHSL(0.24 + rnd() * 0.06, 0.38 + rnd() * 0.15, 0.26 + rnd() * 0.1));
+      crowns.setColorAt(b++, col.setHSL(0.2 + rnd() * 0.07, 0.28 + rnd() * 0.12, 0.2 + rnd() * 0.08));
     }
   }
   trees.count = n; crowns.count = trunks.count = b; scene.add(trees, crowns, trunks);
