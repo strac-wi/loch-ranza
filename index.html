@@ -613,40 +613,53 @@ sun.shadow.normalBias = 0.04;
 sun.layers.enableAll();
 scene.add(sun, sun.target);
 
+// tileable fbm for the cloud deck, baked once into a small texture
+function cloudTex() {
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), img = g.createImageData(N, N);
+  const lat = (i, j, p) => hash(((i % p) + p) % p + 131, ((j % p) + p) % p + 71);
+  const vnoise = (x, y, p) => {
+    const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    return lerp(lerp(lat(i, j, p), lat(i + 1, j, p), ux), lerp(lat(i, j + 1, p), lat(i + 1, j + 1, p), ux), uy);
+  };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let v = 0, a = 0.5, f = 4;
+    for (let o = 0; o < 5; o++) { v += a * vnoise(x / N * f, y / N * f, f); a *= 0.5; f *= 2; }
+    const k = (y * N + x) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = Math.round(clamp(v * 1.15 - 0.05, 0, 1) * 255); img.data[k + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
 // sky dome with a soft sun glow
 {
   const g = new THREE.SphereGeometry(36000, 32, 16);
   const m = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: SKY_TOP }, hor: { value: SKY }, sunDir: { value: SUN_DIR } },
+    uniforms: { top: { value: SKY_TOP }, hor: { value: SKY }, sunDir: { value: SUN_DIR }, uCloud: { value: cloudTex() }, uOff: { value: new THREE.Vector2() }, uCov: { value: 0.5 } },
     vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: `uniform vec3 top; uniform vec3 hor; uniform vec3 sunDir; varying vec3 vD;
+    fragmentShader: `uniform vec3 top; uniform vec3 hor; uniform vec3 sunDir; uniform sampler2D uCloud; uniform vec2 uOff; uniform float uCov; varying vec3 vD;
       void main(){ vec3 d = normalize(vD);
         vec3 c = mix(hor, top, smoothstep(0.0, 0.42, d.y));
         float s = max(dot(d, sunDir), 0.0);
         c += vec3(1.0, 0.88, 0.68) * (pow(s, 600.0) * 1.4 + pow(s, 14.0) * 0.16);
-        gl_FragColor = vec4(c, 1.0); }`,
+        if (d.y > 0.0) {
+          // a flat cloud deck seen in perspective, thinning into the haze at the horizon
+          vec2 uv = d.xz / (d.y + 0.05) * 0.16 + uOff;
+          float n = texture2D(uCloud, uv).r, n2 = texture2D(uCloud, uv * 2.7 + 0.31).r;
+          float dens = smoothstep(uCov, uCov + 0.22, n * 0.8 + n2 * 0.2) * smoothstep(0.0, 0.16, d.y);
+          float lit = clamp(0.55 + (n - texture2D(uCloud, uv + sunDir.xz * 0.012).r) * 6.0, 0.0, 1.0);
+          vec3 cc = mix(vec3(0.70, 0.74, 0.79), vec3(1.05, 1.03, 1.0), lit) + vec3(1.0, 0.9, 0.7) * pow(s, 8.0) * 0.25;
+          c = mix(c, cc, dens * 0.92);
+        }
+        gl_FragColor = vec4(c, 1.0);
+        #include <tonemapping_fragment>
+      }`,
   });
   const sky = new THREE.Mesh(g, m); sky.renderOrder = -1; sky.frustumCulled = false;
   scene.add(sky);
   scene.userData.sky = sky;
 }
-// low-poly cumulus, drifting downwind
-const clouds = (() => {
-  const rnd = mulberry(77), N = 320;
-  const mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xf3f5f7, emissive: 0x56616b, fog: false }), N);
-  const d = new THREE.Object3D(); let n = 0;
-  for (let c = 0; c < 50 && n < N; c++) {
-    const cx = lerp(-16000, 16000, rnd()), cz = lerp(-18000, 14000, rnd()), cy = 900 + rnd() * 700, puffs = 4 + Math.floor(rnd() * 4), size = 0.7 + rnd() * 0.8;
-    for (let q = 0; q < puffs && n < N; q++) {
-      d.position.set(cx + (rnd() - 0.5) * 320 * size, cy + rnd() * 60, cz + (rnd() - 0.5) * 200 * size);
-      d.scale.set((90 + rnd() * 90) * size, (35 + rnd() * 30) * size, (70 + rnd() * 70) * size);
-      d.rotation.set(rnd() * 0.4, rnd() * 6, rnd() * 0.3); d.updateMatrix(); mesh.setMatrixAt(n++, d.matrix);
-    }
-  }
-  mesh.count = n; mesh.frustumCulled = false; scene.add(mesh);
-  return mesh;
-})();
+// clouds now live on the sky dome; this empty group keeps the detail toggle and drift code simple
+const clouds = new THREE.Group();
 
 // ---------- terrain ----------
 const FIELD_PAL = [[0.40, 0.56, 0.25], [0.47, 0.61, 0.28], [0.35, 0.50, 0.22], [0.56, 0.59, 0.31], [0.63, 0.57, 0.34], [0.42, 0.54, 0.24]];
@@ -751,6 +764,7 @@ function waterMaterial(amp) {
       uDom: { value: new THREE.Vector4(DOM.x0, DOM.y0, DOM.x1 - DOM.x0, DOM.y1 - DOM.y0) },
       uDeep: { value: new THREE.Color(0x1b4252) }, uShallow: { value: new THREE.Color(0x3f8e8c) }, uSkyTop: { value: SKY_TOP },
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
+      uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
     },
     vertexShader: WAVE_GLSL + `varying vec3 vW; varying float vH;
       void main(){ vec4 wp = modelMatrix*vec4(position,1.0);
@@ -760,9 +774,28 @@ function waterMaterial(amp) {
         vW = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`,
     fragmentShader: `uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSkyTop; uniform vec3 uFog; uniform vec3 uSun;
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
+      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip;
       varying vec3 vW; varying float vH;
+      // cat's-paw ripples: a few short wind waves summed analytically for the normal only
+      vec2 ripple(vec2 p, float t){
+        vec2 g = vec2(0.0);
+        // irrational directions and wavelengths so the pattern never lines up into stripes
+        vec2 q = p + vec2(sin(p.y*0.071 + t*0.3), cos(p.x*0.063 - t*0.27))*6.0;
+        g += vec2(0.80, 0.60)*cos(dot(vec2(0.80, 0.60), q)*0.83 + t*2.4);
+        g += vec2(-0.53, 0.85)*cos(dot(vec2(-0.53, 0.85), q)*1.37 + t*3.1)*0.7;
+        g += vec2(0.96, -0.28)*cos(dot(vec2(0.96, -0.28), q)*2.21 + t*4.1)*0.5;
+        return g;
+      }
       void main(){
         vec3 n = normalize(cross(dFdx(vW), dFdy(vW))); if (n.y < 0.0) n = -n;
+        float dist = distance(cameraPosition, vW);
+        vec2 rg = ripple(vW.xz, uTime) * uRip * (1.0 - smoothstep(15.0, 240.0, dist));
+        n = normalize(n + vec3(-rg.x, 0.0, -rg.y));
+        // ship-relative coordinates for the waterline and wake
+        vec2 rel = vW.xz - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
+        vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - vec2(3.2, 13.3);
+        float hd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 1.8;
+        float spd = length(uVel);
         vec2 uv = vec2((vW.x - uDom.x)/uDom.z, (-vW.z - uDom.y)/uDom.w);
         float depth = texture2D(uDepth, uv).r*40.0;
         vec3 col = mix(uShallow, uDeep, smoothstep(0.5, 14.0, depth))*(0.55 + 0.45*clamp(dot(n, uSun), 0.0, 1.0));
@@ -776,8 +809,22 @@ function waterMaterial(amp) {
         float crest = smoothstep(0.6, 1.0, vH)*smoothstep(0.22, 0.6, uAmp);
         float surf = (1.0 - smoothstep(0.15, 1.5, depth))*(0.55 + 0.45*sin(uTime*1.3 - depth*5.0 + vW.x*0.03 - vW.z*0.02));
         col = mix(col, vec3(0.93, 0.96, 0.96), clamp(crest*0.65 + surf*0.7, 0.0, 0.85));
-        col = mix(col, uFog, smoothstep(uFogNear, uFogFar, distance(cameraPosition, vW)));
-        gl_FragColor = vec4(col, 1.0); }`,
+        // the hull darkens the water hard against it; churned water at the waterline and a fading wake astern
+        col *= mix(0.62, 1.0, smoothstep(0.0, 3.0, hd));
+        float churn = (1.0 - smoothstep(0.0, 0.8 + spd*0.8, hd)) * (0.18 + 0.5*clamp(spd/3.0, 0.0, 1.0));
+        float wake = 0.0;
+        if (spd > 0.15) {
+          vec2 vd = uVel / spd; float b = dot(rel, -vd), sd = dot(rel, vec2(-vd.y, vd.x));
+          float w = 6.0 + max(b, 0.0)*0.1;
+          wake = step(0.0, b) * exp(-b/(30.0 + 50.0*spd)) * (1.0 - smoothstep(w*0.55, w, abs(sd))) * clamp(spd/2.5, 0.0, 1.0);
+          wake *= 0.75 + 0.25*sin(b*0.21 - uTime*1.1 + sin(sd*0.7 + b*0.05)*2.0);
+        }
+        float foam = clamp(churn + wake*0.7, 0.0, 0.8) * (0.7 + 0.3*sin(vW.x*2.3 + vW.z*1.7 + uTime));
+        col = mix(col, vec3(0.9, 0.94, 0.94), foam * step(0.0, hd));
+        col = mix(col, uFog, smoothstep(uFogNear, uFogFar, dist));
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+      }`,
   });
 }
 const WATER_HALF = 800, WATER_CELL = 12.5;
@@ -1013,9 +1060,9 @@ function updateLife(dt) {
     B.position.set(u.x, S.tide + waveH(u.x, -u.y, t) * 0.8, -u.y);
     B.rotation.set(Math.sin(t * 0.8) * 0.05 * (0.4 + S.wx.wave), 1.2 + Math.sin(t * 0.02) * 0.4, Math.cos(t * 0.7) * 0.06 * (0.4 + S.wx.wave), 'YXZ');
   }
-  clouds.position.x += S.wind.x * 0.6 * dt; clouds.position.z -= S.wind.y * 0.6 * dt;
-  if (Math.abs(clouds.position.x) > 8000) clouds.position.x -= Math.sign(clouds.position.x) * 16000;
-  if (Math.abs(clouds.position.z) > 8000) clouds.position.z -= Math.sign(clouds.position.z) * 16000;
+  const SU = scene.userData.sky.material.uniforms;
+  SU.uOff.value.x = (SU.uOff.value.x + S.wind.x * 0.6 * dt / 6000) % 1; SU.uOff.value.y = (SU.uOff.value.y - S.wind.y * 0.6 * dt / 6000) % 1;
+  SU.uCov.value = 0.68 - 0.16 * S.wx.wave;
 }
 function makeLabel(text, x, y, h) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 96;
@@ -1024,7 +1071,7 @@ function makeLabel(text, x, y, h) {
   g.lineWidth = 8; g.strokeStyle = 'rgba(10,18,22,.75)'; g.strokeText(text.toUpperCase(), 256, 48);
   g.fillStyle = '#f4f1e8'; g.fillText(text.toUpperCase(), 256, 48);
   const tex = new THREE.CanvasTexture(c);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, fog: false, transparent: true }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, fog: false, transparent: true, toneMapped: false }));
   s.scale.set(0.16, 0.03, 1); s.position.set(x, h, -y); s.renderOrder = 5; scene.add(s); return s;
 }
 
@@ -1050,10 +1097,25 @@ function buildShip() {
     mBridge = MAT(0xb3262b), mSeat = MAT(0xb52a2e), mCrane = MAT(0xe8b923);
   const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t; };
   const FONT = '"Barlow Condensed", "Arial Narrow", sans-serif';
+  // a working ship's paint: grime streaks running down, rust weeping from fittings, a salt bloom along the bottom
+  const weather = (g, w, h, light) => {
+    const r = mulberry(light ? 41 : 17);
+    for (let i = 0; i < 70; i++) {
+      const x = r() * w, y0 = r() * h * 0.5, len = h * (0.3 + r() * 0.7), wd = 2 + r() * 10;
+      const gr = g.createLinearGradient(0, y0, 0, y0 + len);
+      const c = light ? (r() < 0.2 ? '150,85,40' : '70,64,56') : '205,210,205';
+      gr.addColorStop(0, `rgba(${c},${(light ? 0.10 : 0.06) + r() * 0.08})`); gr.addColorStop(1, `rgba(${c},0)`);
+      g.fillStyle = gr; g.fillRect(x, y0, wd, len);
+    }
+    const gb = g.createLinearGradient(0, h * 0.7, 0, h);
+    gb.addColorStop(0, 'rgba(0,0,0,0)'); gb.addColorStop(1, light ? 'rgba(90,80,65,0.16)' : 'rgba(210,215,210,0.10)');
+    g.fillStyle = gb; g.fillRect(0, 0, w, h);
+  };
   // white lettering on the black topsides
   const liveryTex = canvasTex(2048, 96, (g, w, h) => {
     g.fillStyle = '#1c1e20'; g.fillRect(0, 0, w, h); g.fillStyle = '#f4f4f0';
     g.font = `600 84px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Caledonian MacBrayne', w / 2, h / 2 + 4, w - 40);
+    weather(g, w, h, 0);
   });
   // the white upper band: a row of square saloon windows, her names and the web address
   const bandL = CAB.half * 2, bandTex = canvasTex(2048, 182, (g, w, h) => {
@@ -1065,6 +1127,7 @@ function buildShip() {
     g.font = `600 32px ${FONT}`; g.fillText('GLASGOW', 4.9 * px, h * 0.72);
     g.font = `500 30px ${FONT}`; g.fillText('Loch Raonasa', (CAB.half + 3.2) * px, h * 0.18);
     g.font = `500 30px ${FONT}`; g.fillText('www.calmac.co.uk', (bandL - 1.1) * px - 60, h * 0.8);
+    weather(g, w, h, 1);
   });
   const cw = CAB.outer - CAB.inner, rY = DECK_H + CAB.h, postG = new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5);
   const railRun = (x0, z0, x1, z1, y = rY) => {
@@ -2422,7 +2485,7 @@ function buildWheelhouse() {
   const box = (p, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); p.add(o); return o; };
   const tag = (o, id) => { o.userData.ctrl = id; WH.hits.push(o); return o; };
   const label = (p, text, x, z, w = 0.1) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: labelTex(text), transparent: true, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: labelTex(text), transparent: true, depthWrite: false, toneMapped: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(x, 0.002, z); p.add(m); return m;
   };
   const wh = new THREE.Group(); wh.position.set(BRIDGE.x, BRIDGE.y, BRIDGE.z); SHIP.motion.add(wh);
@@ -2444,7 +2507,7 @@ function buildWheelhouse() {
   }
   const S_ = WH.scr;
   S_.prop = makeScreen(1024, 496); S_.nav = makeScreen(1024, 496); S_.chart = makeScreen(512, 480); S_.alarm = makeScreen(512, 366); S_.deck = makeScreen(1024, 548);
-  const screen = (p, s, x, w, h) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: s.t })); m.position.set(x, 0, 0.034); p.add(m); return m; };
+  const screen = (p, s, x, w, h) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: s.t, toneMapped: false })); m.position.set(x, 0, 0.034); p.add(m); return m; };
   const btnGeo = new THREE.CylinderGeometry(0.024, 0.026, 0.022, 16);
 
   function buildStation(k) {
@@ -2529,7 +2592,7 @@ function buildWheelhouse() {
     const comp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0x8c7a52)); comp.rotation.x = Math.PI; comp.position.set(0, 1.92, -1.8); G.add(comp);
     box(G, 0.05, 0.08, 0.05, mMetal, 0, 1.96, -1.8);
     box(G, 0.34, 0.12, 0.22, mPanel, 0.55, 1.9, -1.95);
-    const vhf = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0x5fc9da })); vhf.position.set(0.49, 1.9, -1.838); G.add(vhf);
+    const vhf = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0x5fc9da, toneMapped: false })); vhf.position.set(0.49, 1.9, -1.838); G.add(vhf);
     for (const x of [-0.93, 0, 0.93]) { const w = box(G, 0.025, 0.62, 0.02, mKnob, x + 0.12, 1.24, -IL + 0.02); w.rotation.z = 0.5; }
     // ---- deck console on the operator's left, with its screen on the wall above ----
     box(G, 0.45, 0.8, 0.98, mDesk, -1.0, 0.4, -1.0);
@@ -2716,12 +2779,50 @@ function drawDeckScreen() {
 
 // ================= AUDIO =================
 const AU = { ctx: null, on: true };
+// One seamless loop of a six-cylinder four-stroke at 1000 rpm (50 firings a second). Each firing is a
+// pressure thump with a sharp combustion crack and a short block ring; cylinders differ slightly and every
+// stroke wanders a little, which gives the uneven, lumpy beat of a big diesel instead of a clean tone.
+function engineBuffer(ctx, seed) {
+  const sr = ctx.sampleRate, CYL = 6, REF = 1000, cycle = 120 / REF, cycles = 25, n = Math.round(cycle * cycles * sr);
+  const buf = ctx.createBuffer(1, n, sr), d = buf.getChannelData(0), r = mulberry(seed);
+  const cylAmp = Array.from({ length: CYL }, () => 0.8 + r() * 0.35), pl = Math.round(0.03 * sr);
+  for (let c = 0; c < cycles; c++) for (let k = 0; k < CYL; k++) {
+    const t0 = Math.round(((c + k / CYL) * cycle + (r() - 0.5) * 0.0006) * sr), a = cylAmp[k] * (0.88 + r() * 0.24), ring = 150 + r() * 40;
+    for (let j = 0; j < pl; j++) {
+      const t = j / sr;
+      const v = a * ((Math.exp(-t / 0.006) - Math.exp(-t / 0.0009)) * 1.3 + (r() * 2 - 1) * Math.exp(-t / 0.0016) * 0.55 + Math.sin(2 * Math.PI * ring * t) * Math.exp(-t / 0.012) * 0.3);
+      d[(t0 + j) % n] += v;
+    }
+  }
+  // take out the DC and normalise
+  let m = 0, lp = 0; for (let i = 0; i < n; i++) m += d[i]; m /= n;
+  for (let i = 0; i < n; i++) { const x = d[i] - m; lp += (x - lp) * 0.002; d[i] = x - lp; }
+  let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i]));
+  for (let i = 0; i < n; i++) d[i] *= 0.9 / pk;
+  return buf;
+}
 function initAudio() {
   if (AU.ctx) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)(); AU.ctx = ctx;
     const master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination); AU.master = master;
-    AU.eng = [0, 1].map(() => { const o = ctx.createOscillator(); o.type = 'sawtooth'; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300; const g = ctx.createGain(); g.gain.value = 0; o.connect(f); f.connect(g); g.connect(master); o.start(); return { o, g }; });
+    // engines: a looped recording-like buffer of combustion pulses, replayed faster or slower with rpm,
+    // through a load-dependent lowpass and a fixed hull resonance; plus diesel knock, turbo and starter
+    AU.bus = ctx.createGain(); AU.room = ctx.createBiquadFilter(); AU.room.type = 'lowpass'; AU.room.frequency.value = 2400;
+    AU.bus.connect(AU.room); AU.room.connect(master);
+    AU.eng = [0, 1].map(i => {
+      const src = ctx.createBufferSource(); src.buffer = engineBuffer(ctx, 11 + i * 29); src.loop = true; src.playbackRate.value = 0.05;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.8;
+      const boom = ctx.createBiquadFilter(); boom.type = 'peaking'; boom.frequency.value = 85; boom.Q.value = 1.2; boom.gain.value = 7;
+      const g = ctx.createGain(); g.gain.value = 0;
+      const kf = ctx.createBiquadFilter(); kf.type = 'bandpass'; kf.frequency.value = 2300; kf.Q.value = 1.4; const kg = ctx.createGain(); kg.gain.value = 0;
+      src.connect(lp); lp.connect(boom); boom.connect(g); g.connect(AU.bus); src.connect(kf); kf.connect(kg); kg.connect(AU.bus);
+      const to = ctx.createOscillator(); to.type = 'sine'; to.frequency.value = 900; const tg = ctx.createGain(); tg.gain.value = 0; to.connect(tg); tg.connect(AU.bus); to.start();
+      const so = ctx.createOscillator(); so.type = 'sawtooth'; so.frequency.value = 170; const sf = ctx.createBiquadFilter(); sf.type = 'lowpass'; sf.frequency.value = 1100;
+      const sg = ctx.createGain(); sg.gain.value = 0; so.connect(sf); sf.connect(sg); sg.connect(AU.bus); so.start();
+      src.start(0, i * 0.131);
+      return { src, lp, g, kg, to, tg, so, sg, turbo: 0, trim: i ? 1.0035 : 1 };
+    });
     const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const ns = ctx.createBufferSource(); ns.buffer = buf; ns.loop = true;
@@ -2737,11 +2838,22 @@ function toggleSound() { AU.on = !AU.on; setT($('bSound'), AU.on ? 'Sound on' : 
 $('bSound').onclick = toggleSound;
 function updateAudio() {
   if (!AU.ctx) return;
-  const t = AU.ctx.currentTime, m = AU.on ? 1 : 0, near = cam.mode === 'wheelhouse' ? 1 : 0.65;
+  const t = AU.ctx.currentTime, m = AU.on ? 1 : 0;
+  // where you are listening from: below decks the hull carries the low end; outside it fades with distance
+  const dist = cam.mode === 'chase' ? cam.dist : cam.mode === 'top' ? cam.topH : 8, fade = cam.mode === 'wheelhouse' ? 1 : 1 / (1 + Math.max(0, dist - 25) / 70);
+  AU.room.frequency.setTargetAtTime(cam.mode === 'wheelhouse' ? 650 : 2600, t, 0.2);
   S.units.forEach((U, i) => {
-    const E = AU.eng[i]; E.o.frequency.setTargetAtTime(20 + U.rpm / ENG_MAX * 46, t, 0.1);
-    const load = Math.hypot(U.p.x, U.p.y) * U.rotor;
-    E.g.gain.setTargetAtTime(m * near * (U.rpm > 40 ? 0.04 + 0.08 * load + 0.04 * U.rpm / ENG_MAX : 0), t, 0.15);
+    const E = AU.eng[i], rf = U.rpm / ENG_MAX, load = Math.hypot(U.p.x, U.p.y) * U.rotor, on = U.rpm > 40 ? 1 : 0;
+    E.src.playbackRate.setTargetAtTime(Math.max(0.05, U.rpm / 1000 * E.trim), t, 0.08);   // governors never match exactly: the twin engines drift in and out of step
+    E.lp.frequency.setTargetAtTime(220 + 900 * load + 500 * rf, t, 0.15);
+    E.g.gain.setTargetAtTime(m * fade * on * (0.11 + 0.16 * load + 0.07 * rf), t, 0.15);
+    // diesel knock is most obvious at light load; the turbo winds up slowly with load and revs
+    E.kg.gain.setTargetAtTime(m * fade * on * 0.035 * (1 - 0.6 * load) * (0.4 + rf), t, 0.2);
+    E.turbo += ((load * 0.7 + rf * 0.3) - E.turbo) * 0.03;
+    E.to.frequency.setTargetAtTime(700 + 3200 * E.turbo, t, 0.3);
+    E.tg.gain.setTargetAtTime(m * fade * on * 0.006 * E.turbo * (cam.mode === 'wheelhouse' ? 0.5 : 1), t, 0.3);
+    E.sg.gain.setTargetAtTime(m * fade * (U.eng === 'start' ? 0.035 : 0), t, 0.05);
+    E.so.frequency.setTargetAtTime(150 + U.rpm * 0.25, t, 0.1);
   });
   const wash = (Math.abs(S.units[0].fx) + Math.abs(S.units[0].fy) + Math.abs(S.units[1].fx) + Math.abs(S.units[1].fy)) / (4 * TMAX) + Math.hypot(S.u, S.v) * 0.04;
   AU.wash.gain.setTargetAtTime(m * clamp(wash, 0, 1) * 0.12, t, 0.2);
@@ -2885,6 +2997,10 @@ function frame(now) {
   const sx = Math.round(camera.position.x / WATER_CELL) * WATER_CELL, sz = Math.round(camera.position.z / WATER_CELL) * WATER_CELL;
   waterNear.position.set(sx, S.tide, sz); waterFar.position.set(sx, S.tide, sz);
   waterNearMat.uniforms.uTime.value = S.t; waterNearMat.uniforms.uAmp.value = S.wx.wave; waterFarMat.uniforms.uTime.value = S.t;
+  {
+    const sp = Math.sin(S.psi), cp = Math.cos(S.psi), U = waterNearMat.uniforms;
+    U.uShip.value.set(S.x, -S.y, sp, cp); U.uVel.value.set(S.u * sp + S.v * cp, -(S.u * cp - S.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
+  }
   sun.target.position.set(S.x, S.tide, -S.y); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 300);
   scene.userData.sky.position.copy(camera.position);
   renderView();
@@ -2924,7 +3040,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, heightAt, landingAngle, TERMS, cam, SHIP,
+  get S() { return S; }, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
