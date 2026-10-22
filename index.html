@@ -470,6 +470,8 @@ const OSM_LOOPS = [
   [2,18,32,18,32,-9,27,-15,-6,-13,-6,14]
 ];
 const GEO = {"dom":[-8317,-6147,9000,14060],"gig":[-3771.1,2174.7],"brgTay":91,"brgGig":332,"named":{"Gigha":[-4394,3284],"Cara":[-5038,-2984],"Gigalum":[-4414,-926]},"card":[-4414,-1476],"yacht":[-1500,5250,1500,1400],"boat":[-43,-246]};
+// traced from the OSM render like the coastline: the Ardminish pontoon, the moorings area of Ardminish Bay and Gigha's South Pier
+Object.assign(GEO, { pontoon: [[-3933, 1925], [-3789, 1906]], moorings: [-3900, -3380, 1640, 2010], southPier: [[-4676, -414], [-4631, -456]] });
 const DOM = { x0: GEO.dom[0], y0: GEO.dom[1], x1: GEO.dom[2], y1: GEO.dom[3] };
 // Slip heads are where the OpenStreetMap ferry route meets each slip: Tayinloan's causeway runs out due west, and
 // Gigha's short concrete slip runs out south-south-east from the headland at the north end of Ardminish Bay. brg is the bearing into land.
@@ -564,7 +566,8 @@ for (const T of TERMS) for (const side of [-1, 1]) for (const out of [170, 140, 
   if (shoreDist(x, y) < -25) { BUOYS.push([x, y, side, T.id]); break; }
 }
 // Ground height above mean sea level (negative = seabed). Kintyre rises to high moor; Gigha and the islets stay low.
-function heightAt(x, y) {
+const SLIP_TOP = 19.2;   // where the 1:8 slipway meets the level causeway
+function heightAt(x, y, mesh = false) {
   const sd = shoreDist(x, y);
   let h;
   if (sd > 0) {
@@ -574,9 +577,25 @@ function heightAt(x, y) {
   for (const T of TERMS) {
     const ax = x - T.P.x, ay = y - T.P.y;
     const al = ax * T.d.x + ay * T.d.y, lt = ax * T.n.x + ay * T.n.y, alt = Math.abs(lt);
+    if (al > -60 && al < T.len - 15 && alt < 40) {
+      // the OSM drawing shows the pier itself as a strip of land, which the coastline trace turned into a sandy
+      // spit along the slipway; out here it is really shallow seabed
+      const w = smooth(40, 25, alt) * smooth(T.len - 15, T.len - 35, al);
+      h = lerp(h, Math.min(h, -0.6 - Math.max(0, T.len - 30 - al) * 0.02), w);
+    }
     if (al > -20 && al < T.len + 30 && alt < 40) {
-      const ox = Math.max(1.5 - al, al - T.len, 0), oy = Math.max(alt - 6, 0);
-      h = Math.max(h, 2.2 - Math.hypot(ox, oy) * 1.6);
+      // the causeway is built up to deck level, but along the slipway the ground follows the 1:8 ramp just
+      // below its surface, so nothing pokes through the concrete
+      const top = Math.min(2.2, -0.5 + Math.max(al, 0) / 8);
+      if (mesh) {
+        // the drawn ground stays below the slip and causeway, which carry their own concrete sides; a mound here
+        // would be smeared by the coarse terrain grid into sand ramps poking out beside the pier
+        if (al < T.len + 5 && alt < 9) h = Math.min(h, top - 0.4);
+      } else {
+        if (al < SLIP_TOP && alt < 9) h = Math.min(h, top - 0.3);
+        const ox = Math.max(1.5 - al, al - T.len, 0), oy = Math.max(alt - 6, 0);
+        h = Math.max(h, top - Math.hypot(ox, oy) * (al < SLIP_TOP ? 2.5 : 1.6));
+      }
     }
     if (al < 1.5 && al > -260 && alt < 50) {
       const w = smooth(50, 28, alt) * smooth(-260, -200, al);
@@ -735,7 +754,7 @@ function buildTerrain() {
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       const fixed = i === 0 || j === 0 || i === nx - 1 || j === ny - 1 || onFineEdge(i, j);
       const x = DOM.x0 + i * C + (fixed ? 0 : (hash(i, j) - 0.5) * C * 0.5), y = DOM.y0 + j * C + (fixed ? 0 : (hash(j + 77, i) - 0.5) * C * 0.5);
-      const h = heightAt(x, y); hc[j * nx + i] = h; put(pos, col, (j * nx + i) * 3, x, y, h);
+      const h = heightAt(x, y, true); hc[j * nx + i] = h; put(pos, col, (j * nx + i) * 3, x, y, h);
     }
     mesh(pos, col, quads(nx, ny, inFine, new Uint32Array((nx - 1) * (ny - 1) * 6)));
   }
@@ -751,7 +770,7 @@ function buildTerrain() {
         const ci = fi0 + Math.floor(i / K), cj = fj0 + Math.floor(j / K), ti = (i % K) / K, tj = (j % K) / K;
         const H = (a, b) => hc[b * nx + a];
         h = (j === 0 || j === my - 1) ? lerp(H(ci, cj), H(Math.min(ci + 1, fi1), cj), ti) : lerp(H(ci, cj), H(ci, Math.min(cj + 1, fj1)), tj);
-      } else h = heightAt(x, y);
+      } else h = heightAt(x, y, true);
       put(pos, col, (j * mx + i) * 3, x, y, h);
     }
     mesh(pos, col, quads(mx, my, null, new Uint32Array((mx - 1) * (my - 1) * 6)));
@@ -789,7 +808,7 @@ function waterMaterial(amp) {
     uniforms: {
       uTime: { value: 0 }, uAmp: { value: amp }, uDepth: { value: depthTex },
       uDom: { value: new THREE.Vector4(DOM.x0, DOM.y0, DOM.x1 - DOM.x0, DOM.y1 - DOM.y0) },
-      uDeep: { value: new THREE.Color(0x1b4252) }, uShallow: { value: new THREE.Color(0x3f8e8c) }, uSkyTop: { value: SKY_TOP },
+      uDeep: { value: new THREE.Color(0x122f38) }, uShallow: { value: new THREE.Color(0x2c615f) }, uSkyTop: { value: SKY_TOP },
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
     },
@@ -830,7 +849,7 @@ function waterMaterial(amp) {
         vec3 R = reflect(-V, n);
         vec3 sky = mix(uFog, uSkyTop, smoothstep(0.0, 0.5, R.y));
         float fres = 0.04 + 0.96*pow(1.0 - max(dot(n, V), 0.0), 5.0);
-        col = mix(col, sky, clamp(fres*0.85, 0.0, 0.85));
+        col = mix(col, sky*0.9, clamp(fres*0.75, 0.0, 0.72));
         vec3 H = normalize(V + uSun);
         col += vec3(1.0, 0.95, 0.85)*pow(max(dot(n, H), 0.0), 140.0)*0.75;
         float crest = smoothstep(0.6, 1.0, vH)*smoothstep(0.22, 0.6, uAmp);
@@ -876,7 +895,7 @@ function buildTerminal(T) {
   g.position.set(T.P.x, 0, -T.P.y); g.rotation.y = -T.brg * DEG;
   const concrete = MAT(0x9a9a92), dark = MAT(0x3b3f40), yellow = MAT(0xe0b23a), white = MAT(0xe8ebea);
   // slipway: sloping 1:8 into the water
-  const a0 = -2, a1 = 19.2;
+  const a0 = -2, a1 = SLIP_TOP;
   const sg = new THREE.BoxGeometry(12, 1, a1 - a0); sg.translate(0, 0, -(a0 + a1) / 2);
   const p = sg.attributes.position;
   for (let i = 0; i < p.count; i++) { const al = -p.getZ(i); p.setY(i, p.getY(i) > 0 ? -0.2 + al / 8 : -5); }
@@ -1057,6 +1076,47 @@ function buildSeaLife() {
     for (const x of [-1.2, 0, 1.1]) add(f, new THREE.SphereGeometry(0.28, 8, 6), MAT(0xe8661e), x, 1.3, -4.4);
     f.userData = { x: GEO.boat[0], y: GEO.boat[1] }; LIFE.boat = f; LIFE.group.add(f);
   }
+  // yachts and small boats on moorings in Ardminish Bay, clear of the ferry's approach, and a few alongside the pontoon
+  {
+    const r = mulberry(4242), T = TERM('gig'), hulls = [0xf2f2ee, 0xf2f2ee, 0x1f2f4a, 0xf0ede4, 0x2f4a3a, 0x8a1f24, 0xf2f2ee];
+    const clearOfFerry = (x, y) => { const ax = x - T.P.x, ay = y - T.P.y, al = ax * T.d.x + ay * T.d.y, lt = ax * T.n.x + ay * T.n.y; return !(al > -340 && al < 40 && Math.abs(lt) < 85); };
+    const [p0, p1] = GEO.pontoon, segD = (x, y) => { const vx = p1[0] - p0[0], vy = p1[1] - p0[1], t = clamp(((x - p0[0]) * vx + (y - p0[1]) * vy) / (vx * vx + vy * vy), 0, 1); return Math.hypot(x - p0[0] - vx * t, y - p0[1] - vy * t); };
+    const placed = [];
+    for (let tries = 0; tries < 900 && placed.length < 9; tries++) {
+      const x = lerp(GEO.moorings[0], GEO.moorings[1], r()), y = lerp(GEO.moorings[2], GEO.moorings[3], r()), h = heightAt(x, y);
+      if (h > -2.4 || h < -16 || !clearOfFerry(x, y) || segD(x, y) < 25 || placed.some(p => Math.hypot(p[0] - x, p[1] - y) < 34)) continue;
+      placed.push([x, y]);
+    }
+    const yacht = (len, col) => {
+      const g = new THREE.Group(), hm = MAT(col);
+      g.add(boatHull(len, len * 0.32, len * 0.14, hm));
+      add(g, new THREE.BoxGeometry(len * 0.2, len * 0.06, len * 0.3), MAT(0xe9e6dc), 0, len * 0.09, len * 0.05);
+      add(g, new THREE.CylinderGeometry(0.06, 0.08, len * 1.25, 6), MAT(0xc8c8c4), 0, len * 0.68, -len * 0.06);
+      const boom = add(g, new THREE.BoxGeometry(0.22, 0.22, len * 0.42), MAT(0x23345a), 0, len * 0.19, len * 0.15);   // mainsail furled on the boom under its cover
+      return g;
+    };
+    const motorBoat = (len, col) => {
+      const g = new THREE.Group();
+      g.add(boatHull(len, len * 0.36, len * 0.16, MAT(col)));
+      add(g, new THREE.BoxGeometry(len * 0.28, len * 0.14, len * 0.22), MAT(0xf0f0ec), 0, len * 0.15, len * 0.08);
+      add(g, new THREE.BoxGeometry(len * 0.285, len * 0.05, len * 0.225), MAT(0x26333c), 0, len * 0.2, len * 0.08);
+      return g;
+    };
+    const buoyG = new THREE.SphereGeometry(0.35, 8, 6), buoyM = MAT(0xe8661e);
+    LIFE.moored = placed.map(([x, y], i) => {
+      const motor = r() < 0.3, len = motor ? 6 + r() * 3 : 8 + r() * 5;
+      const g = motor ? motorBoat(len, hulls[i % hulls.length]) : yacht(len, hulls[(i * 3) % hulls.length]);
+      const buoy = new THREE.Mesh(buoyG, buoyM); LIFE.group.add(g, buoy);
+      return { g, buoy, x, y, len, off: (r() - 0.5) * 30, ph: r() * 6.3 };
+    });
+    // boats lying alongside the pontoon
+    const vx = p1[0] - p0[0], vy = p1[1] - p0[1], L = Math.hypot(vx, vy), ux = vx / L, uy = vy / L;
+    LIFE.alongside = [[0.45, 1, 7], [0.7, -1, 9], [0.86, 1, 5.5]].map(([f, side, len], i) => {
+      const g = i === 1 ? yacht(len, 0xf2f2ee) : motorBoat(len, i ? 0x2b5a8a : 0xf0ede4);
+      LIFE.group.add(g);
+      return { g, x: p0[0] + vx * f - uy * side * (1.6 + len * 0.18), y: p0[1] + vy * f + ux * side * (1.6 + len * 0.18), hdg: Math.atan2(-ux, uy), ph: i * 2.1 };
+    });
+  }
   LIFE.group.traverse(o => { if (o.isMesh) o.castShadow = true; });
 }
 function updateLife(dt) {
@@ -1081,6 +1141,22 @@ function updateLife(dt) {
     Y.position.set(x, S.tide + waveH(x, -y, t) * 0.7, -y);
     Y.rotation.set(Math.sin(t * 0.7) * 0.04, Math.atan2(-dx, dy), 0.16 + Math.sin(t * 0.9) * 0.04, 'YXZ');
   }
+  if (LIFE.moored) {
+    // each boat lies head to wind, astern of its buoy, sheering about a little
+    const wf = S.wind.from * DEG, sw = 0.4 + S.wx.wave;
+    for (const m of LIFE.moored) {
+      const a = wf + (m.off + Math.sin(t * 0.07 + m.ph) * 12) * DEG, bx = Math.sin(a), by = Math.cos(a), back = m.len / 2 + 5;
+      const x = m.x - bx * back, y = m.y - by * back;
+      m.buoy.position.set(m.x, S.tide + waveH(m.x, -m.y, t) * 0.8, -m.y);
+      m.g.position.set(x, S.tide + waveH(x, -y, t) * 0.8, -y);
+      m.g.rotation.set(Math.sin(t * 0.8 + m.ph) * 0.04 * sw, Math.atan2(-bx, by), Math.cos(t * 0.7 + m.ph) * 0.05 * sw, 'YXZ');
+    }
+    for (const b of LIFE.alongside) {
+      b.g.position.set(b.x, S.tide + 0.05 + Math.sin(t * 0.9 + b.ph) * 0.05, -b.y);
+      b.g.rotation.set(0, b.hdg, Math.sin(t * 0.8 + b.ph) * 0.025, 'YXZ');
+    }
+  }
+  if (PONTOON) PONTOON.position.y = S.tide;
   if (LIFE.boat) {
     const B = LIFE.boat, u = B.userData;
     B.position.set(u.x, S.tide + waveH(u.x, -u.y, t) * 0.8, -u.y);
@@ -2805,22 +2881,25 @@ function drawDeckScreen() {
 
 // ================= AUDIO =================
 const AU = { ctx: null, on: true };
-// One seamless loop of a six-cylinder four-stroke at 1000 rpm (50 firings a second). Each firing is a
-// pressure thump with a sharp combustion crack and a short block ring; cylinders differ slightly and every
-// stroke wanders a little, which gives the uneven, lumpy beat of a big diesel instead of a clean tone.
+// One seamless loop of a six-cylinder four-stroke at 1000 rpm (50 firings a second). Matched against a recording
+// taken on deck of a ferry: the sound is mostly a deep tonal hum at the firing rate, throbbing at crankshaft and
+// cam rate, with very little above a couple of kHz. So each firing is a smooth pressure bump rather than a crack,
+// the three firings of each crank turn differ a little (the crankshaft-rate throb) and the two turns of each
+// cycle differ again (the slower cam-rate throb), with a little cycle-to-cycle wander.
 function engineBuffer(ctx, seed) {
   const sr = ctx.sampleRate, CYL = 6, REF = 1000, cycle = 120 / REF, cycles = 25, n = Math.round(cycle * cycles * sr);
   const buf = ctx.createBuffer(1, n, sr), d = buf.getChannelData(0), r = mulberry(seed);
-  const cylAmp = Array.from({ length: CYL }, () => 0.8 + r() * 0.35), pl = Math.round(0.03 * sr);
+  const turn = [1.0, 0.68 + r() * 0.06], inTurn = [1.0, 0.74 + r() * 0.06, 0.87 + r() * 0.05];
+  const W = 0.55 * cycle / CYL, pl = Math.round(0.02 * sr);
   for (let c = 0; c < cycles; c++) for (let k = 0; k < CYL; k++) {
-    const t0 = Math.round(((c + k / CYL) * cycle + (r() - 0.5) * 0.0006) * sr), a = cylAmp[k] * (0.88 + r() * 0.24), ring = 150 + r() * 40;
+    const t0 = Math.round(((c + k / CYL) * cycle + (r() - 0.5) * 0.0004) * sr);
+    const a = turn[k < 3 ? 0 : 1] * inTurn[k % 3] * (0.93 + r() * 0.14);
     for (let j = 0; j < pl; j++) {
-      const t = j / sr;
-      const v = a * ((Math.exp(-t / 0.006) - Math.exp(-t / 0.0009)) * 1.3 + (r() * 2 - 1) * Math.exp(-t / 0.0016) * 0.55 + Math.sin(2 * Math.PI * ring * t) * Math.exp(-t / 0.012) * 0.3);
-      d[(t0 + j) % n] += v;
+      const t = j / sr, sn = t < W ? Math.sin(Math.PI * t / W) : 0;
+      // pressure bump, a ring near the third harmonic of the firing rate, and mechanical noise riding on each stroke
+      d[(t0 + j) % n] += a * (sn * sn + Math.sin(2 * Math.PI * 150 * t) * Math.exp(-t / 0.01) * 0.85 + (r() * 2 - 1) * Math.exp(-t / 0.005) * 0.3);
     }
   }
-  // take out the DC and normalise
   let m = 0, lp = 0; for (let i = 0; i < n; i++) m += d[i]; m /= n;
   for (let i = 0; i < n; i++) { const x = d[i] - m; lp += (x - lp) * 0.002; d[i] = x - lp; }
   let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i]));
@@ -2839,15 +2918,19 @@ function initAudio() {
     AU.eng = [0, 1].map(i => {
       const src = ctx.createBufferSource(); src.buffer = engineBuffer(ctx, 11 + i * 29); src.loop = true; src.playbackRate.value = 0.05;
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.8;
-      const boom = ctx.createBiquadFilter(); boom.type = 'peaking'; boom.frequency.value = 85; boom.Q.value = 1.2; boom.gain.value = 7;
+      const boom = ctx.createBiquadFilter(); boom.type = 'peaking'; boom.frequency.value = 80; boom.Q.value = 1.0; boom.gain.value = 4;
       const g = ctx.createGain(); g.gain.value = 0;
       const kf = ctx.createBiquadFilter(); kf.type = 'bandpass'; kf.frequency.value = 2300; kf.Q.value = 1.4; const kg = ctx.createGain(); kg.gain.value = 0;
       src.connect(lp); lp.connect(boom); boom.connect(g); g.connect(AU.bus); src.connect(kf); kf.connect(kg); kg.connect(AU.bus);
       const to = ctx.createOscillator(); to.type = 'sine'; to.frequency.value = 900; const tg = ctx.createGain(); tg.gain.value = 0; to.connect(tg); tg.connect(AU.bus); to.start();
       const so = ctx.createOscillator(); so.type = 'sawtooth'; so.frequency.value = 170; const sf = ctx.createBiquadFilter(); sf.type = 'lowpass'; sf.frequency.value = 1100;
       const sg = ctx.createGain(); sg.gain.value = 0; so.connect(sf); sf.connect(sg); sg.connect(AU.bus); so.start();
+      // broadband machinery and ventilation noise under the hum
+      const bn = ctx.createBufferSource(); bn.buffer = AU.noiseBuf || (AU.noiseBuf = (() => { const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), x = b.getChannelData(0); for (let j = 0; j < x.length; j++) x[j] = Math.random() * 2 - 1; return b; })());
+      bn.loop = true; const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 900; bf.Q.value = 0.35;
+      const bg = ctx.createGain(); bg.gain.value = 0; bn.connect(bf); bf.connect(bg); bg.connect(AU.bus); bn.start(0, i * 0.7);
       src.start(0, i * 0.131);
-      return { src, lp, g, kg, to, tg, so, sg, turbo: 0, trim: i ? 1.0035 : 1 };
+      return { src, lp, g, kg, to, tg, so, sg, bg, turbo: 0, trim: i ? 1.0035 : 1 };
     });
     const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -2867,18 +2950,19 @@ function updateAudio() {
   const t = AU.ctx.currentTime, m = AU.on ? 1 : 0;
   // where you are listening from: below decks the hull carries the low end; outside it fades with distance
   const dist = cam.mode === 'chase' ? cam.dist : cam.mode === 'top' ? cam.topH : 8, fade = cam.mode === 'wheelhouse' ? 1 : 1 / (1 + Math.max(0, dist - 25) / 70);
-  AU.room.frequency.setTargetAtTime(cam.mode === 'wheelhouse' ? 650 : 2600, t, 0.2);
+  AU.room.frequency.setTargetAtTime(cam.mode === 'wheelhouse' ? 520 : 1300, t, 0.2);
   S.units.forEach((U, i) => {
     const E = AU.eng[i], rf = U.rpm / ENG_MAX, load = Math.hypot(U.p.x, U.p.y) * U.rotor, on = U.rpm > 40 ? 1 : 0;
     E.src.playbackRate.setTargetAtTime(Math.max(0.05, U.rpm / 1000 * E.trim), t, 0.08);   // governors never match exactly: the twin engines drift in and out of step
-    E.lp.frequency.setTargetAtTime(220 + 900 * load + 500 * rf, t, 0.15);
-    E.g.gain.setTargetAtTime(m * fade * on * (0.11 + 0.16 * load + 0.07 * rf), t, 0.15);
-    // diesel knock is most obvious at light load; the turbo winds up slowly with load and revs
-    E.kg.gain.setTargetAtTime(m * fade * on * 0.035 * (1 - 0.6 * load) * (0.4 + rf), t, 0.2);
+    E.lp.frequency.setTargetAtTime(240 + 420 * load + 260 * rf, t, 0.15);
+    E.g.gain.setTargetAtTime(m * fade * on * (0.14 + 0.12 * load + 0.08 * rf), t, 0.15);
+    // a trace of diesel knock at light load and a faint turbo, both mostly lost under the hum on deck
+    E.kg.gain.setTargetAtTime(m * fade * on * 0.008 * (1 - 0.6 * load) * (0.4 + rf), t, 0.2);
     E.turbo += ((load * 0.7 + rf * 0.3) - E.turbo) * 0.03;
     E.to.frequency.setTargetAtTime(700 + 3200 * E.turbo, t, 0.3);
-    E.tg.gain.setTargetAtTime(m * fade * on * 0.006 * E.turbo * (cam.mode === 'wheelhouse' ? 0.5 : 1), t, 0.3);
+    E.tg.gain.setTargetAtTime(m * fade * on * 0.0025 * E.turbo * (cam.mode === 'wheelhouse' ? 0.5 : 1), t, 0.3);
     E.sg.gain.setTargetAtTime(m * fade * (U.eng === 'start' ? 0.035 : 0), t, 0.05);
+    E.bg.gain.setTargetAtTime(m * fade * on * (0.03 + 0.08 * rf), t, 0.2);
     E.so.frequency.setTargetAtTime(150 + U.rpm * 0.25, t, 0.1);
   });
   const wash = (Math.abs(S.units[0].fx) + Math.abs(S.units[0].fy) + Math.abs(S.units[1].fx) + Math.abs(S.units[1].fy)) / (4 * TMAX) + Math.hypot(S.u, S.v) * 0.04;
@@ -3039,6 +3123,36 @@ function frame(now) {
 // ================= BOOT =================
 buildTerrain();
 TERMS.forEach(buildTerminal);
+// Gigha's South Pier: an old stone pier with a T-head, at the end of the road facing Gigalum
+function buildSouthPier() {
+  const [[x0, y0], [x1, y1]] = GEO.southPier, L = Math.hypot(x1 - x0, y1 - y0), brg = Math.atan2(x1 - x0, y1 - y0);
+  const g = new THREE.Group(); g.position.set(x0, 0, -y0); g.rotation.y = -brg; scene.add(g);
+  const stone = MAT(0x8c8a80), deck = MAT(0x9d9b92), dark = MAT(0x3b3f40), weed = MAT(0x3a3a26);
+  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); o.castShadow = o.receiveShadow = true; return o; };
+  box(6, 6.5, L + 10, stone, 0, -0.75, -(L - 10) / 2);           // stem, from the shore out to the head
+  box(6.1, 0.9, L + 10, weed, 0, -0.2, -(L - 10) / 2);           // weed line between tides
+  box(24, 6.5, 8, stone, 0, -0.75, -L);                           // T-head
+  box(24.1, 0.9, 8.1, weed, 0, -0.2, -L);
+  box(6, 0.12, L + 10, deck, 0, 2.56, -(L - 10) / 2); box(24, 0.12, 8, deck, 0, 2.56, -L);
+  for (const x of [-10, -4, 4, 10]) box(0.5, 0.7, 0.5, dark, x, 2.95, -L - 3.2);
+  for (const z of [-L * 0.4, -L * 0.75]) box(0.45, 0.6, 0.45, dark, 2.5, 2.9, z);
+  box(0.12, 5, 0.12, dark, -2.4, 5.1, -L + 3); box(0.6, 0.2, 0.4, MAT(0xfff4d6), -2.1, 7.5, -L + 3);
+  for (const x of [-11.5, 11.5]) for (let k = 0; k < 9; k++) box(0.5, 0.06, 0.06, MAT(0x6a6e70), x, 2.4 - k * 0.45, -L - 4.05);   // ladders down the face
+}
+buildSouthPier();
+// the floating pontoon in Ardminish Bay; it rides up and down with the tide
+const PONTOON = (() => {
+  const [[x0, y0], [x1, y1]] = GEO.pontoon, L = Math.hypot(x1 - x0, y1 - y0), brg = Math.atan2(x1 - x0, y1 - y0);
+  const g = new THREE.Group(); scene.add(g);
+  const inner = new THREE.Group(); inner.position.set(x0, 0, -y0); inner.rotation.y = -brg; g.add(inner);
+  const b = (w, h, d, c, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT(c)); o.position.set(x, y, z); inner.add(o); o.castShadow = o.receiveShadow = true; return o; };
+  b(2.6, 0.45, L - 12, 0x6f6a60, 0, 0.12, -(L + 12) / 2);         // walkway, starting off the shore
+  b(2.7, 0.18, L - 12, 0xe9e9e4, 0, -0.1, -(L + 12) / 2);         // white floats
+  b(8, 0.45, 3, 0x6f6a60, 0, 0.12, -L + 1.5);                     // landing stage at the end
+  b(1.4, 0.12, 14, 0x8a8f90, 0, 1.0, -6);                          // gangway down from the shore
+  for (let z = 14; z < L - 2; z += 12) for (const x of [-1.4, 1.4]) b(0.18, 0.3, 0.18, 0x2a2c2d, x, 0.5, -z);
+  return g;
+})();
 buildScatter();
 buildShip();
 buildWheelhouse();
