@@ -796,6 +796,18 @@ const WAVES = [
 const WAVE_GLSL = 'uniform float uTime; uniform float uAmp;\nfloat waveH(vec2 p){ float h = 0.0;\n' +
   WAVES.map(w => `h += ${w.a.toFixed(3)}*sin(${w.k.toFixed(5)}*dot(p, vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})) - ${w.w.toFixed(4)}*uTime);`).join('\n') +
   '\nreturn h*uAmp; }\n';
+// The slope of the same swell, worked out exactly per pixel instead of from the 12.5 m mesh (which samples the
+// shortest swell barely twice per wavelength and so shades it into moire stripes). Each wave fades out once it
+// is too fine for the pixel to resolve.
+// Shading adds a spread of weaker wave trains at other lengths and headings on top of the three that move the
+// surface, so the crests break up irregularly instead of lining up into a regular corduroy.
+const SHADE_WAVES = WAVES.map(w => ({ dx: w.dx, dz: w.dz, l: w.l, a: w.a * 0.6 })).concat(
+  [[15, 0.08, 38], [19, 0.11, -27], [23, 0.13, 55], [31, 0.15, -48], [37, 0.12, 14], [49, 0.16, -8], [12, 0.06, 71], [27, 0.1, -66]].map(([l, a, deg]) => {
+    const b = Math.atan2(0.6, 0.8) + deg * Math.PI / 180; return { dx: Math.cos(b), dz: Math.sin(b), l, a };
+  })).map((w, i) => Object.assign(w, { k: 2 * Math.PI / w.l, w: Math.sqrt(9.81 * 2 * Math.PI / w.l), ph: (i * 2.39996) % 6.283 }));
+const WAVE_GRAD_GLSL = 'vec2 waveGrad(vec2 p, float t, float fp){ vec2 g = vec2(0.0);\n' +
+  SHADE_WAVES.map(w => `g += ${(w.a * w.k).toFixed(4)}*cos(${w.k.toFixed(5)}*dot(p, vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})) - ${w.w.toFixed(4)}*t + ${w.ph.toFixed(3)})*vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})*(1.0 - smoothstep(0.6, 1.6, ${w.k.toFixed(5)}*fp));`).join('\n') +
+  '\nreturn g; }\n';
 function waveH(x, z, t) {
   let h = 0;
   for (const w of WAVES) h += w.a * Math.sin(w.k * (w.dx * x + w.dz * z) - w.w * t);
@@ -822,21 +834,25 @@ function waterMaterial(amp) {
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
       uniform vec4 uShip; uniform vec2 uVel; uniform float uRip;
       varying vec3 vW; varying float vH;
-      // cat's-paw ripples: a few short wind waves summed analytically for the normal only
-      vec2 ripple(vec2 p, float t){
+      ` + WAVE_GRAD_GLSL + `
+      // cat's-paw ripples: a few short wind waves summed analytically for the normal only, each faded
+      // before it gets finer than the pixel so they never alias into stripes
+      vec2 ripple(vec2 p, float t, float fp){
         vec2 g = vec2(0.0);
-        // irrational directions and wavelengths so the pattern never lines up into stripes
         vec2 q = p + vec2(sin(p.y*0.071 + t*0.3), cos(p.x*0.063 - t*0.27))*6.0;
-        g += vec2(0.80, 0.60)*cos(dot(vec2(0.80, 0.60), q)*0.83 + t*2.4);
-        g += vec2(-0.53, 0.85)*cos(dot(vec2(-0.53, 0.85), q)*1.37 + t*3.1)*0.7;
-        g += vec2(0.96, -0.28)*cos(dot(vec2(0.96, -0.28), q)*2.21 + t*4.1)*0.5;
+        g += vec2(0.80, 0.60)*cos(dot(vec2(0.80, 0.60), q)*0.83 + t*2.4)*(1.0 - smoothstep(0.4, 1.2, 0.83*fp));
+        g += vec2(-0.53, 0.85)*cos(dot(vec2(-0.53, 0.85), q)*1.37 + t*3.1)*0.7*(1.0 - smoothstep(0.4, 1.2, 1.37*fp));
+        g += vec2(0.96, -0.28)*cos(dot(vec2(0.96, -0.28), q)*2.21 + t*4.1)*0.5*(1.0 - smoothstep(0.4, 1.2, 2.21*fp));
         return g;
       }
       void main(){
-        vec3 n = normalize(cross(dFdx(vW), dFdy(vW))); if (n.y < 0.0) n = -n;
         float dist = distance(cameraPosition, vW);
-        vec2 rg = ripple(vW.xz, uTime) * uRip * (1.0 - smoothstep(15.0, 240.0, dist));
-        n = normalize(n + vec3(-rg.x, 0.0, -rg.y));
+        // world size of this pixel on the water, the longer way (grazing views stretch it)
+        vec2 fw2 = fwidth(vW.xz); float fp = max(fw2.x, fw2.y);
+        vec2 sg = waveGrad(vW.xz, uTime, fp) * uAmp * (1.0 - smoothstep(350.0, 760.0, distance(vW.xz, cameraPosition.xz)));
+        float paws = 0.45 + 0.55*smoothstep(-0.6, 0.9, sin(vW.x*0.011 + uTime*0.05)*cos(vW.z*0.013 - uTime*0.04) + sin((vW.x + vW.z)*0.0071));
+        vec2 rg = ripple(vW.xz, uTime, fp) * uRip * paws;
+        vec3 n = normalize(vec3(-sg.x - rg.x, 1.0, -sg.y - rg.y));
         // ship-relative coordinates for the waterline and wake
         vec2 rel = vW.xz - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
         vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - vec2(3.2, 13.3);
@@ -863,9 +879,9 @@ function waterMaterial(amp) {
           vec2 vd = uVel / spd; float b = dot(rel, -vd), sd = dot(rel, vec2(-vd.y, vd.x));
           float w = 6.0 + max(b, 0.0)*0.1;
           wake = step(0.0, b) * exp(-b/(30.0 + 50.0*spd)) * (1.0 - smoothstep(w*0.55, w, abs(sd))) * clamp(spd/2.5, 0.0, 1.0);
-          wake *= 0.75 + 0.25*sin(b*0.21 - uTime*1.1 + sin(sd*0.7 + b*0.05)*2.0);
+          wake *= 0.85 + 0.15*sin(b*0.21 - uTime*1.1 + sin(sd*0.7 + b*0.05)*2.0);
         }
-        float foam = clamp(churn + wake*0.7, 0.0, 0.8) * (0.7 + 0.3*sin(vW.x*2.3 + vW.z*1.7 + uTime));
+        float foam = clamp(churn + wake*0.7, 0.0, 0.8) * mix(0.7 + 0.3*sin(vW.x*2.3 + vW.z*1.7 + uTime), 0.85, smoothstep(0.4, 1.0, 2.9*fp));
         col = mix(col, vec3(0.9, 0.94, 0.94), foam * step(0.0, hd));
         col = mix(col, uFog, smoothstep(uFogNear, uFogFar, dist));
         gl_FragColor = vec4(col, 1.0);
@@ -2953,13 +2969,16 @@ function updateAudio() {
   AU.room.frequency.setTargetAtTime(cam.mode === 'wheelhouse' ? 520 : 1300, t, 0.2);
   S.units.forEach((U, i) => {
     const E = AU.eng[i], rf = U.rpm / ENG_MAX, load = Math.hypot(U.p.x, U.p.y) * U.rotor, on = U.rpm > 40 ? 1 : 0;
-    E.src.playbackRate.setTargetAtTime(Math.max(0.05, U.rpm / 1000 * E.trim), t, 0.08);   // governors never match exactly: the twin engines drift in and out of step
-    E.lp.frequency.setTargetAtTime(240 + 420 * load + 260 * rf, t, 0.15);
-    E.g.gain.setTargetAtTime(m * fade * on * (0.14 + 0.12 * load + 0.08 * rf), t, 0.15);
+    // the heard revs rise far less than the gauge between idle and full throttle, so she keeps the low rumble and
+    // works harder rather than screaming; governors never match exactly, so the twins drift in and out of step
+    const heard = U.rpm <= ENG_IDLE ? U.rpm : ENG_IDLE + (U.rpm - ENG_IDLE) * 0.38;
+    E.src.playbackRate.setTargetAtTime(Math.max(0.05, heard / 1000 * E.trim), t, 0.08);
+    E.lp.frequency.setTargetAtTime(230 + 300 * load + 90 * rf, t, 0.15);
+    E.g.gain.setTargetAtTime(m * fade * on * (0.15 + 0.15 * load + 0.05 * rf), t, 0.15);
     // a trace of diesel knock at light load and a faint turbo, both mostly lost under the hum on deck
     E.kg.gain.setTargetAtTime(m * fade * on * 0.008 * (1 - 0.6 * load) * (0.4 + rf), t, 0.2);
     E.turbo += ((load * 0.7 + rf * 0.3) - E.turbo) * 0.03;
-    E.to.frequency.setTargetAtTime(700 + 3200 * E.turbo, t, 0.3);
+    E.to.frequency.setTargetAtTime(700 + 1800 * E.turbo, t, 0.3);
     E.tg.gain.setTargetAtTime(m * fade * on * 0.0025 * E.turbo * (cam.mode === 'wheelhouse' ? 0.5 : 1), t, 0.3);
     E.sg.gain.setTargetAtTime(m * fade * (U.eng === 'start' ? 0.035 : 0), t, 0.05);
     E.bg.gain.setTargetAtTime(m * fade * on * (0.03 + 0.08 * rf), t, 0.2);
