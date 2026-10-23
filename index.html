@@ -153,6 +153,9 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:15px;margin:6px 0 4px}
 .keys kbd{font-family:var(--f-mono);font-size:12px;background:#1b2a31;border:1px solid var(--line-hi);border-radius:3px;padding:1px 5px;white-space:nowrap;justify-self:start}
 .help ol,.help ul{margin:0 0 6px;padding-left:20px;font-size:16px;line-height:1.4}
+#layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
+#layup p{margin:0 0 10px;font-size:15px}
+.lrow{display:flex;gap:8px;flex-wrap:wrap}
 #report{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:4;max-width:min(420px,calc(100% - 32px))}
 #report table{width:100%;border-collapse:collapse;font-size:15px;margin:6px 0 12px}
 #report td{padding:3px 0;border-bottom:1px solid var(--line)}
@@ -267,6 +270,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <p id="fpHint" hidden>Drag to look around · drag levers, sticks and the wheel · click buttons · scroll to zoom · double-click to face ahead</p>
     <div id="alarmbar" hidden><ul id="alarmTop"></ul><button id="bAck2" class="warn">Ack</button></div>
     <div id="toasts" aria-live="polite"></div>
+    <div id="layup" class="card" hidden><p id="layupText"></p><div class="lrow"><button id="layupYes" class="go">Lay up at South Pier</button><button id="layupNo">Carry on</button></div></div>
 
     <div id="report" class="card" hidden>
       <p class="eyebrow" id="repEyebrow">Crossing complete</p>
@@ -331,6 +335,8 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <p class="fine">Map data © OpenStreetMap contributors (ODbL). Outer coastline: GSHHG (Wessel &amp; Smith, LGPL). Depths are modelled, not charted.</p>
         <h3>Simple controls</h3>
         <p>Pick Simple on the start screen, or switch with the Controls button at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
+        <h3>Laying up at the South Pier</h3>
+        <p>When the cars are off at Gigha you are asked whether to lay her up for the night. Choose the South Pier and the waiting traffic is sent home; raise the ramp, pull away and follow the flashing yellow markers south down Gigha's east side. The last one brings you to the pier, where a green outline shows the berth along its fendered face. Come alongside parallel to the face and stop under 0.4 kn: the crew put the lines out and you get an end-of-day score. Let go to sail for Tayinloan again.</p>
         <h3>Wheelhouse view</h3>
         <p>Press V for the wheelhouse. You stand at the conning station of the leading end; changing which end leads walks you to the other station. On the main desk, from left to right: engine start, stop and clutch for each unit, the two throttles, the joystick (ahead, astern and sideways), the steering wheel, the two individual unit pitch sticks, then mode, conning-end and utility buttons. The amber dot beside each unit stick shows where the pitch actually is while the servo catches up. Look left for the deck console: hydraulics, mooring line, and pins, Raise, Hold, Lower and Float for each ramp, with the deck display above it.</p>
         <h3>Sailing from a slip</h3>
@@ -471,7 +477,20 @@ const OSM_LOOPS = [
 ];
 const GEO = {"dom":[-8317,-6147,9000,14060],"gig":[-3771.1,2174.7],"brgTay":91,"brgGig":332,"named":{"Gigha":[-4394,3284],"Cara":[-5038,-2984],"Gigalum":[-4414,-926]},"card":[-4414,-1476],"yacht":[-1500,5250,1500,1400],"boat":[-43,-246]};
 // traced from the OSM render like the coastline: the Ardminish pontoon, the moorings area of Ardminish Bay and Gigha's South Pier
-Object.assign(GEO, { pontoon: [[-3933, 1925], [-3789, 1906]], moorings: [-3900, -3380, 1640, 2010], southPier: [[-4676, -414], [-4631, -456]] });
+Object.assign(GEO, { pontoon: [[-3933, 1925], [-3789, 1906]], moorings: [-3900, -3380, 1640, 2010] });
+// Gigha's South Pier, after aerial and shore photos: a ~98 m open-piled trestle running out at 118 degrees to a solid
+// head, with a fendered berthing arm running north-east. The seaward face of head and arm (a = 14) is the berth.
+// Local axes: a runs out along the trestle from its seaward end, c runs along the head towards the north-east.
+const SPIER = (() => {
+  const R = { x: -4676, y: -414 }, L = 98, A = { x: Math.sin(118 * DEG), y: Math.cos(118 * DEG) }, C = { x: Math.sin(28 * DEG), y: Math.cos(28 * DEG) };
+  const E = { x: R.x + A.x * L, y: R.y + A.y * L };
+  const toW = (a, c) => ({ x: E.x + A.x * a + C.x * c, y: E.y + A.y * a + C.y * c });
+  const local = (x, y) => ({ a: (x - E.x) * A.x + (y - E.y) * A.y, c: (x - E.x) * C.x + (y - E.y) * C.y });
+  const boxes = [{ a0: 0, a1: 14, c0: -20, c1: 4 }, { a0: 8.5, a1: 14, c0: 4, c1: 30 }, { a0: -L, a1: 0, c0: -2.3, c1: 2.3 }];
+  const berth = toW(19.45, 6);
+  const fin = toW(24, 46);
+  return { R, L, A, C, E, toW, local, boxes, berth, berthBrg: 28, route: [[-3350, 1750], [-3250, 900], [-3500, 150], [-4100, -250], [fin.x, fin.y]] };
+})();
 const DOM = { x0: GEO.dom[0], y0: GEO.dom[1], x1: GEO.dom[2], y1: GEO.dom[3] };
 // Slip heads are where the OpenStreetMap ferry route meets each slip: Tayinloan's causeway runs out due west, and
 // Gigha's short concrete slip runs out south-south-east from the headland at the north end of Ardminish Bay. brg is the bearing into land.
@@ -602,6 +621,14 @@ function heightAt(x, y, mesh = false) {
       h = lerp(h, Math.min(h, -3.8), w);
     }
   }
+  {
+    const q = SPIER.local(x, y);
+    if (q.a > -SPIER.L + 10 && q.a < 16 && Math.abs(q.c) < 28) {
+      const w = smooth(28, 12, Math.abs(q.c)) * smooth(-SPIER.L + 10, -SPIER.L + 30, q.a);
+      h = lerp(h, Math.min(h, -0.8 - (q.a + SPIER.L) * 0.03), w);
+    }
+    if (q.a > 12 && q.a < 75 && q.c > -35 && q.c < 70) h = lerp(h, Math.min(h, -4.6), smooth(75, 55, q.a) * smooth(-35, -20, q.c) * smooth(70, 50, q.c));
+  }
   return h;
 }
 
@@ -722,6 +749,42 @@ function landColor(h, x, y) {
   const rough = [lerp(0.38, 0.43, br), lerp(0.43, 0.38, br), lerp(0.27, 0.25, br)], moor = [0.37, 0.33, 0.25];
   return [lerp(rough[0], moor[0], t) + n * 0.05, lerp(rough[1], moor[1], t) + n * 0.04, lerp(rough[2], moor[2], t) + n * 0.02];
 }
+// Terrain: smooth-shaded, with per-pixel detail laid over the vertex colours so the ground does not read as flat
+// 17 m facets. Grass and heather get a mottle at a few scales, steep faces turn to bare rock, and the band just above
+// the tide line is darkened and wet; the finest detail fades out with distance so it never shimmers.
+const TERRAIN_U = { uTide: { value: 0 } };
+const TERRAIN_MAT = (() => {
+  const m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 4, specular: 0x111111 });
+  m.extensions = { derivatives: true };
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uTide = TERRAIN_U.uTide;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vWP; uniform float uTide;
+      float th12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+      float tnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+        return mix(mix(th12(i), th12(i + vec2(1.0, 0.0)), f.x), mix(th12(i + vec2(0.0, 1.0)), th12(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        float dist = length(vWP - cameraPosition);
+        vec2 p = vWP.xz;
+        float n1 = tnoise(p * 0.045), n2 = tnoise(p * 0.19 + 7.3), n3 = tnoise(p * 0.83 + 3.1);
+        float near = 1.0 - smoothstep(60.0, 320.0, dist), mid = 1.0 - smoothstep(400.0, 2600.0, dist);
+        vec3 fn = normalize(cross(dFdx(vWP), dFdy(vWP)));
+        float slope = 1.0 - abs(fn.y), h = vWP.y - uTide, base = dot(diffuseColor.rgb, vec3(0.333));
+        // bare rock on the steep faces and crags
+        vec3 rock = vec3(0.43, 0.42, 0.39) * (0.8 + 0.4 * n2);
+        diffuseColor.rgb = mix(diffuseColor.rgb, rock, smoothstep(0.42, 0.68, slope + (n1 - 0.5) * 0.25) * step(1.2, h));
+        // mottled ground: tussocks, heather clumps, sheep tracks
+        diffuseColor.rgb *= 1.0 + ((n1 - 0.5) * 0.22 + (n2 - 0.5) * 0.16) * mid + (n3 - 0.5) * 0.14 * near;
+        // pale dry sand above the tide, darker wet sand and weed just above the water
+        float wet = (1.0 - smoothstep(0.05, 0.9, h)) * step(-0.6, h);
+        diffuseColor.rgb *= 1.0 - 0.3 * wet;
+      }`);
+  };
+  return m;
+})();
 function buildTerrain() {
   const C = 70, K = 4, f = C / K;
   const nx = Math.round((DOM.x1 - DOM.x0) / C) + 1, ny = Math.round((DOM.y1 - DOM.y0) / C) + 1;
@@ -734,7 +797,7 @@ function buildTerrain() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 })); m.receiveShadow = true; scene.add(m);
+    const m = new THREE.Mesh(g, TERRAIN_MAT); m.receiveShadow = true; scene.add(m);
   };
   const quads = (nx, ny, skip, idx) => {
     let q = 0;
@@ -801,7 +864,7 @@ const WAVE_GLSL = 'uniform float uTime; uniform float uAmp;\nfloat waveH(vec2 p)
 // is too fine for the pixel to resolve.
 // Shading adds a spread of weaker wave trains at other lengths and headings on top of the three that move the
 // surface, so the crests break up irregularly instead of lining up into a regular corduroy.
-const SHADE_WAVES = WAVES.map(w => ({ dx: w.dx, dz: w.dz, l: w.l, a: w.a * 0.6 })).concat(
+const SHADE_WAVES = WAVES.map(w => ({ dx: w.dx, dz: w.dz, l: w.l, a: w.a * 0.35 })).concat(
   [[15, 0.08, 38], [19, 0.11, -27], [23, 0.13, 55], [31, 0.15, -48], [37, 0.12, 14], [49, 0.16, -8], [12, 0.06, 71], [27, 0.1, -66]].map(([l, a, deg]) => {
     const b = Math.atan2(0.6, 0.8) + deg * Math.PI / 180; return { dx: Math.cos(b), dz: Math.sin(b), l, a };
   })).map((w, i) => Object.assign(w, { k: 2 * Math.PI / w.l, w: Math.sqrt(9.81 * 2 * Math.PI / w.l), ph: (i * 2.39996) % 6.283 }));
@@ -845,14 +908,27 @@ function waterMaterial(amp) {
         g += vec2(0.96, -0.28)*cos(dot(vec2(0.96, -0.28), q)*2.21 + t*4.1)*0.5*(1.0 - smoothstep(0.4, 1.2, 2.21*fp));
         return g;
       }
+      // random fine chop for the glitter: value-noise slopes at two scales, drifting with the wind
+      float wh12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+      float wn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+        return mix(mix(wh12(i), wh12(i + vec2(1.0, 0.0)), f.x), mix(wh12(i + vec2(0.0, 1.0)), wh12(i + vec2(1.0, 1.0)), f.x), f.y); }
+      vec2 chop(vec2 p, float t, float fp){
+        vec2 g = vec2(0.0); const float e = 0.2;
+        vec2 q = p * 0.55 + vec2(t * 0.33, t * 0.21); float a = wn(q);
+        g += vec2(wn(q + vec2(e, 0.0)) - a, wn(q + vec2(0.0, e)) - a) / e * 0.55 * (1.0 - smoothstep(0.5, 1.3, 0.55 * 3.0 * fp));
+        vec2 r = p * 1.6 + vec2(-t * 0.47, t * 0.39); float b = wn(r);
+        g += vec2(wn(r + vec2(e, 0.0)) - b, wn(r + vec2(0.0, e)) - b) / e * 0.35 * (1.0 - smoothstep(0.5, 1.3, 1.6 * 3.0 * fp));
+        return g;
+      }
       void main(){
         float dist = distance(cameraPosition, vW);
         // world size of this pixel on the water, the longer way (grazing views stretch it)
         vec2 fw2 = fwidth(vW.xz); float fp = max(fw2.x, fw2.y);
         vec2 sg = waveGrad(vW.xz, uTime, fp) * uAmp * (1.0 - smoothstep(350.0, 760.0, distance(vW.xz, cameraPosition.xz)));
         float paws = 0.45 + 0.55*smoothstep(-0.6, 0.9, sin(vW.x*0.011 + uTime*0.05)*cos(vW.z*0.013 - uTime*0.04) + sin((vW.x + vW.z)*0.0071));
-        vec2 rg = ripple(vW.xz, uTime, fp) * uRip * paws;
-        vec3 n = normalize(vec3(-sg.x - rg.x, 1.0, -sg.y - rg.y));
+        vec2 rg = ripple(vW.xz, uTime, fp) * uRip * paws * 0.25;
+        vec2 cg = chop(vW.xz, uTime, fp) * (0.04 + uRip * 1.3) * (0.6 + 0.4 * paws);
+        vec3 n = normalize(vec3(-sg.x - rg.x - cg.x, 1.0, -sg.y - rg.y - cg.y));
         // ship-relative coordinates for the waterline and wake
         vec2 rel = vW.xz - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
         vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - vec2(3.2, 13.3);
@@ -1385,6 +1461,8 @@ function buildShip() {
   // mooring line
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
   SHIP.line = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0xe8dcae })); SHIP.line.frustumCulled = false; SHIP.line.visible = false;
+  const bl = new THREE.BufferGeometry(); bl.setAttribute('position', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+  SHIP.berthLines = new THREE.LineSegments(bl, new THREE.LineBasicMaterial({ color: 0xe8dcae })); SHIP.berthLines.frustumCulled = false; SHIP.berthLines.visible = false; scene.add(SHIP.berthLines);
   scene.add(SHIP.line);
 }
 
@@ -1455,6 +1533,7 @@ function newGame(start, wxKey, simple = false) {
     pax: { aboard: 0, dest: 'gig', waiting: { tay: 0, gig: 0 }, acc: 0 },
     leg: { state: 'alongside', at: 'tay', from: 'tay', to: 'gig', departT: null, pen: [], maxImpact: 0 },
     score: 0, crossings: 0, alarms: [], ack: new Set(), alarmSound: false, horn: false,
+    layup: { state: 'none', wp: 0, declined: false, maxImpact: 0, contactT: -99, departT: 0, holdT: 0, pose: null },
   };
   const T = TERM('tay');
   if (start === 'cold') {
@@ -1463,7 +1542,7 @@ function newGame(start, wxKey, simple = false) {
     S.x = T.P.x - T.d.x * 60; S.y = T.P.y - T.d.y * 60;
   }
   S.tide = S.tide0;
-  SHIP.line.visible = false;
+  SHIP.line.visible = false; SHIP.berthLines.visible = false;
   updateShipTransform(0);
   computeEndGeo();
   spawnQueue('gig', 3 + Math.floor(rnd() * 5));
@@ -1584,6 +1663,21 @@ function physStep(dt) {
         S.endLastContact[e] = S.t;
       }
     }
+    // the South Pier's head, berthing arm and trestle are solid: the hull bears on the fenders
+    {
+      const q = SPIER.local(wx, wy);
+      for (const B of SPIER.boxes) {
+        if (q.a < B.a0 - 0.4 || q.a > B.a1 + 0.4 || q.c < B.c0 - 0.4 || q.c > B.c1 + 0.4) continue;
+        const pens = [[q.a - B.a0 + 0.4, -1, 0], [B.a1 + 0.4 - q.a, 1, 0], [q.c - B.c0 + 0.4, 0, -1], [B.c1 + 0.4 - q.c, 0, 1]];
+        const [pen, na, nc] = pens.reduce((m, v) => v[0] < m[0] ? v : m);
+        const nx = SPIER.A.x * na + SPIER.C.x * nc, ny = SPIER.A.y * na + SPIER.C.y * nc;
+        const vn = vx * nx + vy * ny, vt = vx * -ny + vy * nx;
+        const Fn = Math.max(0, K_SLIP * pen - (vn < 0 ? C_SLIP : 0.4 * C_SLIP) * vn), Ff = clamp(-vt * F_LAT, -0.6 * Fn, 0.6 * Fn);
+        fx += nx * Fn - ny * Ff; fy += ny * Fn + nx * Ff;
+        if (S.t - (S.layup.contactT || -99) > 1.5 && vn < 0) pierImpact(-vn);
+        S.layup.contactT = S.t;
+      }
+    }
     const h = heightAt(wx, wy), depth = S.tide - h;
     if (depth < DRAFT) {
       const pen = Math.min(DRAFT - depth, 3);
@@ -1619,6 +1713,12 @@ function physStep(dt) {
     S.line.tension = lerp(S.line.tension, Fl, 0.05);
     if (Fl > LINE_BREAK) { S.line.fast = false; SHIP.line.visible = false; addPen('Mooring line parted', 120); toast('The mooring line has parted', 'warn'); }
   } else S.line.tension = 0;
+  // laid up at the South Pier: head, stern and spring lines hold her where the crew made fast
+  if (S.layup.state === 'fast') {
+    const Pz = S.layup.pose, vxw = S.u * sp + S.v * cp, vyw = S.u * cp - S.v * sp, k = 2e4, c = 1.7e5;
+    applyWorldForce(F, 0, 0, -k * (S.x - Pz.x) - c * vxw, -k * (S.y - Pz.y) - c * vyw, sp, cp);
+    F.N += -2e6 * Math.atan2(Math.sin(S.psi - Pz.psi), Math.cos(S.psi - Pz.psi)) - 1.8e7 * S.r;
+  }
   // integrate (body-frame 3-DOF)
   S.u += (F.X + MY * S.v * S.r) / MX * dt;
   S.v += (F.Y - MX * S.u * S.r) / MY * dt;
@@ -1764,14 +1864,14 @@ function crewUpdate(dt) {
       if (S.line.fast) { S.line.fast = false; SHIP.line.visible = false; }
       const want = OTHER(T.id).endIdx === 0 ? 1 : -1, still = S.units.every(U => Math.hypot(U.p.x, U.p.y) < 0.12) && Math.abs(S.lev.S) < 0.05;
       if (S.dir !== want && still) { S.dir = want; cam.az = 0; syncControls(); }
-      say = `Ramp up and pinned. Clear to sail for ${OTHER(T.id).name}.`;
+      say = S.layup.state === 'chosen' ? 'Ramp up and pinned. Clear to sail for the South Pier.' : `Ramp up and pinned. Clear to sail for ${OTHER(T.id).name}.`;
     }
   } else {
     let all = true;
     for (let e = 0; e < 2; e++) all = secure(e) && all;
     if (S.line.fast && sog > 0.3) { S.line.fast = false; SHIP.line.visible = false; }
     if (all && S.hpu.on && S.leg.state === 'underway') S.hpu.on = false;
-    say = !all ? 'Securing the ramps.' : S.leg.state === 'underway' ? `Ramps secure. Steer for ${TERM(S.leg.to).name}.` : 'Standing by.';
+    say = !all ? 'Securing the ramps.' : S.layup.state === 'fast' ? 'All fast. That is her laid up for the night.' : S.layup.state === 'passage' ? 'Ramps secure. Follow the markers to the South Pier.' : S.leg.state === 'underway' ? `Ramps secure. Steer for ${TERM(S.leg.to).name}.` : 'Standing by.';
   }
   S.crewHold = hold;
   if (say !== S.crewMsg) { S.crewMsg = say; log('Crew: ' + say); }
@@ -1874,7 +1974,7 @@ function updateCargo(dt) {
       const car = off.car; off.car = null;
       const wp = new V3(); car.mesh.getWorldPosition(wp); SHIP.motion.remove(car.mesh); scene.add(car.mesh); car.mesh.position.copy(wp);
       S.mov = { car, kind: 'off', e, T, slot: { x: off.x, z: off.z }, s: 0 };
-    } else if (S.queue[T.id].length) {
+    } else if (S.queue[T.id].length && !layupOffer()) {   // hold the loading while the master decides about laying up
       const slot = loadOrder(e).find(s => !s.car);
       if (slot) {
         const car = S.queue[T.id].shift(); slot.car = car; car.slot = slot; car.dest = OTHER(T.id).id;
@@ -1908,8 +2008,13 @@ function updateLeg() {
       if (work) addPen(`Sailed from ${T.name} with traffic still to work`, 150);
       if (S.line.fast) { S.line.fast = false; SHIP.line.visible = false; }
       S.fullWarned = false;
-      spawnQueue(T.id, 2 + Math.floor(S.rnd() * 7)); S.pax.waiting[T.id] += 4 + Math.floor(S.rnd() * 22);
-      log(`Departed ${T.name} for ${OTHER(T.id).name}`);
+      if (S.layup.state === 'chosen') {
+        S.layup.state = 'passage'; S.layup.wp = 0; S.layup.departT = S.t; S.layup.maxImpact = 0;
+        log(`Departed ${T.name} for the South Pier`);
+      } else {
+        spawnQueue(T.id, 2 + Math.floor(S.rnd() * 7)); S.pax.waiting[T.id] += 4 + Math.floor(S.rnd() * 22);
+        log(`Departed ${T.name} for ${OTHER(T.id).name}`);
+      }
     }
   } else {
     const D = TERM(L.to), e = D.endIdx;
@@ -1919,6 +2024,8 @@ function updateLeg() {
   }
 }
 function arrive(D) {
+  if (S.layup.state !== 'none') { S.layup.state = 'none'; }
+  S.layup.declined = false;
   const L = S.leg, passage = S.t - L.departT;
   const rows = [];
   rows.push(['Passage time', mmss(passage), '']);
@@ -1942,6 +2049,114 @@ function arrive(D) {
   S.leg = { state: 'alongside', at: D.id, from: D.id, to: OTHER(D.id).id, departT: null, pen: [], maxImpact: 0 };
 }
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+// ================= LAY-UP AT THE SOUTH PIER =================
+// Once the cars are off at Gigha the master can call it a day: no more traffic is taken, the ramp goes up, and she is
+// taken round to the South Pier, following markers, to lie alongside the berth face while the crew put the lines out.
+function layupOffer() {
+  const L = S.layup;
+  return L.state === 'none' && !L.declined && S.leg.state === 'alongside' && S.leg.at === 'gig' &&
+    !S.slots.some(s => s.car && s.car.dest === 'gig') && !(S.mov && S.mov.kind === 'off') && !(S.pax.aboard > 0 && S.pax.dest === 'gig');
+}
+function layupChoose(yes) {
+  const L = S.layup;
+  if (L.state === 'fast') { layupLetGo(); return; }
+  if (!yes) { L.declined = true; return; }
+  L.state = 'chosen';
+  for (const car of S.queue.gig) if (car.mesh.parent) car.mesh.parent.remove(car.mesh);
+  S.cars = S.cars.filter(c => !S.queue.gig.includes(c)); S.queue.gig = []; S.pax.waiting.gig = 0;
+  log('Crew: Last run done. We will take her round to the South Pier for the night.');
+  toast('Raise the ramp, then follow the markers south to the South Pier', 'good');
+}
+function pierImpact(v) {
+  const L = S.layup, kn = v / KN;
+  if (L.state === 'passage') L.maxImpact = Math.max(L.maxImpact, v);
+  if (v > 0.35) { addPen(`Struck the South Pier at ${kn.toFixed(2)} kn`, Math.round(40 + (v - 0.35) * 600)); toast(`Heavy contact with the pier: ${kn.toFixed(2)} kn`, 'warn'); }
+  else if (v > 0.08) log(`Alongside the South Pier fenders at ${kn.toFixed(2)} kn`);
+}
+function layupBerthState() {
+  const q = SPIER.local(S.x, S.y), d = ((S.psi / DEG - SPIER.berthBrg) % 180 + 180) % 180, par = Math.min(d, 180 - d);
+  return { q, par, along: q.a > 18.3 && q.a < 21.8 && q.c > -6 && q.c < 18, sog: Math.hypot(S.u, S.v) / KN };
+}
+function layupTarget() {
+  const L = S.layup, R = SPIER.route;
+  return L.wp < R.length ? { x: R[L.wp][0], y: R[L.wp][1], final: false } : { x: SPIER.berth.x, y: SPIER.berth.y, final: true };
+}
+function updateLayup(dt) {
+  const L = S.layup;
+  if (L.state === 'passage') {
+    const T = layupTarget();
+    if (!T.final && Math.hypot(S.x - T.x, S.y - T.y) < 120) { L.wp++; if (L.wp < SPIER.route.length) log(`Marker passed: steer for the next (${L.wp + 1} of ${SPIER.route.length})`); else log('Last marker: bring her alongside the berth face, parallel to it'); }
+    const B = layupBerthState();
+    if (B.along && B.par < 10 && B.sog < 0.4) { L.holdT += dt; if (L.holdT > 2) layupFast(); } else L.holdT = 0;
+  }
+  let offer = layupOffer();
+  // if the bridge says nothing, the crew carry on loading for Tayinloan
+  if (offer) { L.offerT = (L.offerT || 0) + dt; if (L.offerT > 90) { L.declined = true; offer = false; log('Crew: No word from the bridge, so we are loading for Tayinloan.'); } } else L.offerT = 0;
+  const show = offer || L.state === 'fast';
+  $('layup').hidden = !show;
+  if (show) {
+    setT($('layupText'), offer ? 'Cars are off at Gigha. Lay her up at the South Pier for the night, or carry on to Tayinloan?' : 'Laid up at the South Pier. Lines fast.');
+    setT($('layupYes'), offer ? 'Lay up at South Pier' : 'Let go for Tayinloan');
+    $('layupNo').hidden = !offer;
+  }
+}
+function layupFast() {
+  const L = S.layup;
+  L.state = 'fast'; L.pose = { x: S.x, y: S.y, psi: S.psi };
+  const passage = S.t - L.departT, rows = [['Passage from Ardminish', mmss(passage), ''], ['Contact with the fenders', (L.maxImpact / KN).toFixed(2) + ' kn', '']];
+  let pts = 600;
+  const timePts = Math.round(clamp((14 * 60 - passage) / 6, -150, 150));
+  rows.push([timePts >= 0 ? 'Time bonus (under 14 min)' : 'Time penalty (over 14 min)', (timePts >= 0 ? '+' : '') + timePts, timePts >= 0 ? 'pos' : 'neg']); pts += timePts;
+  if (L.maxImpact < 0.15) { rows.push(['Brought alongside without a bump', '+100', 'pos']); pts += 100; }
+  const Lg = S.leg; Lg.pen.forEach(p => rows.push([p.text, '−' + p.pts, 'neg']));
+  const penSum = Lg.pen.reduce((a, p) => a + p.pts, 0), legScore = Math.max(0, pts - penSum);
+  S.score += penSum + legScore; Lg.pen = [];
+  rows.push(['Lay-up score', String(legScore), 'pos']);
+  $('repEyebrow').textContent = 'End of the day';
+  $('repTitle').textContent = 'Laid up at the South Pier';
+  $('repTable').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="${r[2]}">${r[1]}</td></tr>`).join('');
+  $('report').hidden = false;
+  log(`Crew: All fast at the South Pier. Laid up after ${mmss(passage)}, scored ${legScore}.`, 'good');
+  SHIP.berthLines.visible = true;
+}
+function layupLetGo() {
+  const L = S.layup;
+  L.state = 'none'; L.declined = true; SHIP.berthLines.visible = false;
+  S.leg = { state: 'underway', at: null, from: 'gig', to: 'tay', departT: S.t, pen: [], maxImpact: 0 };
+  log('Crew: Lines let go. Steer for Tayinloan.');
+}
+// guidance in the scene: a lit yellow marker at the next waypoint, and a green outline where she should lie
+const LAYUP_GFX = (() => {
+  const mk = new THREE.Group();
+  mk.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 3.2, 10), MAT(0xf2c230)));
+  const top = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.3, 10), MAT(0xf2c230)); top.position.y = 2.2; mk.add(top);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe28a, toneMapped: false })); lamp.position.y = 3.1; mk.add(lamp);
+  const ghost = new THREE.Mesh(new THREE.BoxGeometry(10, 0.2, 30.2), new THREE.MeshBasicMaterial({ color: 0x3fdc8a, transparent: true, opacity: 0.35, depthWrite: false }));
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(10, 0.2, 30.2)), new THREE.LineBasicMaterial({ color: 0x7dffb6 }));
+  ghost.add(edge);
+  mk.visible = ghost.visible = false; scene.add(mk, ghost);
+  return { mk, lamp, ghost };
+})();
+function updateLayupGfx() {
+  const L = S.layup, on = L.state === 'passage' || L.state === 'chosen';
+  LAYUP_GFX.mk.visible = on && L.wp < SPIER.route.length;
+  if (LAYUP_GFX.mk.visible) { const T = layupTarget(); LAYUP_GFX.mk.position.set(T.x, S.tide + waveH(T.x, -T.y, S.t) * 0.8 - 0.6, -T.y); LAYUP_GFX.lamp.visible = Math.floor(S.t * 1.5) % 2 === 0; }
+  LAYUP_GFX.ghost.visible = on && L.wp >= SPIER.route.length - 1;
+  if (LAYUP_GFX.ghost.visible) { const b = SPIER.berth; LAYUP_GFX.ghost.position.set(b.x, S.tide + 0.15, -b.y); LAYUP_GFX.ghost.rotation.y = -SPIER.berthBrg * DEG; }
+  if (SHIP.berthLines.visible) {
+    // head and stern lines from the ship's quarters to bollards on the berth face
+    const sp = Math.sin(S.psi), cp = Math.cos(S.psi), side = Math.sign(-(SPIER.A.x * cp - SPIER.A.y * sp)) || 1, pa = SHIP.berthLines.geometry.attributes.position;
+    [13, -13].forEach((xb, i) => {
+      const yb = side * 4.6, wx = S.x + xb * sp + yb * cp, wy = S.y + xb * cp - yb * sp, q = SPIER.local(wx, wy), dir = Math.sign(q.c - SPIER.local(S.x, S.y).c);
+      const bw = SPIER.toW(12.8, clamp(q.c + dir * 7, -19, 29));
+      pa.setXYZ(i * 2, wx, S.tide + S.heave + DECK_H + 0.9, -wy); pa.setXYZ(i * 2 + 1, bw.x, 3.9, -bw.y);
+    });
+    pa.needsUpdate = true;
+  }
+}
+$('layupYes').onclick = () => layupChoose(true);
+$('layupNo').onclick = () => layupChoose(false);
 
 // ================= ALARMS =================
 function updateAlarms(dt) {
@@ -2091,11 +2306,12 @@ function updateUI(force) {
   setT($('nWind'), `${fmt3(S.wind.from)}° ${(S.wind.spd / KN).toFixed(0)}`);
   setT($('nCur'), `${fmt3(Math.atan2(cur.x, cur.y) / DEG)}° ${(Math.hypot(cur.x, cur.y) / KN).toFixed(1)}`);
   const D = TERM(S.leg.state === 'underway' ? S.leg.to : S.leg.at), De = D.endIdx, k = De === 0 ? 1 : -1;
-  const dist = Math.hypot(S.x + k * HALF_L * sp - D.P.x, S.y + k * HALF_L * cp - D.P.y);
+  const LT = S.layup.state === 'passage' ? layupTarget() : null;
+  const dist = LT ? Math.hypot(S.x - LT.x, S.y - LT.y) : Math.hypot(S.x + k * HALF_L * sp - D.P.x, S.y + k * HALF_L * cp - D.P.y);
   setT($('nDist'), dist > 1852 ? (dist / 1852).toFixed(2) + ' nm' : Math.round(dist) + ' m');
   setT($('nClock'), clock().slice(0, 5));
   setT($('mHdg'), fmt3(conH) + '°'); setT($('mSog'), (sog / KN).toFixed(1)); setT($('mDist'), dist > 1852 ? (dist / 1852).toFixed(1) + 'nm' : Math.round(dist) + 'm');
-  setT($('routeTag'), S.leg.state === 'underway' ? `${TERM(S.leg.from).name} → ${TERM(S.leg.to).name}` : `Alongside ${TERM(S.leg.at).name}`);
+  setT($('routeTag'), S.layup.state === 'fast' ? 'Laid up · South Pier' : S.layup.state === 'passage' ? 'Gigha → South Pier' : S.leg.state === 'underway' ? `${TERM(S.leg.from).name} → ${TERM(S.leg.to).name}` : `Alongside ${TERM(S.leg.at).name}`);
   setT($('bWarp'), `Time ×${S.warp}`); setT($('tWarp'), `×${S.warp}`); setC($('tWarp'), 'on', S.warp > 1);
   S.units.forEach((U, i) => {
     const led = $('uLed' + i); setC(led, 'run', U.eng === 'run'); setC(led, 'crank', U.eng === 'start');
@@ -2158,6 +2374,7 @@ function simpleChecklist() {
     const T = TERM(S.leg.at), e = T.endIdx, E = S.ends[e], g = S.endGeo[e], O = OTHER(T.id);
     const stowed = E.ramp.pins && E.ramp.ang >= RAMP_STOW - 0.5;
     if (workLeft(T)) return [`Alongside ${T.name}`, [['Keep her square on the slip', g.on], ['Crew lands the ramp', E.ramp.landed], ['Cars off and on', false, 'note'], ['Wait: the crew holds her on', false, 'note']]];
+    if (S.layup.state === 'chosen') return ['Ready for the South Pier', [['Crew raises and pins the ramp', stowed], ['Line let go', !S.line.fast], ['Pull away and head south: follow the yellow markers', false, 'note']]];
     return [`Ready for ${O.name}`, [['Crew raises and pins the ramp', stowed], ['Line let go', !S.line.fast], ['Pull away: W for ahead, A/D to turn', false, 'note']]];
   }
   const D = TERM(S.leg.to), e = D.endIdx, g = S.endGeo[e], k = e === 0 ? 1 : -1, sp = Math.sin(S.psi), cp = Math.cos(S.psi);
@@ -2167,11 +2384,23 @@ function simpleChecklist() {
   items.push(['The crew does the rest', false, 'note']);
   return [`Passage to ${D.name}`, items];
 }
+function layupChecklist() {
+  const L = S.layup, B = layupBerthState(), sec = S.ends.every(E => E.ramp.pins && E.ramp.ang >= RAMP_STOW - 0.5);
+  if (L.state === 'fast') return ['Laid up at the South Pier', [['Lines fast', true], ['Stop the engines when you like', S.units.every(U => U.eng !== 'run')], ['Or let go and sail for Tayinloan', false, 'note']]];
+  const T = layupTarget(), d = Math.hypot(S.x - T.x, S.y - T.y), ds = d > 1852 ? (d / 1852).toFixed(2) + ' nm' : Math.round(d) + ' m', N = SPIER.route.length;
+  const items = [['Both ramps up and pinned', sec]];
+  if (!T.final) items.push([`Steer for the yellow marker ${L.wp + 1} of ${N}, ${ds}`, false, 'note']);
+  items.push(['Come alongside the berth face, parallel (inside the green outline)', B.along && B.par < 10]);
+  items.push(['Stop alongside, under 0.4 kn', B.along && B.sog < 0.4]);
+  items.push(['The crew put the lines out', false, 'note']);
+  return ['Passage to the South Pier', items];
+}
 function updateChecklist() {
   let title, items;
   const sog = Math.hypot(S.u, S.v) / KN;
   const engOK = S.units.every(U => U.eng === 'run'), cluOK = S.units.every(U => U.clutch);
-  if (S.simple) [title, items] = simpleChecklist();
+  if (S.layup.state === 'passage' || S.layup.state === 'fast') [title, items] = layupChecklist();
+  else if (S.simple) [title, items] = simpleChecklist();
   else if (S.leg.state === 'alongside') {
     const T = TERM(S.leg.at), e = T.endIdx, E = S.ends[e], g = S.endGeo[e], O = OTHER(T.id);
     if (workLeft(T)) {
@@ -2285,6 +2514,15 @@ function drawMap() {
     for (const T of TERMS) { g.beginPath(); g.moveTo(tx(T.P.x), ty(T.P.y)); g.lineTo(tx(T.P.x - T.d.x * 400), ty(T.P.y - T.d.y * 400)); g.stroke(); }
     g.setLineDash([]);
     for (const [x, y, side] of BUOYS) { g.fillStyle = side < 0 ? '#e0453f' : '#3fbf6a'; g.beginPath(); g.arc(tx(x), ty(y), 5, 0, 7); g.fill(); }
+  }
+  // South Pier, and the lay-up route while it is in use
+  g.strokeStyle = '#a7b0ae'; g.lineWidth = Math.max(2, 6 * sc);
+  { const r = SPIER.R, e = SPIER.E; g.beginPath(); g.moveTo(tx(r.x), ty(r.y)); g.lineTo(tx(e.x), ty(e.y)); g.stroke(); const h0 = SPIER.toW(7, -20), h1 = SPIER.toW(11, 30); g.lineWidth = Math.max(3, 12 * sc); g.beginPath(); g.moveTo(tx(h0.x), ty(h0.y)); g.lineTo(tx(h1.x), ty(h1.y)); g.stroke(); }
+  if (S.layup.state === 'passage' || S.layup.state === 'chosen') {
+    const pts = [[S.x, S.y], ...SPIER.route.slice(S.layup.wp), [SPIER.berth.x, SPIER.berth.y]];
+    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(242,194,48,.85)'; g.lineWidth = 2; g.beginPath();
+    pts.forEach(([x, y], i) => i ? g.lineTo(tx(x), ty(y)) : g.moveTo(tx(x), ty(y))); g.stroke(); g.setLineDash([]);
+    SPIER.route.forEach(([x, y], i) => { if (i < S.layup.wp) return; g.fillStyle = i === S.layup.wp ? '#f2c230' : 'rgba(242,194,48,.5)'; g.beginPath(); g.arc(tx(x), ty(y), i === S.layup.wp ? 6 : 4, 0, 7); g.fill(); });
   }
   // ship
   const sp = Math.sin(S.psi), cp = Math.cos(S.psi), boost = Math.max(1, 7 / (15 * sc));
@@ -3112,8 +3350,10 @@ function frame(now) {
     updateHydraulics(sdt);
     updateCargo(sdt);
     updateLeg();
+    updateLayup(sdt);
     updateAlarms(sdt);
     updateVisuals(sdt);
+    updateLayupGfx();
     updateLife(sdt);
   }
   updateTouch();
@@ -3125,7 +3365,7 @@ function frame(now) {
   updateCamera();
   const sx = Math.round(camera.position.x / WATER_CELL) * WATER_CELL, sz = Math.round(camera.position.z / WATER_CELL) * WATER_CELL;
   waterNear.position.set(sx, S.tide, sz); waterFar.position.set(sx, S.tide, sz);
-  waterNearMat.uniforms.uTime.value = S.t; waterNearMat.uniforms.uAmp.value = S.wx.wave; waterFarMat.uniforms.uTime.value = S.t;
+  waterNearMat.uniforms.uTime.value = S.t; waterNearMat.uniforms.uAmp.value = S.wx.wave; waterFarMat.uniforms.uTime.value = S.t; TERRAIN_U.uTide.value = S.tide;
   {
     const sp = Math.sin(S.psi), cp = Math.cos(S.psi), U = waterNearMat.uniforms;
     U.uShip.value.set(S.x, -S.y, sp, cp); U.uVel.value.set(S.u * sp + S.v * cp, -(S.u * cp - S.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
@@ -3142,21 +3382,45 @@ function frame(now) {
 // ================= BOOT =================
 buildTerrain();
 TERMS.forEach(buildTerminal);
-// Gigha's South Pier: an old stone pier with a T-head, at the end of the road facing Gigalum
+// Gigha's South Pier, modelled after the aerial and shore photos
 function buildSouthPier() {
-  const [[x0, y0], [x1, y1]] = GEO.southPier, L = Math.hypot(x1 - x0, y1 - y0), brg = Math.atan2(x1 - x0, y1 - y0);
-  const g = new THREE.Group(); g.position.set(x0, 0, -y0); g.rotation.y = -brg; scene.add(g);
-  const stone = MAT(0x8c8a80), deck = MAT(0x9d9b92), dark = MAT(0x3b3f40), weed = MAT(0x3a3a26);
-  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); o.castShadow = o.receiveShadow = true; return o; };
-  box(6, 6.5, L + 10, stone, 0, -0.75, -(L - 10) / 2);           // stem, from the shore out to the head
-  box(6.1, 0.9, L + 10, weed, 0, -0.2, -(L - 10) / 2);           // weed line between tides
-  box(24, 6.5, 8, stone, 0, -0.75, -L);                           // T-head
-  box(24.1, 0.9, 8.1, weed, 0, -0.2, -L);
-  box(6, 0.12, L + 10, deck, 0, 2.56, -(L - 10) / 2); box(24, 0.12, 8, deck, 0, 2.56, -L);
-  for (const x of [-10, -4, 4, 10]) box(0.5, 0.7, 0.5, dark, x, 2.95, -L - 3.2);
-  for (const z of [-L * 0.4, -L * 0.75]) box(0.45, 0.6, 0.45, dark, 2.5, 2.9, z);
-  box(0.12, 5, 0.12, dark, -2.4, 5.1, -L + 3); box(0.6, 0.2, 0.4, MAT(0xfff4d6), -2.1, 7.5, -L + 3);
-  for (const x of [-11.5, 11.5]) for (let k = 0; k < 9; k++) box(0.5, 0.06, 0.06, MAT(0x6a6e70), x, 2.4 - k * 0.45, -L - 4.05);   // ladders down the face
+  const P = SPIER, g = new THREE.Group(); g.position.set(P.E.x, 0, -P.E.y); g.rotation.y = -118 * DEG; scene.add(g);
+  // in this group -z runs out along the trestle (a) and -x runs along the head to the north-east (c)
+  const stone = MAT(0x8d8a80), deck = MAT(0x9f9a8e), dark = MAT(0x34383a), weed = MAT(0x3a3a24), timber = MAT(0x4a3b2c), white = MAT(0xeeefec), rail = MAT(0xb9bdbd), tyre = MAT(0x151617);
+  const box = (w, h, d, m, a, c, y) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(-c, y, -a); g.add(o); o.castShadow = o.receiveShadow = true; return o; };
+  const DECK = 3.4;
+  // trestle: deck on pairs of piles with cross-heads, railed both sides
+  box(4.6, 0.45, P.L + 2, deck, -P.L / 2, 0, DECK - 0.22);
+  box(4.7, 0.25, P.L + 2, timber, -P.L / 2, 0, DECK - 0.55);
+  const pileG = new THREE.CylinderGeometry(0.22, 0.26, 8.5, 6);
+  for (let a = -P.L + 4; a < -1; a += 6.5) {
+    for (const c of [-1.8, 1.8]) { const pl = new THREE.Mesh(pileG, timber); pl.position.set(-c, -1.2, -a); g.add(pl); pl.castShadow = true; }
+    box(4.8, 0.35, 0.4, timber, a, 0, DECK - 0.75);
+    const br = box(0.15, 0.15, 5.4, timber, a, 0, 0.2); br.rotation.x = 0; br.rotation.y = Math.PI / 2; br.rotation.z = 0.7;
+  }
+  const postG = new THREE.CylinderGeometry(0.04, 0.04, 1.1, 5);
+  for (const c of [-2.2, 2.2]) {
+    for (let a = -P.L; a <= 0; a += 2.5) { const pp = new THREE.Mesh(postG, rail); pp.position.set(-c, DECK + 0.55, -a); g.add(pp); }
+    for (const y of [DECK + 0.6, DECK + 1.08]) box(0.06, 0.06, P.L, rail, -P.L / 2, c, y);
+  }
+  // solid head and the berthing arm, weed between the tides, a fendered seaward face
+  box(24, 8.2, 14, stone, 7, -8, DECK - 4.1); box(24.1, 0.12, 14.1, deck, 7, -8, DECK + 0.02);
+  box(26, 8.2, 5.5, stone, 11.25, 17, DECK - 4.1); box(26.1, 0.12, 5.6, deck, 11.25, 17, DECK + 0.02);
+  box(24.2, 1.1, 14.2, weed, 7, -8, -0.1); box(26.2, 1.1, 5.7, weed, 11.25, 17, -0.1);
+  for (let c = -19.5; c <= 29.6; c += 2.45) box(0.36, 7.4, 0.36, timber, 14.2, c, DECK - 3.5);
+  box(50, 0.3, 0.3, timber, 14.35, 5, DECK - 0.3); box(50, 0.3, 0.3, timber, 14.35, 5, 0.6);
+  const tyreG = new THREE.TorusGeometry(0.42, 0.17, 6, 12);
+  for (let c = -18; c <= 28; c += 4.6) { const t = new THREE.Mesh(tyreG, tyre); t.position.set(-c, 1.4, -14.55); g.add(t); }
+  for (const c of [-16, -6, 4, 14, 24]) { box(0.45, 0.6, 0.45, dark, 12.8, c, DECK + 0.3); box(0.6, 0.12, 0.6, dark, 12.8, c, DECK + 0.62); }
+  for (let k = 0; k < 8; k++) box(0.6, 0.06, 0.06, MAT(0x6a6e70), 14.5, -10, DECK - 0.4 - k * 0.45);
+  // the white building on the south-west part of the head
+  box(8, 3, 4.6, white, 7, -14, DECK + 1.5); box(8.3, 0.18, 4.9, MAT(0x5a6064), 7, -14, DECK + 3.08);
+  box(0.06, 2, 1, MAT(0x3b4a55), 5, -11.68, DECK + 1); box(0.06, 0.9, 1.6, MAT(0x26333c), 9, -11.68, DECK + 1.8);
+  box(0.14, 5.5, 0.14, dark, 2, 2, DECK + 2.75); box(0.6, 0.2, 0.4, MAT(0xfff4d6), 2, 1.7, DECK + 5.4);
+  // shed and parking at the root
+  box(9, 3.8, 6, MAT(0x3c3f3e), -P.L - 8, 9, heightAt(P.R.x, P.R.y) + 1.9); box(9.6, 0.5, 6.6, MAT(0x2a2d2e), -P.L - 8, 9, heightAt(P.R.x, P.R.y) + 4.0);
+  const rnd = mulberry(5150);
+  for (const [a, c] of [[-P.L - 18, 3], [-P.L - 24, 5], [-P.L - 15, 14]]) { const car = makeCar(rnd), w = P.toW(a, c); car.position.set(w.x, heightAt(w.x, w.y) + 0.02, -w.y); car.rotation.y = -(118 + 80) * DEG; scene.add(car); }
 }
 buildSouthPier();
 // the floating pontoon in Ardminish Bay; it rides up and down with the tide
@@ -3199,7 +3463,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer,
+  get S() { return S; }, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
