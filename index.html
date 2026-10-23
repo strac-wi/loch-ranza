@@ -153,6 +153,12 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:15px;margin:6px 0 4px}
 .keys kbd{font-family:var(--f-mono);font-size:12px;background:#1b2a31;border:1px solid var(--line-hi);border-radius:3px;padding:1px 5px;white-space:nowrap;justify-self:start}
 .help ol,.help ul{margin:0 0 6px;padding-left:20px;font-size:16px;line-height:1.4}
+#paYT{position:absolute;left:16px;top:220px;z-index:4;width:252px;padding:8px 10px}
+.pyh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:14px}
+.pyh button{padding:2px 8px}
+#paYTFrame iframe{display:block;width:232px;height:232px;border:0;background:#000}
+.pyn{margin:6px 0 0;font-size:12px;opacity:.75}
+@media (max-width:700px){#paYT{top:96px}}
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -239,7 +245,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <button id="bCam" title="Cycle camera (V)">View: chase</button>
         <button id="bSound" title="Mute (M)">Sound on</button>
         <button id="bPA" title="Play the passenger announcement (P)">Announcement</button>
-        <button id="bPALoad" title="Use your own recording for the announcement; it stays on this device">PA audio: built-in</button>
+        <button id="bPALoad" title="Announcement source: the YouTube video, the built-in spoken one, or your own recording (kept on this device)">PA: YouTube</button>
         <input type="file" id="paFile" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.mov,.mp4" hidden>
         <button id="bHelp">Help</button>
         <button id="bConsole">Show console</button>
@@ -273,6 +279,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <p id="fpHint" hidden>Drag to look around · drag levers, sticks and the wheel · click buttons · scroll to zoom · double-click to face ahead</p>
     <div id="alarmbar" hidden><ul id="alarmTop"></ul><button id="bAck2" class="warn">Ack</button></div>
     <div id="toasts" aria-live="polite"></div>
+    <div id="paYT" class="card" hidden><div class="pyh"><b>Passenger announcement</b><button id="paYTClose" aria-label="Close">×</button></div><div id="paYTFrame"></div><p class="pyn">From YouTube. Tap play if it does not start.</p></div>
     <div id="layup" class="card" hidden><p id="layupText"></p><div class="lrow"><button id="layupYes" class="go">Lay up at South Pier</button><button id="layupNo">Carry on</button></div></div>
 
     <div id="report" class="card" hidden>
@@ -332,7 +339,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
           <kbd>H</kbd><span>Horn (hold)</span>
           <kbd>C</kbd><span>Change direction: the other end leads, and in the wheelhouse you walk to its station</span>
           <kbd>V · T · M</kbd><span>Camera · time compression · mute</span>
-          <kbd>P</kbd><span>Passenger announcement (also plays by itself after leaving each slip)</span>
+          <kbd>P</kbd><span>Passenger announcement (also plays by itself after leaving each slip). The PA button picks the source: the YouTube video (shown in a small player), a built-in spoken one, or your own recording, which stays on your device</span>
           <kbd>Touch</kbd><span>Left pad: drag up for ahead, down for astern, sideways to crab; speed stays where you leave it and sideways recentres. Right bar: drag to steer, it recentres when you let go. Both work at once. Pinch the view with two fingers to zoom; View changes camera.</span>
           <kbd>Mouse</kbd><span>Drag to orbit the camera, scroll to zoom (in chase view it closes in on the ship, then narrows the lens), double-click to reset</span>
         </div>
@@ -3217,19 +3224,27 @@ function paStore(mode, fn) {
     r.onsuccess = () => { try { fn(r.result.transaction('pa', mode).objectStore('pa')); } catch (e) { /* storage unavailable */ } };
   } catch (e) { /* no IndexedDB here */ }
 }
-paStore('readonly', st => { const q = st.get('clip'); q.onsuccess = () => { if (q.result) { PA.pending = q.result; setT($('bPALoad'), 'PA audio: yours'); } }; });
+// where the announcement comes from: the YouTube video (embedded and visible, as YouTube requires), the built-in
+// spoken one, or the player's own file. The Claude-hosted copy cannot embed YouTube, so it starts on built-in.
+const PA_YT = { id: '3oNIYU4xNrM', start: 0, end: 41 };
+const PA_LABEL = { youtube: 'PA: YouTube', builtin: 'PA: built-in', file: 'PA: your file' };
+PA.mode = (() => { try { const m = localStorage.getItem('lr.pa'); if (PA_LABEL[m]) return m; } catch (e) { /* no storage */ } return /claude/i.test(location.hostname) ? 'builtin' : 'youtube'; })();
+function paSetMode(m) { PA.mode = m; setT($('bPALoad'), PA_LABEL[m]); try { localStorage.setItem('lr.pa', m); } catch (e) { /* no storage */ } }
+setT($('bPALoad'), PA_LABEL[PA.mode]);
+paStore('readonly', st => { const q = st.get('clip'); q.onsuccess = () => { if (q.result) PA.pending = q.result; }; });
 async function paDecode(blob, save) {
   initAudio(); if (!AU.ctx) return false;
   try {
     PA.buf = await AU.ctx.decodeAudioData(await blob.arrayBuffer()); PA.pending = null;
-    setT($('bPALoad'), 'PA audio: yours');
+    if (save) paSetMode('file');
     if (save) { paStore('readwrite', st => st.put(blob, 'clip')); toast('Announcement set to your recording. It stays on this device only.', 'good'); }
     return true;
   } catch (e) { PA.pending = null; if (save) toast('Could not read that file. Try .mp3, .m4a or .wav', 'warn'); return false; }
 }
 $('bPALoad').onclick = () => {
-  if (PA.buf || PA.pending) { PA.buf = PA.pending = null; paStore('readwrite', st => st.delete('clip')); setT($('bPALoad'), 'PA audio: built-in'); toast('Back to the built-in announcement'); return; }
-  $('paFile').click();
+  const next = { youtube: 'builtin', builtin: 'file', file: 'youtube' }[PA.mode];
+  if (next === 'file' && !PA.buf && !PA.pending) { paSetMode('file'); $('paFile').click(); return; }
+  paSetMode(next); toast(next === 'youtube' ? 'Announcement: the YouTube video' : next === 'builtin' ? 'Announcement: built-in' : 'Announcement: your recording');
 };
 $('paFile').onchange = (ev) => { const f = ev.target.files && ev.target.files[0]; if (f) paDecode(f, true); ev.target.value = ''; };
 function paText() {
@@ -3247,17 +3262,32 @@ function paChime(t0) {
     o.connect(g); g.connect(AU.master); o.start(t0 + dt); o.stop(t0 + dt + 1.5);
   });
 }
-function paDone() { PA.playing = false; PA.src = null; PA.utter = null; setT($('bPA'), 'Announcement'); if (AU.bus) AU.bus.gain.setTargetAtTime(1, AU.ctx.currentTime, 0.4); }
+function paDone() {
+  PA.playing = false; PA.src = null; PA.utter = null; setT($('bPA'), 'Announcement');
+  if (AU.bus) AU.bus.gain.setTargetAtTime(1, AU.ctx.currentTime, 0.4);
+  clearTimeout(PA.ytTimer); if (!$('paYT').hidden) { $('paYTFrame').replaceChildren(); $('paYT').hidden = true; }
+}
+function paYouTube() {
+  // YouTube's own player, visible, playing the announcement section and closing when it is over
+  const f = document.createElement('iframe');
+  f.src = `https://www.youtube-nocookie.com/embed/${PA_YT.id}?start=${PA_YT.start}&end=${PA_YT.end}&autoplay=1&playsinline=1&rel=0`;
+  f.allow = 'autoplay; encrypted-media; picture-in-picture'; f.title = 'Passenger announcement (YouTube)'; f.referrerPolicy = 'strict-origin-when-cross-origin';
+  $('paYTFrame').replaceChildren(f); $('paYT').hidden = false;
+  PA.ytTimer = setTimeout(paDone, (PA_YT.end - PA_YT.start + 8) * 1000);
+}
+$('paYTClose').onclick = () => paDone();
 async function paPlay(auto) {
   initAudio(); if (!AU.ctx) return;
   if (PA.playing) { if (auto) return; if (PA.src) try { PA.src.stop(); } catch (e) { /* already stopped */ } if (window.speechSynthesis) speechSynthesis.cancel(); paDone(); return; }
   if (auto && !AU.on) return;
   if (AU.ctx.state === 'suspended') AU.ctx.resume();
-  if (!PA.buf && PA.pending) await paDecode(PA.pending, false);
+  if (PA.mode === 'file' && !PA.buf && PA.pending) await paDecode(PA.pending, false);
   PA.playing = true; setT($('bPA'), 'Stop announcement');
-  const t0 = AU.ctx.currentTime + 0.05; paChime(t0);
+  const t0 = AU.ctx.currentTime + 0.05;
   AU.bus.gain.setTargetAtTime(0.45, t0, 0.4);   // the engines duck under the tannoy
-  if (PA.buf) {
+  if (PA.mode !== 'youtube') paChime(t0);   // the video brings its own chime
+  if (PA.mode === 'youtube') paYouTube();
+  else if (PA.mode === 'file' && PA.buf) {
     // tannoy: band-limited, a touch of presence and a short slap-back off the steelwork
     const src = AU.ctx.createBufferSource(); src.buffer = PA.buf;
     const hp = AU.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 280;
