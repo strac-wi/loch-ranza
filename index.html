@@ -1532,7 +1532,7 @@ function newGame(start, wxKey, simple = false) {
     endGeo: [{ T: null, al: -999, lt: 0, alignDeg: 180 }, { T: null, al: -999, lt: 0, alignDeg: 180 }],
     endFnAcc: [0, 0], endFnN: 0, endFn: [0, 0], endFnS: [0, 0], endLastContact: [-99, -99], endInContact: [false, false],
     grounded: false, groundT: -99, ukc: 9,
-    cars: [], slots: SLOT_DEF.map(s => ({ x: s.x, z: s.z, car: null })), queue: { tay: [], gig: [] }, mov: null, ashore: [],
+    cars: [], slots: SLOT_DEF.map(s => ({ x: s.x, z: s.z, car: null })), queue: { tay: [], gig: [] }, movs: [], ashore: [],
     pax: { aboard: 0, dest: 'gig', waiting: { tay: 0, gig: 0 }, acc: 0 },
     leg: { state: 'alongside', at: 'tay', from: 'tay', to: 'gig', departT: null, pen: [], maxImpact: 0 },
     score: 0, crossings: 0, alarms: [], ack: new Set(), alarmSound: false, horn: false,
@@ -1845,7 +1845,7 @@ function crewUpdate(dt) {
   const T = berthedAt(), sog = Math.hypot(S.u, S.v) / KN;
   const secure = (e) => {
     const E = S.ends[e], R = E.ramp;
-    if (S.mov && S.mov.e === e) return false;              // never lift a ramp with a car on it
+    if (S.movs.some(m => m.e === e)) return false;          // never lift a ramp with a car on it
     if (R.ang < RAMP_STOW - 0.5) { S.hpu.on = true; R.pins = false; R.lever = 'raise'; return false; }
     if (!R.pins) { R.pins = true; R.lever = 'hold'; }
     return true;
@@ -1900,7 +1900,7 @@ function cargoReady(e) {
   return g.held && E.ramp.landed && E.ramp.strain < 0.95;
 }
 function workLeft(T) {
-  return S.queue[T.id].length > 0 || S.slots.some(s => s.car && s.car.dest === T.id) || !!S.mov ||
+  return S.queue[T.id].length > 0 || S.slots.some(s => s.car && s.car.dest === T.id) || S.movs.length > 0 ||
     (S.pax.aboard > 0 && S.pax.dest === T.id) || S.pax.waiting[T.id] > 0;
 }
 function berthedAt() {
@@ -1927,51 +1927,65 @@ function updateCargo(dt) {
     p.lerp(a.to, Math.min(1, 7 * dt / d)); a.car.mesh.rotation.set(0, Math.atan2(-dx, -dz), 0);
   }
   const T = berthedAt(), e = T ? T.endIdx : -1, ready = T ? cargoReady(e) : false;
-  if (S.mov) {
-    const m = S.mov, pts = movePath(m);
-    const segs = []; let total = 0;
-    for (let i = 0; i < 4; i++) { const l = pts[i].distanceTo(pts[i + 1]); segs.push(l); total += l; }
+  // vehicles move as a convoy: each follows the one ahead at a car's length plus a gap, so the traffic flows on and off
+  // continuously instead of one car at a time
+  const GAP = 6.2;
+  for (let i = 0; i < S.movs.length; i++) {
+    const m = S.movs[i], pts = movePath(m), segs = []; let total = 0;
+    for (let k = 0; k < 4; k++) { const l = pts[k].distanceTo(pts[k + 1]); segs.push(l); total += l; }
     let acc = 0, seg = 0; while (seg < 3 && m.s > acc + segs[seg]) { acc += segs[seg]; seg++; }
-    const onRamp = seg === 1 || seg === 2;
-    const R = S.ends[m.e].ramp;
+    const R = S.ends[m.e].ramp, onRamp = seg === 1 || seg === 2;
     const sep = S.endGeo[m.e].T !== m.T || S.endGeo[m.e].al < -2.0 || R.la === null || R.ang > R.la + 4;
     if (m.fall) {
       m.fall -= dt; m.car.mesh.position.y -= 4 * dt; m.car.mesh.rotation.x += 1.2 * dt;
-      if (m.fall <= 0) { scene.remove(m.car.mesh); S.cars.splice(S.cars.indexOf(m.car), 1); S.mov = null; }
-      return;
+      if (m.fall <= 0) { scene.remove(m.car.mesh); S.cars.splice(S.cars.indexOf(m.car), 1); m.done = true; }
+      continue;
     }
     if (onRamp && sep) {
-      m.fall = 3; if (m.kind === 'on') m.slot.car = null; addPen('A vehicle went into the sea off the ramp', 500); toast('Vehicle lost off the ramp', 'warn'); return;
+      m.fall = 3; if (m.kind === 'on') m.slot.car = null; addPen('A vehicle went into the sea off the ramp', 500); toast('Vehicle lost off the ramp', 'warn'); continue;
     }
-    const go = cargoReady(m.e) || (m.kind === 'off' && seg >= 3) || (m.kind === 'on' && seg === 0 && S.endGeo[m.e].on);
-    if (go) m.s += 5 * dt;
-    if (m.kind === 'off' && seg >= 3) {          // clear of the ramp: drive off up the pier and free the ramp for the next car
-      S.ashore.push({ car: m.car, to: pts[4] }); S.mov = null; return;
+    if (m.kind === 'off' && seg >= 3) {           // clear of the ramp: drive off up the pier
+      S.ashore.push({ car: m.car, to: pts[4] }); m.done = true; continue;
     }
+    // hold back if a car that set off earlier is close ahead
+    const a0 = pts[seg], b0 = pts[seg + 1], hx = b0.x - a0.x, hz = b0.z - a0.z, hl = Math.hypot(hx, hz) || 1, cp = m.car.mesh.position;
+    const blocked = S.movs.slice(0, i).some(o => {
+      if (o.done || o.fall) return false;
+      const dx = o.car.mesh.position.x - cp.x, dz = o.car.mesh.position.z - cp.z, d = Math.hypot(dx, dz);
+      return d < GAP && (dx * hx + dz * hz) / hl > 0.3 * d;
+    });
+    const go = !blocked && (cargoReady(m.e) || (m.kind === 'on' && seg === 0 && S.endGeo[m.e].on));
+    m.v = approach(m.v || 0, go ? 5 : 0, (go ? 4 : 9) * dt);
+    m.s += m.v * dt;
     if (m.s >= total) {
       if (m.kind === 'off') { scene.remove(m.car.mesh); S.cars.splice(S.cars.indexOf(m.car), 1); }
       else { m.car.dest = OTHER(m.T.id).id; placeAboard(m.car, m.slot); }
-      S.mov = null; return;
+      m.done = true; continue;
     }
     acc = 0; seg = 0; while (seg < 3 && m.s > acc + segs[seg]) { acc += segs[seg]; seg++; }
-    const t = segs[seg] > 0 ? clamp((m.s - acc) / segs[seg], 0, 1) : 1;
-    const a = pts[seg], b = pts[seg + 1];
+    const t = segs[seg] > 0 ? clamp((m.s - acc) / segs[seg], 0, 1) : 1, a = pts[seg], b = pts[seg + 1];
     m.car.mesh.position.lerpVectors(a, b, t);
     const dx = b.x - a.x, dz = b.z - a.z;
     if (dx * dx + dz * dz > 0.01) m.car.mesh.rotation.set(0, Math.atan2(-dx, -dz), 0);
-  } else if (ready) {
-    const k = e === 0 ? 1 : -1;
-    const off = S.slots.filter(s => s.car && s.car.dest === T.id).sort((a, b) => (a.z * k) - (b.z * k))[0];
-    if (off) {
-      const car = off.car; off.car = null;
-      const wp = new V3(); car.mesh.getWorldPosition(wp); SHIP.motion.remove(car.mesh); scene.add(car.mesh); car.mesh.position.copy(wp);
-      S.mov = { car, kind: 'off', e, T, slot: { x: off.x, z: off.z }, s: 0 };
-    } else if (S.queue[T.id].length && !layupOffer()) {   // hold the loading while the master decides about laying up
-      const slot = loadOrder(e).find(s => !s.car);
-      if (slot) {
-        const car = S.queue[T.id].shift(); slot.car = car; car.slot = slot; car.dest = OTHER(T.id).id;
-        S.mov = { car, kind: 'on', e, T, slot, s: 0, start: car.mesh.position.clone() };
-      } else if (!S.fullWarned) { log('Car deck full', 'warn'); S.fullWarned = true; }
+  }
+  S.movs = S.movs.filter(m => !m.done);
+  if (ready) {
+    // the next car sets off once the one before has rolled a few lengths; loading starts when the last car is off
+    const last = S.movs[S.movs.length - 1], clear = !last || last.s > 7;
+    const offLeft = S.slots.some(sl => sl.car && sl.car.dest === T.id), k = e === 0 ? 1 : -1;
+    if (clear && S.movs.length < 6) {
+      if (offLeft) {
+        const off = S.slots.filter(sl => sl.car && sl.car.dest === T.id).sort((a, b) => (a.z * k) - (b.z * k))[0];
+        const car = off.car; off.car = null;
+        const wp = new V3(); car.mesh.getWorldPosition(wp); SHIP.motion.remove(car.mesh); scene.add(car.mesh); car.mesh.position.copy(wp);
+        S.movs.push({ car, kind: 'off', e, T, slot: { x: off.x, z: off.z }, s: 0, v: 0 });
+      } else if (!S.movs.some(m => m.kind === 'off') && S.queue[T.id].length && !layupOffer()) {   // hold the loading while the master decides about laying up
+        const slot = loadOrder(e).find(sl => !sl.car);
+        if (slot) {
+          const car = S.queue[T.id].shift(); slot.car = car; car.slot = slot; car.dest = OTHER(T.id).id;
+          S.movs.push({ car, kind: 'on', e, T, slot, s: 0, v: 0, start: car.mesh.position.clone() });
+        } else if (!S.fullWarned) { log('Car deck full', 'warn'); S.fullWarned = true; }
+      }
     }
   }
   // foot passengers walk while the ramp is down and she is held on
@@ -2049,7 +2063,7 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 function layupOffer() {
   const L = S.layup;
   return L.state === 'none' && !L.declined && S.leg.state === 'alongside' && S.leg.at === 'gig' &&
-    !S.slots.some(s => s.car && s.car.dest === 'gig') && !(S.mov && S.mov.kind === 'off') && !(S.pax.aboard > 0 && S.pax.dest === 'gig');
+    !S.slots.some(s => s.car && s.car.dest === 'gig') && !S.movs.some(m => m.kind === 'off') && !(S.pax.aboard > 0 && S.pax.dest === 'gig');
 }
 function layupChoose(yes) {
   const L = S.layup;
@@ -2390,7 +2404,7 @@ function updateChecklist() {
   else if (S.leg.state === 'alongside') {
     const T = TERM(S.leg.at), e = T.endIdx, E = S.ends[e], g = S.endGeo[e], O = OTHER(T.id);
     if (workLeft(T)) {
-      const offN = S.slots.filter(s => s.car && s.car.dest === T.id).length, onN = S.queue[T.id].length + (S.mov ? 1 : 0);
+      const offN = S.slots.filter(s => s.car && s.car.dest === T.id).length, onN = S.queue[T.id].length + S.movs.filter(m => m.kind === 'on').length;
       title = `Alongside ${T.name}: work traffic`;
       items = [
         ['Ship held squarely on the slip', g.held], [`No.${e + 1} ramp landed`, E.ramp.landed], ['Ramp lever in Float', E.ramp.lever === 'float'],
@@ -3108,7 +3122,7 @@ function drawDeckScreen() {
     const F = `600 25px ${FD}`;
     txt(g, 'LEVER', x0, 324, F, SC.dim); txt(g, R.lever.toUpperCase(), x0 + 200, 324, `700 26px ${FD}`, SC.ink);
     txt(g, 'PINS', x0, 360, F, SC.dim); txt(g, R.pins ? 'IN' : 'OUT', x0 + 200, 360, `700 26px ${FD}`, R.pins ? SC.grn : SC.amb);
-    const busy = S.mov && S.mov.e === e;
+    const busy = S.movs.some(m => m.e === e);
     txt(g, 'TRAFFIC', x0, 396, F, SC.dim); txt(g, busy ? 'CROSSING' : R.landed ? 'CLEAR' : '-', x0 + 200, 396, `700 26px ${FD}`, busy ? SC.amb : SC.ink);
     txt(g, 'STRAIN', x0, 432, F, SC.dim); sbar(g, x0 + 200, 424, 260, 14, R.strain, SC.red);
   });
