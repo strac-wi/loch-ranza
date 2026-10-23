@@ -238,6 +238,9 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <button id="bWarp" title="Time compression (T)">Time ×1</button>
         <button id="bCam" title="Cycle camera (V)">View: chase</button>
         <button id="bSound" title="Mute (M)">Sound on</button>
+        <button id="bPA" title="Play the passenger announcement (P)">Announcement</button>
+        <button id="bPALoad" title="Use your own recording for the announcement; it stays on this device">PA audio: built-in</button>
+        <input type="file" id="paFile" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.mov,.mp4" hidden>
         <button id="bHelp">Help</button>
         <button id="bConsole">Show console</button>
         <button id="bSimple" title="Switch between full procedure and simple controls">Controls: full</button>
@@ -262,7 +265,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <div id="touch" hidden>
       <div class="tjoy" id="tJoy" aria-label="Joystick: ahead, astern and sideways"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><span class="tl t-l">P</span><span class="tl t-r">S</span><div class="tknob" id="tJoyK"></div></div>
       <div class="tright">
-        <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change direction: the other end leads">Change dir</button><button id="tCam" title="Change camera view">View</button></div>
+        <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change direction: the other end leads">Change dir</button><button id="tCam" title="Change camera view">View</button><button id="tPA" title="Passenger announcement">PA</button></div>
         <div class="tsteer" id="tSteer" aria-label="Steer"><span class="tl t-l">Port</span><span class="tl t-mid">Steer</span><span class="tl t-r">Stbd</span><div class="tknob" id="tSteerK"></div></div>
       </div>
     </div>
@@ -329,6 +332,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
           <kbd>H</kbd><span>Horn (hold)</span>
           <kbd>C</kbd><span>Change direction: the other end leads, and in the wheelhouse you walk to its station</span>
           <kbd>V · T · M</kbd><span>Camera · time compression · mute</span>
+          <kbd>P</kbd><span>Passenger announcement (also plays by itself after leaving each slip)</span>
           <kbd>Touch</kbd><span>Left pad: drag up for ahead, down for astern, sideways to crab; speed stays where you leave it and sideways recentres. Right bar: drag to steer, it recentres when you let go. Both work at once. Pinch the view with two fingers to zoom; View changes camera.</span>
           <kbd>Mouse</kbd><span>Drag to orbit the camera, scroll to zoom (in chase view it closes in on the ship, then narrows the lens), double-click to reset</span>
         </div>
@@ -2008,6 +2012,7 @@ function updateLeg() {
       if (work) addPen(`Sailed from ${T.name} with traffic still to work`, 150);
       if (S.line.fast) { S.line.fast = false; SHIP.line.visible = false; }
       S.fullWarned = false;
+      S.paAt = S.t + 8; S.paDest = S.layup.state === 'chosen' ? 'the South Pier' : OTHER(T.id).name;   // the announcement goes out once she is clear of the slip
       if (S.layup.state === 'chosen') {
         S.layup.state = 'passage'; S.layup.wp = 0; S.layup.departT = S.t; S.layup.maxImpact = 0;
         log(`Departed ${T.name} for the South Pier`);
@@ -2553,6 +2558,7 @@ window.addEventListener('keydown', (ev) => {
   if (ev.code === 'KeyV') cycleCam();
   if (ev.code === 'KeyT') cycleWarp();
   if (ev.code === 'KeyC') swapEnds();
+  if (ev.code === 'KeyP') paPlay(false);
   if (ev.code === 'KeyM') toggleSound();
 });
 window.addEventListener('keyup', (ev) => keys.delete(ev.code));
@@ -3199,6 +3205,78 @@ function initAudio() {
 }
 function toggleSound() { AU.on = !AU.on; setT($('bSound'), AU.on ? 'Sound on' : 'Sound off'); }
 $('bSound').onclick = toggleSound;
+
+// ================= PASSENGER ANNOUNCEMENT =================
+// Plays a chime and then the announcement over a tannoy-like filter, ducking the engines. The default is spoken by
+// the browser from our own wording; players can load their own recording, which is kept only in this browser.
+const PA = { buf: null, pending: null, src: null, playing: false, utter: null };
+function paStore(mode, fn) {
+  try {
+    const r = indexedDB.open('lochranza', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('pa');
+    r.onsuccess = () => { try { fn(r.result.transaction('pa', mode).objectStore('pa')); } catch (e) { /* storage unavailable */ } };
+  } catch (e) { /* no IndexedDB here */ }
+}
+paStore('readonly', st => { const q = st.get('clip'); q.onsuccess = () => { if (q.result) { PA.pending = q.result; setT($('bPALoad'), 'PA audio: yours'); } }; });
+async function paDecode(blob, save) {
+  initAudio(); if (!AU.ctx) return false;
+  try {
+    PA.buf = await AU.ctx.decodeAudioData(await blob.arrayBuffer()); PA.pending = null;
+    setT($('bPALoad'), 'PA audio: yours');
+    if (save) { paStore('readwrite', st => st.put(blob, 'clip')); toast('Announcement set to your recording. It stays on this device only.', 'good'); }
+    return true;
+  } catch (e) { PA.pending = null; if (save) toast('Could not read that file. Try .mp3, .m4a or .wav', 'warn'); return false; }
+}
+$('bPALoad').onclick = () => {
+  if (PA.buf || PA.pending) { PA.buf = PA.pending = null; paStore('readwrite', st => st.delete('clip')); setT($('bPALoad'), 'PA audio: built-in'); toast('Back to the built-in announcement'); return; }
+  $('paFile').click();
+};
+$('paFile').onchange = (ev) => { const f = ev.target.files && ev.target.files[0]; if (f) paDecode(f, true); ev.target.value = ''; };
+function paText() {
+  const dest = (S && S.paDest) || 'Gigha';
+  return `Good day, ladies and gentlemen, and welcome aboard the Loch Ranza, bound for ${dest}. The crossing will take about twenty minutes. ` +
+    'Please take a moment to read the safety notices on board, which show where to find life jackets and your muster point. ' +
+    'In an emergency you will hear seven short blasts and one long blast on the ship\'s whistle. If you hear this, please go to the muster point and follow the instructions of the crew. ' +
+    'Please keep the car deck clear while we are under way unless you are staying in your vehicle, and take care on the stairs. Thank you, and enjoy your crossing.';
+}
+function paChime(t0) {
+  const ctx = AU.ctx;
+  [[659, 0], [523, 0.55]].forEach(([f, dt]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t0 + dt); g.gain.linearRampToValueAtTime(0.16, t0 + dt + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t0 + dt + 1.4);
+    o.connect(g); g.connect(AU.master); o.start(t0 + dt); o.stop(t0 + dt + 1.5);
+  });
+}
+function paDone() { PA.playing = false; PA.src = null; PA.utter = null; setT($('bPA'), 'Announcement'); if (AU.bus) AU.bus.gain.setTargetAtTime(1, AU.ctx.currentTime, 0.4); }
+async function paPlay(auto) {
+  initAudio(); if (!AU.ctx) return;
+  if (PA.playing) { if (auto) return; if (PA.src) try { PA.src.stop(); } catch (e) { /* already stopped */ } if (window.speechSynthesis) speechSynthesis.cancel(); paDone(); return; }
+  if (auto && !AU.on) return;
+  if (AU.ctx.state === 'suspended') AU.ctx.resume();
+  if (!PA.buf && PA.pending) await paDecode(PA.pending, false);
+  PA.playing = true; setT($('bPA'), 'Stop announcement');
+  const t0 = AU.ctx.currentTime + 0.05; paChime(t0);
+  AU.bus.gain.setTargetAtTime(0.45, t0, 0.4);   // the engines duck under the tannoy
+  if (PA.buf) {
+    // tannoy: band-limited, a touch of presence and a short slap-back off the steelwork
+    const src = AU.ctx.createBufferSource(); src.buffer = PA.buf;
+    const hp = AU.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 280;
+    const lp = AU.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4200;
+    const pk = AU.ctx.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 2000; pk.Q.value = 0.8; pk.gain.value = 4;
+    const g = AU.ctx.createGain(); g.gain.value = 0.9;
+    const dl = AU.ctx.createDelay(0.5); dl.delayTime.value = 0.085; const fb = AU.ctx.createGain(); fb.gain.value = 0.22;
+    src.connect(hp); hp.connect(lp); lp.connect(pk); pk.connect(g); g.connect(AU.master); g.connect(dl); dl.connect(fb); fb.connect(dl); fb.connect(AU.master);
+    src.onended = paDone; src.start(t0 + 1.6); PA.src = src;
+  } else if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
+    const u = new SpeechSynthesisUtterance(paText()); u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.95;
+    const v = speechSynthesis.getVoices().find(v => /en-GB/i.test(v.lang)); if (v) u.voice = v;
+    u.onend = u.onerror = paDone; PA.utter = u;
+    setTimeout(() => { if (PA.utter === u) speechSynthesis.speak(u); }, 1600);
+  } else { setTimeout(paDone, 2500); }
+  if (S) log(auto ? 'Passenger announcement' : 'Passenger announcement (by hand)');
+}
+$('bPA').onclick = () => paPlay(false);
+$('tPA').onclick = () => paPlay(false);
 function updateAudio() {
   if (!AU.ctx) return;
   const t = AU.ctx.currentTime, m = AU.on ? 1 : 0;
@@ -3351,6 +3429,7 @@ function frame(now) {
     updateCargo(sdt);
     updateLeg();
     updateLayup(sdt);
+    if (S.paAt && S.t >= S.paAt) { S.paAt = 0; paPlay(true); }
     updateAlarms(sdt);
     updateVisuals(sdt);
     updateLayupGfx();
