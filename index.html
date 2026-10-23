@@ -297,7 +297,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <div class="opts">
           <fieldset>
             <legend>Start</legend>
-            <label><input type="radio" name="start" value="cold" checked><span>Alongside Tayinloan<small>Engines stopped, line fast, ramp on the slip, cars waiting to board.</small></span></label>
+            <label><input type="radio" name="start" value="cold" checked><span>Alongside Tayinloan<small>Engines running, held on the slip with a touch of pitch, ramp down, cars waiting to board.</small></span></label>
             <label><input type="radio" name="start" value="ready"><span>Off the slip, ready to sail<small>Loaded, engines running, clutches in, ramps up and pinned.</small></span></label>
           </fieldset>
           <fieldset>
@@ -349,13 +349,13 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <h3>Laying up at the South Pier</h3>
         <p>When the cars are off at Gigha you are asked whether to lay her up for the night. Choose the South Pier and the waiting traffic is sent home; raise the ramp, pull away and follow the flashing yellow markers south down Gigha's east side. The last one brings you to the pier, where a green outline shows the berth along its fendered face. Come alongside parallel to the face and stop under 0.4 kn: the crew put the lines out and you get an end-of-day score. Let go to sail for Tayinloan again.</p>
         <h3>Wheelhouse view</h3>
-        <p>Press V for the wheelhouse. You stand at the conning station of the leading end; changing which end leads walks you to the other station. On the main desk, from left to right: engine start, stop and clutch for each unit, the two throttles, the joystick (ahead, astern and sideways), the steering wheel, the two individual unit pitch sticks, then mode, conning-end and utility buttons. The amber dot beside each unit stick shows where the pitch actually is while the servo catches up. Look left for the deck console: hydraulics, mooring line, and pins, Raise, Hold, Lower and Float for each ramp, with the deck display above it.</p>
+        <p>Press V for the wheelhouse. You stand at the conning station of the leading end; changing which end leads walks you to the other station. On the main desk, from left to right: engine start, stop and clutch for each unit, the two throttles, the joystick (ahead, astern and sideways), the steering wheel, the two individual unit pitch sticks, then mode, conning-end and utility buttons. The amber dot beside each unit stick shows where the pitch actually is while the servo catches up. Look left for the deck console: hydraulics, and pins, Raise, Hold, Lower and Float for each ramp, with the deck display above it.</p>
         <h3>Sailing from a slip</h3>
         <ol>
           <li>Start both engines, keep them at idle and engage the clutches with pitch at zero.</li>
           <li>Hold her on with a little pitch toward the slip while the cars come off and on.</li>
           <li>Once the last car is off the ramp, start the HPU, raise the ramp fully and put the pins in.</li>
-          <li>Let go the line. Set the conning direction so the far end leads, open up and go.</li>
+          <li>Set the conning direction so the far end leads, take the pitch off the slip, open up and go. There are no ropes at a slip: she is held there by power alone.</li>
         </ol>
         <h3>Landing on a slip</h3>
         <ol>
@@ -391,7 +391,6 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
       <div class="row"><button id="bHpu">HPU off</button><div class="meter" style="flex:1"><span>Press.</span><div class="bar"><i id="hpuBar" class="g"></i></div><output id="hpuP">0 bar</output></div></div>
       <div class="rampRow" data-end="0"></div>
       <div class="rampRow" data-end="1"></div>
-      <div class="row"><button id="bLine">Make fast</button><span class="kv">Line <output id="oLine">clear</output></span></div>
       <div class="kv"><span>Cars</span><output id="oCars">0 / 12</output><span>Pax</span><output id="oPax">0</output></div>
       <p class="hint" id="oCargo">-</p>
     </section>
@@ -1563,8 +1562,10 @@ function newGame(start, wxKey, simple = false) {
     S.pax.waiting.tay = 23;
     const E = S.ends[1];
     E.ramp.pins = false; E.ramp.lever = 'float'; const la = landingAngle(1); E.ramp.ang = la === null ? -12 : la; E.ramp.landed = true;
-    makeFast(1, true);
-    log('Alongside Tayinloan. Engines stopped, line fast, No.2 ramp on the slip.');
+    // no ropes at a slip: she is held on by the propellers, pushing the No.2 end against the slip
+    S.units.forEach(U => { U.eng = 'run'; U.rpm = ENG_IDLE + 0.2 * (ENG_MAX - ENG_IDLE); U.thr = 0.2; U.clutch = true; U.rotor = U.rpm / ENG_MAX; U.p.x = -0.15; });
+    if (!simple) S.lev.S = -0.15;
+    log('Alongside Tayinloan, held on the slip with a touch of pitch. No.2 ramp down.');
   } else {
     for (let i = 0; i < 7; i++) { const car = { mesh: makeCar(rnd), dest: 'gig' }; S.cars.push(car); placeAboard(car, loadOrder(1)[i]); }
     S.pax.aboard = 23; S.pax.dest = 'gig';
@@ -1866,7 +1867,6 @@ function crewUpdate(dt) {
         if (!R.landed) { if (S.hpu.p > 110) R.lever = 'lower'; say = `Lowering the No.${e + 1} ramp.`; }
         else {
           R.lever = 'float';
-          if (!S.line.fast) makeFast(e, true);
           say = 'Working traffic.';
         }
       } else say = 'Hold her square on the slip and we will put the ramp down.';
@@ -1887,18 +1887,6 @@ function crewUpdate(dt) {
   S.crewHold = hold;
   if (say !== S.crewMsg) { S.crewMsg = say; log('Crew: ' + say); }
 }
-function makeFast(e, quiet) {
-  const g = S.endGeo[e];
-  if (!g.T || g.al < -1.5 || Math.abs(g.lt) > 3) { msg('Get an end onto the slip before putting a line out'); return; }
-  const sp = Math.sin(S.psi), cp = Math.cos(S.psi), k = e === 0 ? 1 : -1, xb = k * 14.6;
-  const pick = (yb) => { const wx = S.x + xb * sp + yb * cp, wy = S.y + xb * cp - yb * sp; return { wx, wy, lt: (wx - g.T.P.x) * g.T.n.x + (wy - g.T.P.y) * g.T.n.y }; };
-  const yb = -3.6, A = pick(yb), side = Math.sign(A.lt) || 1;
-  const [bx, by] = xyFromTerm(g.T, side * 5.4, 21);
-  S.line = { fast: true, end: e, T: g.T, B: { x: bx, y: by }, yb, L0: Math.hypot(bx - A.wx, by - A.wy) - 0.15, tension: 0 };
-  SHIP.line.visible = true;
-  if (!quiet) log(`Line made fast from the No.${e + 1} end`);
-}
-
 // ================= CARGO =================
 function spawnQueue(tid, n) {
   for (let i = 0; i < n; i++) { const car = { mesh: makeCar(S.rnd), dest: OTHER(tid).id, home: tid }; S.cars.push(car); S.queue[tid].push(car); scene.add(car.mesh); const p = queueSpot(TERM(tid), S.queue[tid].length - 1); car.mesh.position.copy(p); car.mesh.rotation.y = -TERM(tid).brg * DEG + Math.PI; }
@@ -2276,11 +2264,6 @@ const ACT = {
     R.lever = l;
   },
   hpu() { S.hpu.on = !S.hpu.on; log(`HPU ${S.hpu.on ? 'started' : 'stopped'}`); },
-  line() {
-    if (S.line.fast) { S.line.fast = false; SHIP.line.visible = false; log('Line let go'); return; }
-    const e = S.endGeo[0].on ? 0 : S.endGeo[1].on ? 1 : (S.endGeo[0].al > S.endGeo[1].al ? 0 : 1);
-    makeFast(e);
-  },
 };
 function rampStatus(e) {
   const R = S.ends[e].ramp;
@@ -2351,8 +2334,6 @@ function updateUI(force) {
     document.querySelectorAll(`[data-e="${e}"]`).forEach(b => setC(b, 'on', b.dataset.l === R.lever));
     drawRampViz(e);
   });
-  setT($('bLine'), S.line.fast ? 'Let go' : 'Make fast'); setC($('bLine'), 'on', S.line.fast);
-  setT($('oLine'), S.line.fast ? `fast · ${(S.line.tension / 1000).toFixed(0)} kN` : 'clear');
   setT($('oCars'), `${S.slots.filter(s => s.car).length} / 12`);
   setT($('oPax'), String(S.pax.aboard));
   const T = berthedAt();
@@ -2386,8 +2367,8 @@ function simpleChecklist() {
     const T = TERM(S.leg.at), e = T.endIdx, E = S.ends[e], g = S.endGeo[e], O = OTHER(T.id);
     const stowed = E.ramp.pins && E.ramp.ang >= RAMP_STOW - 0.5;
     if (workLeft(T)) return [`Alongside ${T.name}`, [['Keep her square on the slip', g.on], ['Crew lands the ramp', E.ramp.landed], ['Cars off and on', false, 'note'], ['Wait: the crew holds her on', false, 'note']]];
-    if (S.layup.state === 'chosen') return ['Ready for the South Pier', [['Crew raises and pins the ramp', stowed], ['Line let go', !S.line.fast], ['Pull away and head south: follow the yellow markers', false, 'note']]];
-    return [`Ready for ${O.name}`, [['Crew raises and pins the ramp', stowed], ['Line let go', !S.line.fast], ['Pull away: W for ahead, A/D to turn', false, 'note']]];
+    if (S.layup.state === 'chosen') return ['Ready for the South Pier', [['Crew raises and pins the ramp', stowed], ['Pull away and head south: follow the yellow markers', false, 'note']]];
+    return [`Ready for ${O.name}`, [['Crew raises and pins the ramp', stowed], ['Pull away: W for ahead, A/D to turn', false, 'note']]];
   }
   const D = TERM(S.leg.to), e = D.endIdx, g = S.endGeo[e], k = e === 0 ? 1 : -1, sp = Math.sin(S.psi), cp = Math.cos(S.psi);
   const dist = Math.hypot(S.x + k * HALF_L * sp - D.P.x, S.y + k * HALF_L * cp - D.P.y);
@@ -2429,7 +2410,7 @@ function updateChecklist() {
       items = [
         ['Both engines running', engOK], ['Both clutches in', cluOK],
         ['HPU on, pins out, raise ramp', E.ramp.ang >= RAMP_STOW - 0.5], [`No.${e + 1} ramp pinned`, E.ramp.pins && E.ramp.ang >= RAMP_STOW - 0.5],
-        ['Mooring line let go', !S.line.fast], [`Conning: No.${O.endIdx + 1} leads`, S.dir === wantDir], ['Ease off the slip and away', false],
+        [`Conning: No.${O.endIdx + 1} leads`, S.dir === wantDir], ['Ease off the slip and away', false],
       ];
     }
   } else {
@@ -2663,7 +2644,6 @@ $('tWarp').onclick = () => cycleWarp();
 $('dir1').onclick = () => setDir(1);
 $('dir2').onclick = () => setDir(-1);
 $('bHpu').onclick = () => ACT.hpu();
-$('bLine').onclick = () => ACT.line();
 function ack() { S.ack = new Set(S.alarms); S.alarmSound = false; }
 $('bAck').onclick = ack; $('bAck2').onclick = ack;
 const WARPS = [1, 2, 4, 8];
@@ -2823,7 +2803,6 @@ function defineControls() {
   C.warp = { label: 'Time compression', val: () => '×' + S.warp, down: cycleWarp };
   C.panels = { label: 'Console panels', val: () => $('console').hidden ? 'hidden' : 'shown', down: () => setConsole(!$('console').hidden) };
   C.hpu = { label: 'Hydraulic power pack', val: () => `${S.hpu.on ? 'on' : 'off'} · ${Math.round(S.hpu.p)} bar`, down: () => ACT.hpu() };
-  C.line = { label: 'Mooring line', val: () => S.line.fast ? `fast · ${(S.line.tension / 1000).toFixed(0)} kN` : 'clear', down: () => ACT.line() };
   [0, 1].forEach(e => {
     const R = () => S.ends[e].ramp, n = `No.${e + 1} ramp`;
     C['pins' + e] = { label: `${n} securing pins`, val: () => R().pins ? 'in' : 'out', down: () => ACT.pins(e) };
@@ -2973,7 +2952,6 @@ function buildWheelhouse() {
     box(wallScr, 0.6, 0.34, 0.04, mPanel, 0, 0, 0);
     screen(wallScr, S_.deck, 0, 0.56, 0.3).position.z = 0.024;
     button(side, 'hpu', -0.4, -0.11, 'HPU', () => S.hpu.on ? (S.hpu.p > 110 ? LAMP.green : LAMP.amber) : 0);
-    button(side, 'line', -0.4, 0.08, 'Line', () => S.line.fast ? LAMP.amber : 0);
     [0, 1].forEach(e => {
       const z = e ? 0.08 : -0.11, R = () => S.ends[e].ramp;
       label(side, `No.${e + 1} ramp`, -0.27, z, 0.12);
@@ -3142,7 +3120,7 @@ function drawDeckScreen() {
     txt(g, 'STRAIN', x0, 432, F, SC.dim); sbar(g, x0 + 200, 424, 260, 14, R.strain, SC.red);
   });
   g.fillStyle = SC.line; g.fillRect(14, 462, 996, 2);
-  txt(g, `LINE ${S.line.fast ? 'FAST · ' + (S.line.tension / 1000).toFixed(0) + ' kN' : 'CLEAR'}   ·   CARS ${S.slots.filter(sl => sl.car).length}/12   ·   PAX ${S.pax.aboard}`, 20, 490, `600 27px ${FD}`, SC.ink, 'left', 984);
+  txt(g, `${S.endGeo.some(q => q.held) ? 'HELD ON BY PITCH' : 'CLEAR OF THE SLIP'}   ·   CARS ${S.slots.filter(sl => sl.car).length}/12   ·   PAX ${S.pax.aboard}`, 20, 490, `600 27px ${FD}`, SC.ink, 'left', 984);
   txt(g, WH.cargo, 20, 526, `500 25px ${FD}`, SC.dim, 'left', 984);
 }
 
