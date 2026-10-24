@@ -4270,7 +4270,7 @@ function updateRibVisuals(dt) {
   R.heave += ((hf + ha + hs + hpp) / 4 * (1 - 0.5 * p) - R.heave) * a; R.pitch += (pitch - R.pitch) * a; R.roll += (roll - R.roll) * a;
   RIB.root.position.set(R.x, S.tide + R.heave + 0.08 * p - 0.06, -R.y); RIB.root.rotation.y = -R.psi;
   RIB.body.rotation.set(R.pitch, 0, R.roll);
-  RIB.steer.rotation.y = -R.wheel * 32 * DEG; RIB.trim.rotation.x = -R.trim * DEG; RIB.prop.rotation.z = R.prop;
+  RIB.steer.rotation.y = R.wheel * 32 * DEG;   // wheel to starboard swings the prop to starboard, pushing the stern to port RIB.trim.rotation.x = -R.trim * DEG; RIB.prop.rotation.z = R.prop;
   RIB.wheel.rotation.z = -R.wheel * 2.6; RIB.lever.rotation.x = -R.lever * 0.8;
   RIB.helm.visible = cam.mode !== 'helm';
   // prop wash astern and spray off the chines once she is planing
