@@ -6,7 +6,7 @@ Or pick the RIB on the start screen: a Gala Viking V500 with a Suzuki 100 hp out
 
 Play it at https://strac-wi.github.io/loch-ranza/
 
-Loch Sween (RIB only, from a mooring off Achnamara): https://strac-wi.github.io/loch-ranza/#sween, or pick it under Water on the start screen. Its shore, roads and woods are traced from OpenStreetMap (© OpenStreetMap contributors, ODbL), GSHHG beyond; hills from Terrain Tiles on AWS (SRTM, NASA; EU-DEM, produced using Copernicus data and information funded by the European Union). Depths are modelled, not charted.
+Loch Sween (RIB only, from a mooring off Achnamara): https://strac-wi.github.io/loch-ranza/#sween, or pick it under Water on the start screen. Its shore, roads and woods are traced from OpenStreetMap (© OpenStreetMap contributors, ODbL), GSHHG beyond; hills from Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA). Depths are modelled, not charted.
 
 
 Not affiliated with or endorsed by Caledonian MacBrayne. Map data © OpenStreetMap contributors (ODbL). Outer coastline: GSHHG (Wessel & Smith, LGPL). Depths are modelled, not charted.
