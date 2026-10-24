@@ -163,6 +163,8 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
 .help ol,.help ul{margin:0 0 6px;padding-left:20px;font-size:16px;line-height:1.4}
 #ribHud{display:none;position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;z-index:3;padding:8px 10px;width:300px;box-sizing:border-box;pointer-events:auto}
 body.rib #ribHud{display:block}
+/* tablets: the touch lever has the bottom-left corner, so the panel sits above it (phones put the panel at the top instead) */
+@media (min-width:701px){body.touchon #ribHud{bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + 250px)}}
 body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #bPALoad,body.rib #layup,body.rib #alarmbar{display:none!important}
 .rg{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .rlev{position:relative;width:12px;height:52px;border:1px solid var(--line-hi);border-radius:3px;background:rgba(0,0,0,.25)}
@@ -3188,7 +3190,7 @@ bindPad($('tSteer'), (ev) => {
 }, () => { TOUCH.steer = false; TOUCH.springW = GAME !== 'rib'; TOUCH.springRW = GAME === 'rib'; });
 $('tStop').onclick = () => { if (GAME === 'rib') RB.lever = 0; else zeroPitch(); };
 $('tHorn').addEventListener('pointerdown', () => { hornBtn = true; });
-function setTouch(on) { TOUCH.on = on; setT($('bTouch'), on ? 'Touch controls: on' : 'Touch controls: off'); setC($('bTouch'), 'on', on); }
+function setTouch(on) { TOUCH.on = on; document.body.classList.toggle('touchon', on); setT($('bTouch'), on ? 'Touch controls: on' : 'Touch controls: off'); setC($('bTouch'), 'on', on); }
 $('bTouch').onclick = () => setTouch(!TOUCH.on);
 function updateTouch() {
   const show = TOUCH.on && S.running && $('menu').hidden;
