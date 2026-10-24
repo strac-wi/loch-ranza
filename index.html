@@ -305,7 +305,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
             <label><input type="radio" name="wx" value="fresh"><span>Fresh westerly<small>26 kn gusting, a lumpy sea on the beam.</small></span></label>
           </fieldset>
         </div>
-        <div class="row"><button id="bGo" class="go">Take the con</button><button id="bHelp2">How she handles</button></div>
+        <div class="row"><button id="bGo" class="go">Start</button><button id="bHelp2">How she handles</button></div>
         <p class="fine" style="margin-top:12px">Press V in game for the first-person wheelhouse. Coastline in the Sound traced from OpenStreetMap (© OpenStreetMap contributors, ODbL); beyond it, the GSHHG shoreline (Wessel &amp; Smith, LGPL). An unofficial fan simulator, not affiliated with or endorsed by Caledonian MacBrayne. The coastline is stylised and the handling figures are estimates, so treat it as a game rather than a training aid.</p>
       </div>
     </div>
@@ -504,6 +504,83 @@ const TERMS = [
 TERMS.forEach(T => { const b = T.brg * DEG; T.d = { x: Math.sin(b), y: Math.cos(b) }; T.n = { x: T.d.y, y: -T.d.x }; });
 const TERM = (id) => TERMS.find(T => T.id === id);
 const OTHER = (id) => TERMS.find(T => T.id !== id);
+
+// ---------- Ardminish and Tayinloan: roads, buildings and greenery ----------
+// Road lines and building positions are read off the OpenStreetMap render (© OpenStreetMap contributors); the look of
+// things and the rough extent of the woods, gorse and beaches follow the aerial and shore photos.
+const pierRoot = (T, extra = 0) => [T.P.x + T.d.x * (T.len + extra), T.P.y + T.d.y * (T.len + extra)];
+const ROADS = [
+  { id: 'c22', w: 4.6, pts: [[-4099, 2886], [-4133, 2734], [-4171, 2581], [-4202, 2428], [-4236, 2275], [-4252, 2199], [-4267, 2122], [-4271, 2046], [-4268, 1970], [-4267, 1893], [-4263, 1817], [-4262, 1740], [-4264, 1664], [-4288, 1590], [-4320, 1511], [-4347, 1435], [-4370, 1358], [-4397, 1282], [-4446, 1129], [-4469, 1053]] },
+  { id: 'gigFerry', w: 5.2, ferry: 'gig', pts: [pierRoot(TERMS[1], 1), [-3822, 2251], [-3842, 2258], [-3870, 2253], [-3900, 2237], [-3923, 2222], [-3946, 2199], [-3969, 2168], [-3992, 2122], [-4015, 2069], [-4038, 2019], [-4072, 2001], [-4180, 2001], [-4268, 2004]] },
+  { id: 'boathouse', w: 4.2, pts: [[-4072, 2001], [-4058, 1991], [-4030, 1975], [-3994, 1958], [-3966, 1946]] },
+  { id: 'path', w: 1.7, path: true, pts: [[-4049, 1952], [-4030, 1905], [-4022, 1862], [-4031, 1812], [-4041, 1771], [-4060, 1718], [-4100, 1700], [-4180, 1702], [-4262, 1712]] },
+  { id: 'tayFerry', w: 5.6, ferry: 'tay', pts: [pierRoot(TERMS[0], 1), [140, -3], [160, -9], [172, -28], [187, -93], [210, -170], [233, -246], [248, -322], [264, -407], [294, -456], [340, -483], [455, -521], [569, -544], [634, -552], [669, -514]] },
+  { id: 'a83', w: 7.4, lines: true, pts: [[875, 174], [808, -60], [745, -280], [690, -480], [626, -705]] },
+  { id: 'tayVillage', w: 4.2, pts: [[455, -521], [452, -560], [462, -600], [500, -615], [560, -610], [590, -560]] },
+];
+// Each building: [x, y, type, size]. Types: house (white harled cottage), boathouse, hotel, shop, shelter, terminal, farm
+const BUILDINGS = [
+  [-3984, 1934, 'boathouse'], [-4116, 2112, 'hotel'], [-4224, 2058, 'shop'], [-3833, 2266, 'shelter'],
+  [-4334, 2045, 'house'], [-4309, 2038, 'house'], [-4285, 2047, 'house'], [-4253, 2052, 'house'], [-4240, 2027, 'house'], [-4250, 2076, 'house'],
+  [-4294, 1876, 'house'], [-4317, 1874, 'house'], [-4292, 1832, 'house'], [-4294, 1812, 'house'], [-4316, 1782, 'house'], [-4288, 1757, 'house'],
+  [-4320, 1752, 'house'], [-4325, 1723, 'house'], [-4304, 1704, 'house'], [-4243, 1678, 'house'], [-4308, 1672, 'house'], [-4249, 1656, 'house'],
+  [-4315, 1649, 'house'], [-4108, 1568, 'house'], [-4324, 1444, 'house'], [-4334, 1420, 'house'], [-4338, 1373, 'house'], [-4289, 1343, 'house'], [-4317, 1316, 'house'],
+  [-4035, 2433, 'farm'], [-3931, 2495, 'farm'], [-3940, 2472, 'house'], [-4341, 2401, 'house'], [-4524, 2356, 'farm'], [-4051, 2736, 'house'], [-4394, 2882, 'farm'],
+  [-3872, 3584, 'farm'], [-3941, 3195, 'house'], [-4680, 3462, 'house'], [-4149, 1086, 'house'], [-3770, 1161, 'house'], [-4575, 1149, 'house'],
+  [196, 30, 'terminal'], [186, -85, 'house'], [186, -117, 'house'],
+  [370, -498, 'house'], [392, -510, 'house'], [417, -513, 'house'], [424, -568, 'house'], [455, -569, 'house'], [523, -576, 'house'], [492, -591, 'house'],
+  [560, -591, 'house'], [452, -598, 'house'], [614, -598, 'house'], [413, -626, 'house'], [448, -637, 'house'], [664, -448, 'farm'], [692, -376, 'house'],
+  [739, -422, 'house'], [785, -295, 'farm'], [807, -385, 'house'], [963, -459, 'house'], [1050, -391, 'house'], [1087, -430, 'farm'],
+];
+// woodland, gorse, lawns and car parks as polygons; sandy stretches of shore as [x0, y0, x1, y1, half-width]
+// low gorse clumps on machair (short, flowery grass on sandy ground): by the hotel, on the slope above the Boathouse, in
+// the roadside strips. There are no woods round the bay.
+const MACHAIR = [
+  [[-4140, 2150], [-4085, 2160], [-4045, 2128], [-4030, 2085], [-4060, 2062], [-4110, 2070], [-4150, 2105]],
+  [[-4062, 1962], [-4010, 1952], [-3990, 1912], [-3972, 1860], [-3978, 1800], [-4010, 1758], [-4060, 1745], [-4085, 1800], [-4080, 1890]],
+  [[-4040, 2045], [-4020, 2040], [-3998, 2002], [-4010, 1985], [-4036, 1996]],
+  [[-4352, 2066], [-4330, 2070], [-4318, 2022], [-4345, 2010]],
+];
+const GORSE = [
+  [[-3992, 1925], [-3960, 1905], [-3955, 1860], [-3968, 1800], [-3990, 1790], [-3985, 1860]],
+  [[-3870, 2300], [-3830, 2295], [-3812, 2275], [-3850, 2270], [-3885, 2280]],
+  [[-3998, 2110], [-3975, 2150], [-3958, 2140], [-3985, 2100]],
+];
+const LAWNS = [
+  [[-4000, 1950], [-3968, 1955], [-3958, 1925], [-3990, 1918]],
+  [[-4135, 2130], [-4095, 2135], [-4092, 2095], [-4132, 2092]],
+  [[-3880, 2275], [-3846, 2270], [-3838, 2246], [-3872, 2244]],
+];
+const CARPARKS = [
+  [[-3972, 1948], [-3950, 1950], [-3944, 1930], [-3965, 1926]],
+  [[-3846, 2262], [-3822, 2262], [-3820, 2246], [-3842, 2244]],
+  [[160, 25], [232, 30], [236, 82], [168, 86]],
+];
+const BEACHES = [
+  [-3950, 2205, -3900, 2232, 14], [-4005, 2095, -3990, 2140, 10], [-4040, 2010, -4010, 1990, 10], [-4040, 1835, -4005, 1760, 12],
+  [-3968, 1958, -3950, 1952, 8], [120, 400, 120, -700, 22], [160, -700, 120, -300, 22],
+];
+function polyIn(P, x, y) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+function segDist(x, y, ax, ay, bx, by) { const vx = bx - ax, vy = by - ay, t = clamp(((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1), 0, 1); return Math.hypot(x - ax - vx * t, y - ay - vy * t); }
+function nearestRoad(x, y) {
+  let best = { d: 1e9, dx: 1, dy: 0, nx: 0, ny: 1 };
+  for (const R of ROADS) { if (R.path) continue; for (let i = 1; i < R.pts.length; i++) {
+    const [ax, ay] = R.pts[i - 1], [bx, by] = R.pts[i], vx = bx - ax, vy = by - ay, l = Math.hypot(vx, vy) || 1, t = clamp(((x - ax) * vx + (y - ay) * vy) / (l * l), 0, 1);
+    const qx = ax + vx * t, qy = ay + vy * t, d = Math.hypot(x - qx, y - qy) - R.w / 2;
+    if (d < best.d) { const dl = Math.hypot(x - qx, y - qy) || 1; best = { d, dx: vx / l, dy: vy / l, nx: (x - qx) / dl, ny: (y - qy) / dl }; }
+  } }
+  return best;
+}
+function roadDist(x, y) { let d = 1e9; for (const R of ROADS) for (let i = 1; i < R.pts.length; i++) d = Math.min(d, segDist(x, y, ...R.pts[i - 1], ...R.pts[i]) - R.w / 2); return d; }
+// a polyline as a function of distance along it: position and heading
+function polyline(pts) {
+  const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return { pts, L, len: L[L.length - 1], at(s) {
+    s = clamp(s, 0, this.len); let i = 1; while (i < pts.length - 1 && L[i] < s) i++;
+    const a = pts[i - 1], b = pts[i], t = (s - L[i - 1]) / (L[i] - L[i - 1] || 1), dx = b[0] - a[0], dy = b[1] - a[1], dl = Math.hypot(dx, dy) || 1;
+    return { x: a[0] + dx * t, y: a[1] + dy * t, dx: dx / dl, dy: dy / dl };
+  } };
+}
 
 // Signed distance to the shore (+ on land) on a 12.5 m raster: exact near the coast, chamfer-propagated beyond.
 // OpenStreetMap decides inside its footprint, GSHHG outside; where the two meet, the raster boundary seeds the distance.
@@ -755,16 +832,81 @@ function landColor(h, x, y) {
 // Terrain: smooth-shaded, with per-pixel detail laid over the vertex colours so the ground does not read as flat
 // 17 m facets. Grass and heather get a mottle at a few scales, steep faces turn to bare rock, and the band just above
 // the tide line is darkened and wet; the finest detail fades out with distance so it never shimmers.
-const TERRAIN_U = { uTide: { value: 0 } };
+// Ground detail painted at under a metre a pixel over Ardminish and Tayinloan: roads with verges and the odd passing
+// place, car parks, lawns, woodland floor, gorse, and a crisp shoreline of sand or rock. The terrain shader lays it
+// over the vertex colours, so it follows the ground exactly.
+const DETAIL_R = { ard: [-4540, 1000, 900, 1950], tay: [-40, -760, 1260, 980] };
+function buildGroundDetail(R, NX, NY) {
+  const [x0, y0, w, h] = R, c = document.createElement('canvas'); c.width = NX; c.height = NY;
+  const g = c.getContext('2d'), sx = NX / w, sy = NY / h, X = (x) => (x - x0) * sx, Y = (y) => (y0 + h - y) * sy, ms = Math.sqrt(sx * sy);
+  const poly = (P, fill) => { g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.closePath(); g.fillStyle = fill; g.fill(); };
+  const line = (P, wd, stroke, dash) => { g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.lineWidth = wd * ms; g.strokeStyle = stroke; g.lineCap = g.lineJoin = 'round'; g.setLineDash(dash ? dash.map(d => d * ms) : []); g.stroke(); g.setLineDash([]); };
+  g.filter = 'blur(2px)';
+  MACHAIR.forEach(P => poly(P, 'rgba(126,158,78,0.4)'));
+  GORSE.forEach(P => poly(P, 'rgba(70,82,38,0.5)'));
+  g.filter = 'blur(1px)';
+  LAWNS.forEach(P => poly(P, 'rgba(92,128,58,0.8)'));
+  g.filter = 'none';
+  {
+    const r = mulberry(919), flowers = ['rgba(245,244,236,0.8)', 'rgba(236,206,70,0.8)', 'rgba(176,122,170,0.75)', 'rgba(236,206,70,0.8)'];
+    for (const P of MACHAIR.concat(GORSE)) {
+      const xs = P.map(p => p[0]), ys = P.map(p => p[1]), x0p = Math.min(...xs), y0p = Math.min(...ys), wp = Math.max(...xs) - x0p, hp = Math.max(...ys) - y0p;
+      for (let k = 0; k < wp * hp / 6; k++) { const x = x0p + r() * wp, y = y0p + r() * hp; if (!polyIn(P, x, y)) continue; g.fillStyle = flowers[Math.floor(r() * 4)]; g.fillRect(X(x), Y(y), 1, 1); }
+    }
+  }
+  CARPARKS.forEach(P => poly(P, 'rgba(78,80,80,0.96)'));
+  for (const Rd of ROADS) {
+    if (Rd.path) { line(Rd.pts, Rd.w + 0.8, 'rgba(120,112,90,0.5)'); line(Rd.pts, Rd.w, 'rgba(158,146,118,0.9)'); continue; }
+    line(Rd.pts, Rd.w + 2.6, 'rgba(104,118,72,0.55)');           // worn verge
+    line(Rd.pts, Rd.w, 'rgba(74,76,77,0.97)');                      // tarmac
+    if (Rd.lines) line(Rd.pts, 0.15, 'rgba(235,235,225,0.9)', [3, 6]);
+    else if (Rd.w < 5) line(Rd.pts, 0.9, 'rgba(96,98,96,0.35)');     // crown of a single-track road, slightly polished
+  }
+  // marshalling lanes on the Tayinloan car park
+  if (R === DETAIL_R.tay) for (let k = 0; k < 5; k++) line([[172 + k * 1.2, 36 + k * 9], [228 + k * 0.6, 40 + k * 9]], 0.14, 'rgba(235,235,225,0.85)');
+  // the shoreline, pixel by pixel: sand on the beaches, otherwise bare rock and boulders, with a dark weed line
+  const img = g.getImageData(0, 0, NX, NY), d = img.data;
+  const beach = (x, y) => BEACHES.some(([ax, ay, bx, by, hw]) => segDist(x, y, ax, ay, bx, by) < hw);
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const x = x0 + (i + 0.5) / sx, y = y0 + h - (j + 0.5) / sy, sd = shoreDist(x, y);
+    if (sd < -3 || sd > 16) continue;
+    const k = (j * NX + i) * 4; if (d[k + 3] > 140) continue;
+    const n = hash(Math.floor(x * 0.9), Math.floor(y * 0.9)), m = fbm(x * 0.08, y * 0.08);
+    let r, gg, b, a;
+    if (beach(x, y) && sd < 14) { const t = clamp(sd / 14, 0, 1); r = 222 - 30 * t + n * 10; gg = 212 - 26 * t + n * 9; b = 182 - 22 * t + n * 6; a = 230 * (1 - smooth(9, 14, sd)); }
+    else if (sd < 7) { const v = 92 + m * 50 + n * 22; r = v; gg = v * 0.97; b = v * 0.9; a = 235 * (1 - smooth(4, 7, sd)); if (sd < 0.8) { r *= 0.45; gg *= 0.42; b *= 0.3; } }
+    else continue;
+    const A = a / 255, B = d[k + 3] / 255;
+    d[k] = r * A + d[k] * (1 - A); d[k + 1] = gg * A + d[k + 1] * (1 - A); d[k + 2] = b * A + d[k + 2] * (1 - A); d[k + 3] = Math.max(d[k + 3], a);
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 8; t.premultiplyAlpha = true; return t;
+}
+// the same areas of sea get a sandy, weedy bottom showing through the shallows
+function buildBayTint(R, N) {
+  const [x0, y0, w, h] = R, data = new Uint8Array(N * N * 4);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = x0 + (i + 0.5) / N * w, y = y0 + (j + 0.5) / N * h, sd = shoreDist(x, y), k = (j * N + i) * 4;
+    if (sd > 4) continue;
+    const sh = clamp(1 + sd / 140, 0, 1), weed = smooth(0.5, 0.62, fbm(x * 0.011 + 3, y * 0.011 - 5)) * smooth(-10, -40, sd);
+    const a = sh * sh * (0.75 + 0.25 * weed);   // stored premultiplied, so the edge fade cannot darken it
+    data[k] = lerp(84, 30, weed) * a; data[k + 1] = lerp(170, 66, weed) * a; data[k + 2] = lerp(162, 60, weed) * a; data[k + 3] = Math.round(255 * a);
+  }
+  const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
+}
+const DETAIL = { ard: buildGroundDetail(DETAIL_R.ard, 1024, 2048), tay: buildGroundDetail(DETAIL_R.tay, 1536, 1152), bayA: buildBayTint(DETAIL_R.ard, 384), bayT: buildBayTint(DETAIL_R.tay, 256) };
+const TERRAIN_U = { uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay },
+  uDetAR: { value: new THREE.Vector4(...DETAIL_R.ard) }, uDetTR: { value: new THREE.Vector4(...DETAIL_R.tay) } };
 const TERRAIN_MAT = (() => {
   const m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 4, specular: 0x111111 });
   m.extensions = { derivatives: true };
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTide = TERRAIN_U.uTide;
+    Object.assign(sh.uniforms, TERRAIN_U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWP; uniform float uTide;
+      varying vec3 vWP; uniform float uTide; uniform sampler2D uDetA; uniform sampler2D uDetT; uniform vec4 uDetAR; uniform vec4 uDetTR;
+      vec4 detailAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.05, e); }
       float th12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
       float tnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(th12(i), th12(i + vec2(1.0, 0.0)), f.x), mix(th12(i + vec2(0.0, 1.0)), th12(i + vec2(1.0, 1.0)), f.x), f.y); }`)
@@ -779,8 +921,12 @@ const TERRAIN_MAT = (() => {
         // bare rock on the steep faces and crags
         vec3 rock = vec3(0.43, 0.42, 0.39) * (0.8 + 0.4 * n2);
         diffuseColor.rgb = mix(diffuseColor.rgb, rock, smoothstep(0.42, 0.68, slope + (n1 - 0.5) * 0.25) * step(1.2, h));
-        // mottled ground: tussocks, heather clumps, sheep tracks
-        diffuseColor.rgb *= 1.0 + ((n1 - 0.5) * 0.22 + (n2 - 0.5) * 0.16) * mid + (n3 - 0.5) * 0.14 * near;
+        // painted detail around the two terminals: roads, car parks, lawns, woods, beaches
+        vec2 pn = vec2(vWP.x, -vWP.z);
+        vec4 dt = detailAt(uDetA, uDetAR, pn) + detailAt(uDetT, uDetTR, pn);
+        diffuseColor.rgb = mix(diffuseColor.rgb, dt.rgb / max(dt.a, 0.001), dt.a);
+        // mottled ground: tussocks, heather clumps, sheep tracks (less of it on tarmac)
+        diffuseColor.rgb *= 1.0 + (((n1 - 0.5) * 0.22 + (n2 - 0.5) * 0.16) * mid + (n3 - 0.5) * 0.14 * near) * (1.0 - 0.75 * dt.a);
         // pale dry sand above the tide, darker wet sand and weed just above the water
         float wet = (1.0 - smoothstep(0.05, 0.9, h)) * step(-0.6, h);
         diffuseColor.rgb *= 1.0 - 0.3 * wet;
@@ -828,8 +974,13 @@ function buildTerrain() {
   if (fi1 > fi0 && fj1 > fj0) {
     const mx = (fi1 - fi0) * K + 1, my = (fj1 - fj0) * K + 1, pos = new Float32Array(mx * my * 3), col = new Float32Array(mx * my * 3);
     const X0 = DOM.x0 + fi0 * C, Y0 = DOM.y0 + fj0 * C;
+    // a finer patch still over Ardminish Bay, cut out of this one along its grid lines
+    const ua0 = Math.floor((ULTRA[0] - X0) / f), ua1 = Math.ceil((ULTRA[2] - X0) / f), ub0 = Math.floor((ULTRA[1] - Y0) / f), ub1 = Math.ceil((ULTRA[3] - Y0) / f);
+    const inUltra = (i, j) => i >= ua0 && i < ua1 && j >= ub0 && j < ub1;
+    const onUltraEdge = (i, j) => (i >= ua0 && i <= ua1 && (j === ub0 || j === ub1)) || (j >= ub0 && j <= ub1 && (i === ua0 || i === ua1));
+    const hf = new Float32Array(mx * my);
     for (let j = 0; j < my; j++) for (let i = 0; i < mx; i++) {
-      const edge = i === 0 || j === 0 || i === mx - 1 || j === my - 1;
+      const edge = i === 0 || j === 0 || i === mx - 1 || j === my - 1 || onUltraEdge(i, j);
       const x = X0 + i * f + (edge ? 0 : (hash(i + 913, j) - 0.5) * f * 0.5), y = Y0 + j * f + (edge ? 0 : (hash(j + 311, i) - 0.5) * f * 0.5);
       let h;
       if (edge) {   // match the coarse edge exactly: its corners, and straight lines between them
@@ -837,11 +988,28 @@ function buildTerrain() {
         const H = (a, b) => hc[b * nx + a];
         h = (j === 0 || j === my - 1) ? lerp(H(ci, cj), H(Math.min(ci + 1, fi1), cj), ti) : lerp(H(ci, cj), H(ci, Math.min(cj + 1, fj1)), tj);
       } else h = heightAt(x, y, true);
+      if (onUltraEdge(i, j) && !(i === 0 || j === 0 || i === mx - 1 || j === my - 1)) h = heightAt(x, y, true);
+      hf[j * mx + i] = h;
       put(pos, col, (j * mx + i) * 3, x, y, h);
     }
-    mesh(pos, col, quads(mx, my, null, new Uint32Array((mx - 1) * (my - 1) * 6)));
+    mesh(pos, col, quads(mx, my, inUltra, new Uint32Array((mx - 1) * (my - 1) * 6)));
+    // the bay patch: four times finer, its edge following the fine patch's edge exactly
+    const K2 = 4, f2 = f / K2, ux = (ua1 - ua0) * K2 + 1, uy = (ub1 - ub0) * K2 + 1, UX0 = X0 + ua0 * f, UY0 = Y0 + ub0 * f;
+    const upos = new Float32Array(ux * uy * 3), ucol = new Float32Array(ux * uy * 3);
+    for (let j = 0; j < uy; j++) for (let i = 0; i < ux; i++) {
+      const edge = i === 0 || j === 0 || i === ux - 1 || j === uy - 1;
+      const x = UX0 + i * f2 + (edge ? 0 : (hash(i + 4513, j) - 0.5) * f2 * 0.4), y = UY0 + j * f2 + (edge ? 0 : (hash(j + 2311, i) - 0.5) * f2 * 0.4);
+      let h;
+      if (edge) {
+        const ci = ua0 + Math.floor(i / K2), cj = ub0 + Math.floor(j / K2), ti = (i % K2) / K2, tj = (j % K2) / K2, H = (a, b) => hf[b * mx + a];
+        h = (j === 0 || j === uy - 1) ? lerp(H(ci, cj), H(Math.min(ci + 1, ua1), cj), ti) : lerp(H(ci, cj), H(ci, Math.min(cj + 1, ub1)), tj);
+      } else h = heightAt(x, y, true);
+      put(upos, ucol, (j * ux + i) * 3, x, y, h);
+    }
+    mesh(upos, ucol, quads(ux, uy, null, new Uint32Array((ux - 1) * (uy - 1) * 6)));
   }
 }
+const ULTRA = [-4140, 1690, -3710, 2345];   // x0, y0, x1, y1 of the finest terrain, over Ardminish Bay
 function buildDepthTexture() {
   const step = 50, nx = Math.round((DOM.x1 - DOM.x0) / step) + 1, ny = Math.round((DOM.y1 - DOM.y0) / step) + 1;
   const data = new Uint8Array(nx * ny * 4);
@@ -889,6 +1057,7 @@ function waterMaterial(amp) {
       uDeep: { value: new THREE.Color(0x122f38) }, uShallow: { value: new THREE.Color(0x2c615f) }, uSkyTop: { value: SKY_TOP },
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
+      uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uDetAR: TERRAIN_U.uDetAR, uDetTR: TERRAIN_U.uDetTR,
     },
     vertexShader: WAVE_GLSL + `varying vec3 vW; varying float vH;
       void main(){ vec4 wp = modelMatrix*vec4(position,1.0);
@@ -898,7 +1067,8 @@ function waterMaterial(amp) {
         vW = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`,
     fragmentShader: `uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSkyTop; uniform vec3 uFog; uniform vec3 uSun;
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
-      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip;
+      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR;
+      vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
       varying vec3 vW; varying float vH;
       ` + WAVE_GRAD_GLSL + `
       // cat's-paw ripples: a few short wind waves summed analytically for the normal only, each faded
@@ -923,6 +1093,17 @@ function waterMaterial(amp) {
         g += vec2(wn(r + vec2(e, 0.0)) - b, wn(r + vec2(0.0, e)) - b) / e * 0.35 * (1.0 - smoothstep(0.5, 1.3, 1.6 * 3.0 * fp));
         return g;
       }
+      // Kelvin ship waves: diverging crests in echelon along two arms 19.5 degrees either side of the track, running
+      // back from the bow; their wavelength follows the ship's speed. Returns the surface height they add.
+      float kelvin(vec2 p, vec2 bow, vec2 vd, float spd, float fp){
+        vec2 r = p - bow; float b = -dot(r, vd), sd = abs(dot(r, vec2(-vd.y, vd.x)));
+        if (b < 0.0 || b > 700.0) return 0.0;
+        float kd = 9.81 / (spd * spd * 0.6667), cu = sd - b * 0.3536;
+        float amp = 0.5 * clamp((spd - 0.6) / 3.6, 0.0, 1.0) * smoothstep(0.0, 6.0, b) / sqrt(1.0 + b / 30.0);
+        float arm = exp(-pow(cu / (2.2 + 0.08 * b), 2.0)) + 0.3 * step(cu, 0.0) * smoothstep(-0.15 * b - 2.0, 0.0, cu) * smoothstep(0.12 * b, 0.25 * b + 1.0, sd);
+        float ph = kd * (b * 0.8165 + sd * 0.5774);
+        return amp * arm * sin(ph) * (1.0 - smoothstep(0.6, 1.6, kd * fp));
+      }
       void main(){
         float dist = distance(cameraPosition, vW);
         // world size of this pixel on the water, the longer way (grazing views stretch it)
@@ -931,15 +1112,26 @@ function waterMaterial(amp) {
         float paws = 0.45 + 0.55*smoothstep(-0.6, 0.9, sin(vW.x*0.011 + uTime*0.05)*cos(vW.z*0.013 - uTime*0.04) + sin((vW.x + vW.z)*0.0071));
         vec2 rg = ripple(vW.xz, uTime, fp) * uRip * paws * 0.25;
         vec2 cg = chop(vW.xz, uTime, fp) * (0.04 + uRip * 1.3) * (0.6 + 0.4 * paws);
-        vec3 n = normalize(vec3(-sg.x - rg.x - cg.x, 1.0, -sg.y - rg.y - cg.y));
         // ship-relative coordinates for the waterline and wake
         vec2 rel = vW.xz - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
         vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - vec2(3.2, 13.3);
         float hd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 1.8;
         float spd = length(uVel);
+        vec2 vd = spd > 0.05 ? uVel / spd : vec2(0.0, -1.0), bow = uShip.xy + vd * 14.0;
+        vec2 kg = vec2(0.0); float kh = 0.0;
+        if (spd > 0.6 && length(rel) < 720.0) {
+          const float e = 0.6;
+          kh = kelvin(vW.xz, bow, vd, spd, fp);
+          kg = vec2(kelvin(vW.xz + vec2(e, 0.0), bow, vd, spd, fp) - kh, kelvin(vW.xz + vec2(0.0, e), bow, vd, spd, fp) - kh) / e;
+        }
+        vec3 n = normalize(vec3(-sg.x - rg.x - cg.x - kg.x, 1.0, -sg.y - rg.y - cg.y - kg.y));
         vec2 uv = vec2((vW.x - uDom.x)/uDom.z, (-vW.z - uDom.y)/uDom.w);
         float depth = texture2D(uDepth, uv).r*40.0;
-        vec3 col = mix(uShallow, uDeep, smoothstep(0.5, 14.0, depth))*(0.55 + 0.45*clamp(dot(n, uSun), 0.0, 1.0));
+        vec3 alb = mix(uShallow, uDeep, smoothstep(0.5, 14.0, depth));
+        // around the two terminals the sandy and weedy bottom shows through the shallows
+        vec4 bay = bayAt(uBayA, uDetAR, vec2(vW.x, -vW.z)) + bayAt(uBayT, uDetTR, vec2(vW.x, -vW.z));
+        alb = mix(alb, bay.rgb / max(bay.a, 0.001), bay.a * 0.8);
+        vec3 col = alb*(0.55 + 0.45*clamp(dot(n, uSun), 0.0, 1.0));
         vec3 V = normalize(cameraPosition - vW);
         vec3 R = reflect(-V, n);
         vec3 sky = mix(uFog, uSkyTop, smoothstep(0.0, 0.5, R.y));
@@ -955,10 +1147,14 @@ function waterMaterial(amp) {
         float churn = (1.0 - smoothstep(0.0, 0.8 + spd*0.8, hd)) * (0.18 + 0.5*clamp(spd/3.0, 0.0, 1.0));
         float wake = 0.0;
         if (spd > 0.15) {
-          vec2 vd = uVel / spd; float b = dot(rel, -vd), sd = dot(rel, vec2(-vd.y, vd.x));
-          float w = 6.0 + max(b, 0.0)*0.1;
-          wake = step(0.0, b) * exp(-b/(30.0 + 50.0*spd)) * (1.0 - smoothstep(w*0.55, w, abs(sd))) * clamp(spd/2.5, 0.0, 1.0);
-          wake *= 0.85 + 0.15*sin(b*0.21 - uTime*1.1 + sin(sd*0.7 + b*0.05)*2.0);
+          // turbulent wake from the stern: streaks running back along the track, spreading and fading
+          float b = dot(rel, -vd) - 14.0, sd = dot(rel, vec2(-vd.y, vd.x));
+          float w = 5.5 + max(b, 0.0) * 0.08;
+          wake = step(0.0, b) * exp(-b / (30.0 + 50.0 * spd)) * (1.0 - smoothstep(w * 0.5, w, abs(sd))) * clamp(spd / 2.5, 0.0, 1.0);
+          wake *= mix(0.55 + 0.45 * wn(vec2(sd * 0.7, b * 0.045 + uTime * 0.05)), 0.8, smoothstep(0.4, 1.0, 0.7 * fp));
+          // white water breaking on the Kelvin crests close to the bow
+          float bb = -dot(vW.xz - bow, vd);
+          wake += smoothstep(0.3, 0.8, kh / 0.5) * exp(-max(bb, 0.0) / 60.0) * clamp((spd - 2.0) / 2.5, 0.0, 1.0);
         }
         float foam = clamp(churn + wake*0.7, 0.0, 0.8) * mix(0.7 + 0.3*sin(vW.x*2.3 + vW.z*1.7 + uTime), 0.85, smoothstep(0.4, 1.0, 2.9*fp));
         col = mix(col, vec3(0.9, 0.94, 0.94), foam * step(0.0, hd));
@@ -1051,13 +1247,15 @@ function buildScatter() {
   const trees = new THREE.InstancedMesh(tg, phong(0x22331f), 900);
   const crowns = new THREE.InstancedMesh(crownG, phong(0xffffff), 700), trunks = new THREE.InstancedMesh(trunkG, phong(0x4a3a2a), 700);
   let n = 0, b = 0;
-  for (let tries = 0; tries < 60000 && (n < 900 || b < 700); tries++) {
+  const nearBuilding = (x, y, r) => BUILDINGS.some(B => Math.hypot(B[0] - x, B[1] - y) < r);
+  const bWoods = b;
+  for (let tries = 0; tries < 60000 && (n < 900 || b < bWoods + 700); tries++) {
     const x = lerp(DOM.x0 + 800, 4000, rnd()), y = lerp(DOM.y0 + 1500, DOM.y1 - 1500, rnd()), h = heightAt(x, y);
     if (h < 5 || h > 170) continue;
     if (forestAt(x, y, h) && n < 900) {
       const sc = 0.8 + rnd() * 0.6; dummy.position.set(x, h - 0.5, -y); dummy.scale.set(sc, sc * (0.9 + rnd() * 0.4), sc); dummy.rotation.set(0, rnd() * 6, 0);
       dummy.updateMatrix(); trees.setMatrixAt(n++, dummy.matrix);
-    } else if (woodAt(x, y, h) && b < 700) {
+    } else if (woodAt(x, y, h) && b < bWoods + 700 && roadDist(x, y) > 3 && !nearBuilding(x, y, 12) && !(x > -4480 && x < -3650 && y > 1650 && y < 2500)) {
       const sc = 0.6 + rnd() * 0.7; dummy.position.set(x, h - 0.3, -y); dummy.scale.set(sc * (0.9 + rnd() * 0.3), sc, sc * (0.9 + rnd() * 0.3)); dummy.rotation.set(0, rnd() * 6, 0);
       dummy.updateMatrix(); crowns.setMatrixAt(b, dummy.matrix); trunks.setMatrixAt(b, dummy.matrix);
       crowns.setColorAt(b++, col.setHSL(0.2 + rnd() * 0.07, 0.28 + rnd() * 0.12, 0.2 + rnd() * 0.08));
@@ -1074,31 +1272,78 @@ function buildScatter() {
     dummy.updateMatrix(); rocks.setMatrixAt(r, dummy.matrix); rocks.setColorAt(r++, col.setHSL(0.1 + rnd() * 0.05, 0.06, 0.36 + rnd() * 0.18));
   }
   rocks.count = r; scene.add(rocks);
-  // cottages around each terminal
-  const wg = new THREE.BoxGeometry(9, 4.5, 5.5); wg.translate(0, 2.25, 0);
+  // gorse in flower on the rocky ground by the bay, and low scrub along the shore
+  {
+    const gG = new THREE.DodecahedronGeometry(1, 0); gG.translate(0, 0.45, 0);
+    const bushes = new THREE.InstancedMesh(gG, phong(0xffffff), 2600); let q = 0;
+    const put = (px, py, yellow, big) => {
+      const h = heightAt(px, py, true), sc = (big ? 1.3 : 0.9) + rnd() * 1.1;
+      dummy.position.set(px, h - 0.25, -py); dummy.scale.set(sc * (1 + rnd() * 0.5), sc * (0.55 + rnd() * 0.35), sc * (1 + rnd() * 0.5)); dummy.rotation.set(0, rnd() * 6, 0);
+      dummy.updateMatrix(); bushes.setMatrixAt(q, dummy.matrix);
+      bushes.setColorAt(q++, yellow ? col.setHSL(0.13 + rnd() * 0.02, 0.5 + rnd() * 0.18, 0.37 + rnd() * 0.07) : col.setHSL(0.22 + rnd() * 0.05, 0.3 + rnd() * 0.12, 0.17 + rnd() * 0.07));
+    };
+    for (const P of GORSE) {
+      const xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+      for (let x = Math.min(...xs); x < Math.max(...xs); x += 3.6) for (let y = Math.min(...ys); y < Math.max(...ys); y += 3.6) {
+        const px = x + (rnd() - 0.5) * 3, py = y + (rnd() - 0.5) * 3;
+        if (q < 560 && polyIn(P, px, py) && roadDist(px, py) > 2 && shoreDist(px, py) > 2 && !nearBuilding(px, py, 10)) put(px, py, rnd() < 0.6, true);
+      }
+    }
+    for (const P of MACHAIR) {
+      const xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+      for (let x = Math.min(...xs); x < Math.max(...xs); x += 3.9) for (let y = Math.min(...ys); y < Math.max(...ys); y += 3.9) {
+        const px = x + (rnd() - 0.5) * 3.4, py = y + (rnd() - 0.5) * 3.4;
+        if (q >= 2100 || !polyIn(P, px, py) || fbm(px * 0.025 + 7, py * 0.025) < 0.47 || roadDist(px, py) < 2 || shoreDist(px, py) < 2 || nearBuilding(px, py, 11)) continue;
+        put(px, py, rnd() < 0.55, false);
+      }
+    }
+    const qM = q;
+    for (let tries = 0; tries < 20000 && q < 2500; tries++) {
+      const px = lerp(ULTRA[0], ULTRA[2], rnd()), py = lerp(ULTRA[1], ULTRA[3], rnd()), sd = shoreDist(px, py);
+      if (q - qM > 520) break;
+      if (sd < 3 || sd > 22 || roadDist(px, py) < 3 || nearBuilding(px, py, 12) || BEACHES.some(([ax, ay, bx, by, hw]) => segDist(px, py, ax, ay, bx, by) < hw + 4)) continue;
+      put(px, py, rnd() < 0.25, false);
+    }
+    bushes.count = q; scene.add(bushes);
+  }
+  // cottages: the houses on the OpenStreetMap render, each squared to the road it stands by, then farms further out
+  const wg = new THREE.BoxGeometry(9, 7.5, 5.5); wg.translate(0, 0.75, 0);   // the walls run down into the ground on a slope
   const rg = new THREE.ConeGeometry(5.6, 2.6, 4); rg.rotateY(Math.PI / 4); rg.scale(1.15, 1, 0.72); rg.translate(0, 5.8, 0);
   const ch = [3.5, -3.5].map(x => { const c = new THREE.BoxGeometry(0.9, 1.9, 0.9); c.translate(x, 6.7, 0); return c; });
   const win = [];
   for (const z of [-2.78, 2.78]) for (const x of [-3, -1.3, 1.3, 3]) { if (z > 0 && Math.abs(x) < 2) continue; const w = new THREE.BoxGeometry(1.0, 1.1, 0.08); w.translate(x, 2.4, z); win.push(w); }
   const doorG = new THREE.BoxGeometry(1.0, 2.1, 0.08); doorG.translate(0, 1.05, 2.78);
-  const MAXH = 80;
+  const MAXH = 140;
   const walls = new THREE.InstancedMesh(wg, MAT(0xffffff), MAXH), roofs = new THREE.InstancedMesh(rg, phong(0x3a3f45), MAXH);
   const chims = new THREE.InstancedMesh(mergeGeos(ch), MAT(0xd9d4c8), MAXH), wins = new THREE.InstancedMesh(mergeGeos(win), MAT(0x26333c), MAXH);
   const doors = new THREE.InstancedMesh(doorG, MAT(0xffffff), MAXH);
   const doorCols = [0x8a2a24, 0x1f3f63, 0x2f5a3a, 0x222426, 0xc9a43a];
   let m = 0;
-  for (const T of TERMS) {
-    for (let tries = 0; tries < 600 && m < 40 * (TERMS.indexOf(T) + 1); tries++) {
-      const al = T.len + 20 + rnd() * 520, lat = (rnd() - 0.5) * 900;
-      const [x, y] = xyFromTerm(T, lat, al), h = heightAt(x, y);
-      if (h < 2.5 || h > 30) continue;
-      dummy.position.set(x, h - 0.3, -y); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, -T.brg * DEG + (rnd() < 0.5 ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.3, 0);
-      dummy.updateMatrix();
-      [walls, roofs, chims, wins, doors].forEach(im => im.setMatrixAt(m, dummy.matrix));
-      walls.setColorAt(m, col.setHSL(0.11, 0.18, 0.86 + rnd() * 0.1));
-      doors.setColorAt(m, col.setHex(doorCols[Math.floor(rnd() * doorCols.length)]));
-      m++;
+  const house = (x, y, rot, sx, wallHSL) => {
+    if (m >= MAXH) return;
+    const c = Math.cos(rot), sn = Math.sin(rot), corners = [[-4.5, -2.75], [4.5, -2.75], [-4.5, 2.75], [4.5, 2.75]].map(([a, b2]) => heightAt(x + (a * c - b2 * sn) * sx, y + (a * sn + b2 * c) * sx, true));
+    dummy.position.set(x, Math.max(...corners) - 0.2, -y); dummy.scale.set(sx, 1, 1); dummy.rotation.set(0, rot, 0); dummy.updateMatrix();
+    [walls, roofs, chims, wins, doors].forEach(im => im.setMatrixAt(m, dummy.matrix));
+    walls.setColorAt(m, col.setHSL(...(wallHSL || [0.11, 0.18, 0.86 + rnd() * 0.1])));
+    doors.setColorAt(m, col.setHex(doorCols[Math.floor(rnd() * doorCols.length)]));
+    m++;
+  };
+  for (const [bx, by, type] of BUILDINGS) {
+    if (type !== 'house' && type !== 'farm') continue;
+    const near = nearestRoad(bx, by), rot = near.d < 70 ? Math.atan2(near.dy, near.dx) : rnd() * 3;
+    let x = bx, y = by;
+    if (near.d < 8) { x += near.nx * (8 - near.d); y += near.ny * (8 - near.d); }   // stand back from the road
+    house(x, y, rot, 1);
+    if (type === 'farm') {   // a long steading behind the farmhouse
+      const c = Math.cos(rot), sn = Math.sin(rot);
+      house(x + sn * 12 + c * 4, y - c * 12 + sn * 4, rot + Math.PI / 2, 1.9, [0.08, 0.06, 0.62 + rnd() * 0.08]);
     }
+  }
+  for (let tries = 0; tries < 3000 && m < MAXH - 4; tries++) {
+    const x = lerp(DOM.x0 + 800, 4000, rnd()), y = lerp(DOM.y0 + 1500, DOM.y1 - 1500, rnd()), h = heightAt(x, y);
+    if (h < 4 || h > 70 || TERMS.some(T => Math.hypot(x - T.P.x, y - T.P.y) < 1100) || BUILDINGS.some(B => Math.hypot(B[0] - x, B[1] - y) < 260)) continue;
+    if (x > -2600 && x < -700) continue;   // nobody lives in the Sound
+    house(x, y, rnd() * 6, 1);
   }
   [walls, roofs, chims, wins, doors].forEach(im => { im.count = m; scene.add(im); });
 }
@@ -1882,10 +2127,36 @@ function crewUpdate(dt) {
 }
 // ================= CARGO =================
 function spawnQueue(tid, n) {
-  for (let i = 0; i < n; i++) { const car = { mesh: makeCar(S.rnd), dest: OTHER(tid).id, home: tid }; S.cars.push(car); S.queue[tid].push(car); scene.add(car.mesh); const p = queueSpot(TERM(tid), S.queue[tid].length - 1); car.mesh.position.copy(p); car.mesh.rotation.y = -TERM(tid).brg * DEG + Math.PI; }
+  for (let i = 0; i < n; i++) { const car = { mesh: makeCar(S.rnd), dest: OTHER(tid).id, home: tid }; S.cars.push(car); S.queue[tid].push(car); scene.add(car.mesh); const i0 = S.queue[tid].length - 1, P = QPATH[tid], q = P.at(i0 * QGAP); car.qs = i0 * QGAP; car.mesh.position.copy(queueSpot(TERM(tid), i0)); car.mesh.rotation.set(0, Math.atan2(q.dx, -q.dy), 0); }
 }
 function roadY(T, lat, al) { return al <= T.len ? 2.2 : Math.max(2.2, heightAt(...xyFromTerm(T, lat, al)) + 0.05); }
-function queueSpot(T, i) { const al = 30 + i * 5.6; return termObj(T, 2.6, roadY(T, 2.6, al), al); }
+// Cars wait nose to tail along the pier and then back up the road from the slip, on their own side; cars coming off
+// drive away up the other side of the road. Paths run outward from the slip.
+const QGAP = 7.5;
+const QPATH = {}, XPATH = {};
+for (const T of TERMS) {
+  const R = ROADS.find(r => r.ferry === T.id), off = (pts, side) => pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+    return [p[0] - dy / l * side, p[1] + dx / l * side];   // side > 0: to the left looking outward
+  });
+  const pierQ = [], pierX = [];
+  for (let al = 28; al < T.len; al += 6) { pierQ.push(xyFromTerm(T, 2.6, al)); pierX.push(xyFromTerm(T, -2.6, al + 4)); }
+  QPATH[T.id] = polyline(pierQ.concat(off(R.pts.slice(1), 1.4)));
+  XPATH[T.id] = polyline(pierX.concat(off(R.pts.slice(1), -1.4)));
+}
+function pathPos(P, s, T) {
+  const q = P.at(s), lt = (q.x - T.P.x) * T.d.x + (q.y - T.P.y) * T.d.y;
+  return new THREE.Vector3(q.x, lt <= T.len + 0.5 ? 2.2 : Math.max(0.3, heightAt(q.x, q.y, true) + 0.05), -q.y);
+}
+function queueSpot(T, i) { return pathPos(QPATH[T.id], i * QGAP, T); }
+// is another vehicle within a gap ahead of this one, roughly in its path?
+function carAhead(pos, hx, hz, gap, others) {
+  const hl = Math.hypot(hx, hz) || 1;
+  return others.some(o => {
+    const dx = o.x - pos.x, dz = o.z - pos.z, along = (dx * hx + dz * hz) / hl, lat = Math.abs(dx * hz - dz * hx) / hl;
+    return along > 0.2 && along < gap && lat < 2.3;
+  });
+}
 function loadOrder(e) { const sgn = e === 0 ? 1 : -1; return S.slots.slice().sort((a, b) => (b.z * sgn - a.z * sgn) || (a.x - b.x)); }
 function placeAboard(car, slot) {
   slot.car = car; car.slot = slot;
@@ -1915,21 +2186,37 @@ function movePath(m) {
 }
 function updateCargo(dt) {
   for (const T of TERMS) {
+    // the queue shuffles up, never closer than a gap to the car in front or to one setting off for the ramp
+    const P = QPATH[T.id], movers = S.movs.filter(m => m.T === T && m.kind === 'on').map(m => m.car.mesh.position);
     S.queue[T.id].forEach((car, i) => {
-      const p = queueSpot(T, i), c = car.mesh.position, d = c.distanceTo(p);
-      if (d > 0.05) { const s = Math.min(1, 3 * dt / d); c.lerp(p, s); }
+      if (car.qs === undefined) car.qs = i * QGAP;
+      const ahead = i > 0 ? S.queue[T.id][i - 1].qs + QGAP : 0;
+      let target = Math.max(i * QGAP, ahead);
+      const here = car.mesh.position;
+      if (movers.some(p => Math.hypot(p.x - here.x, p.z - here.z) < QGAP + 0.5)) target = car.qs;
+      car.qv = approach(car.qv || 0, car.qs - target > 0.05 ? 3.5 : 0, 5 * dt);
+      car.qs = Math.max(target, car.qs - car.qv * dt);
+      const q = P.at(car.qs);
+      here.copy(pathPos(P, car.qs, T)); car.mesh.rotation.set(0, Math.atan2(q.dx, -q.dy), 0);
     });
   }
+  // cars ashore drive up the pier and away along the road, then are gone
   for (let i = S.ashore.length - 1; i >= 0; i--) {
-    const a = S.ashore[i], p = a.car.mesh.position, d = p.distanceTo(a.to);
-    if (d < 0.5) { scene.remove(a.car.mesh); S.cars.splice(S.cars.indexOf(a.car), 1); S.ashore.splice(i, 1); continue; }
-    const dx = a.to.x - p.x, dz = a.to.z - p.z;
-    p.lerp(a.to, Math.min(1, 7 * dt / d)); a.car.mesh.rotation.set(0, Math.atan2(-dx, -dz), 0);
+    const a = S.ashore[i], p = a.car.mesh.position, P = XPATH[a.T.id];
+    if (a.s === undefined) {
+      const d = p.distanceTo(a.to), dx = a.to.x - p.x, dz = a.to.z - p.z;
+      if (d < 0.6) { a.s = 0; continue; }
+      p.lerp(a.to, Math.min(1, 7 * dt / d)); a.car.mesh.rotation.set(0, Math.atan2(-dx, -dz), 0); continue;
+    }
+    const ahead = S.ashore.filter(o => o !== a && o.s !== undefined && o.s > a.s).map(o => o.s);
+    a.s = Math.min(a.s + 8 * dt, ahead.length ? Math.min(...ahead) - QGAP : 1e9);
+    if (a.s > Math.min(P.len, 170)) { scene.remove(a.car.mesh); S.cars.splice(S.cars.indexOf(a.car), 1); S.ashore.splice(i, 1); continue; }
+    const q = P.at(a.s); p.copy(pathPos(P, a.s, a.T)); a.car.mesh.rotation.set(0, Math.atan2(-q.dx, q.dy), 0);
   }
   const T = berthedAt(), e = T ? T.endIdx : -1, ready = T ? cargoReady(e) : false;
   // vehicles move as a convoy: each follows the one ahead at a car's length plus a gap, so the traffic flows on and off
   // continuously instead of one car at a time
-  const GAP = 6.2;
+  const GAP = 7.5;
   for (let i = 0; i < S.movs.length; i++) {
     const m = S.movs[i], pts = movePath(m), segs = []; let total = 0;
     for (let k = 0; k < 4; k++) { const l = pts[k].distanceTo(pts[k + 1]); segs.push(l); total += l; }
@@ -1941,19 +2228,22 @@ function updateCargo(dt) {
       if (m.fall <= 0) { scene.remove(m.car.mesh); S.cars.splice(S.cars.indexOf(m.car), 1); m.done = true; }
       continue;
     }
+    // she has left before this car reached the ramp: one still on the pier rejoins the front of the queue, one still on
+    // the car deck stays aboard
+    const gone = !(S.endGeo[m.e].T === m.T && S.endGeo[m.e].al > -25);
+    if (gone && seg === 0 && m.kind === 'on') { m.slot.car = null; m.car.dest = OTHER(m.T.id).id; m.car.qs = 0; m.car.qv = 0; S.queue[m.T.id].unshift(m.car); m.done = true; continue; }
+    if (gone && seg === 0 && m.kind === 'off') { const sl = S.slots.find(q => !q.car && q.x === m.slot.x && q.z === m.slot.z); if (sl) { m.car.dest = m.T.id; placeAboard(m.car, sl); m.done = true; continue; } }
     if (onRamp && sep) {
       m.fall = 3; if (m.kind === 'on') m.slot.car = null; addPen('A vehicle went into the sea off the ramp', 500); toast('Vehicle lost off the ramp', 'warn'); continue;
     }
     if (m.kind === 'off' && seg >= 3) {           // clear of the ramp: drive off up the pier
-      S.ashore.push({ car: m.car, to: pts[4] }); m.done = true; continue;
+      S.ashore.push({ car: m.car, to: pathPos(XPATH[m.T.id], 0, m.T), T: m.T }); m.done = true; continue;
     }
     // hold back if a car that set off earlier is close ahead
     const a0 = pts[seg], b0 = pts[seg + 1], hx = b0.x - a0.x, hz = b0.z - a0.z, hl = Math.hypot(hx, hz) || 1, cp = m.car.mesh.position;
-    const blocked = S.movs.slice(0, i).some(o => {
-      if (o.done || o.fall) return false;
-      const dx = o.car.mesh.position.x - cp.x, dz = o.car.mesh.position.z - cp.z, d = Math.hypot(dx, dz);
-      return d < GAP && (dx * hx + dz * hz) / hl > 0.3 * d;
-    });
+    const others = S.movs.slice(0, i).filter(o => !o.done && !o.fall).map(o => o.car.mesh.position);
+    if (m.kind === 'on') S.ashore.forEach(o => others.push(o.car.mesh.position));   // give way to traffic coming off
+    const blocked = carAhead(cp, hx, hz, GAP, others);
     const go = !blocked && (cargoReady(m.e) || (m.kind === 'on' && seg === 0 && S.endGeo[m.e].on));
     m.v = approach(m.v || 0, go ? 5 : 0, (go ? 4 : 9) * dt);
     m.s += m.v * dt;
@@ -1971,7 +2261,7 @@ function updateCargo(dt) {
   S.movs = S.movs.filter(m => !m.done);
   if (ready) {
     // the next car sets off once the one before has rolled a few lengths; loading starts when the last car is off
-    const last = S.movs[S.movs.length - 1], clear = !last || last.s > 7;
+    const last = S.movs[S.movs.length - 1], clear = !last || last.s > 9.5;
     const offLeft = S.slots.some(sl => sl.car && sl.car.dest === T.id), k = e === 0 ? 1 : -1;
     if (clear && S.movs.length < 6) {
       if (offLeft) {
@@ -3280,12 +3570,12 @@ async function paPlay(auto) {
     const hp = AU.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 280;
     const lp = AU.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4200;
     const pk = AU.ctx.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 2000; pk.Q.value = 0.8; pk.gain.value = 4;
-    const g = AU.ctx.createGain(); g.gain.value = 0.9;
+    const g = AU.ctx.createGain(); g.gain.value = 0.8;   // the announcement plays at 80% volume
     const dl = AU.ctx.createDelay(0.5); dl.delayTime.value = 0.085; const fb = AU.ctx.createGain(); fb.gain.value = 0.22;
     src.connect(hp); hp.connect(lp); lp.connect(pk); pk.connect(g); g.connect(AU.master); g.connect(dl); dl.connect(fb); fb.connect(dl); fb.connect(AU.master);
     src.onended = paDone; src.start(t0 + 1.6); PA.src = src;
   } else if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
-    const u = new SpeechSynthesisUtterance(paText()); u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.95;
+    const u = new SpeechSynthesisUtterance(paText()); u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.95; u.volume = 0.8;
     // a Scottish voice if the device has one (iPhones carry "Fiona"), otherwise any British one
     const vs = speechSynthesis.getVoices(), v = vs.find(v => /fiona|scot|sct/i.test(v.name + ' ' + v.lang)) || vs.find(v => /en-GB/i.test(v.lang)); if (v) u.voice = v;
     u.onend = u.onerror = paDone; PA.utter = u;
@@ -3405,13 +3695,15 @@ function updateVisuals(dt) {
     const mag = Math.hypot(U.fx, U.fy) / TMAX;
     U.foamAcc += mag * 70 * dt;
     let n = 0;
-    while (U.foamAcc >= 1 && n++ < 20) {
+    while (U.foamAcc >= 1 && n++ < 60) {
       U.foamAcc -= 1;
       const ux = S.x + U.xb * sp, uy = S.y + U.xb * cp;
       const tx = U.p.x * sp + U.p.y * cp, ty = U.p.x * cp - U.p.y * sp, tl = Math.hypot(tx, ty) || 1;
       const jx = -tx / tl * (2 + mag * 5) + (Math.random() - 0.5) * 1.2, jy = -ty / tl * (2 + mag * 5) + (Math.random() - 0.5) * 1.2;
-      const px = ux + (Math.random() - 0.5) * 3, py = uy + (Math.random() - 0.5) * 3;
-      spawnFoam(px, S.tide + waveH(px, -py, S.t) + 0.25, -py, jx, -jy, 3 + Math.random() * 3);
+      // spread each frame's foam back along the ground she covered, so a slow frame rate never leaves it in rows
+      const back = Math.random() * dt, vxw = S.u * sp + S.v * cp, vyw = S.u * cp - S.v * sp;
+      const px = ux - vxw * back + (Math.random() - 0.5) * 3, py = uy - vyw * back + (Math.random() - 0.5) * 3;
+      spawnFoam(px, S.tide + waveH(px, -py, S.t) + 0.25, -py, jx, -jy, 3 + Math.random() * 3 - back);
     }
   });
   const spd = Math.hypot(S.u, S.v);
@@ -3520,6 +3812,88 @@ function buildSouthPier() {
   for (const [a, c] of [[-P.L - 18, 3], [-P.L - 24, 5], [-P.L - 15, 14]]) { const car = makeCar(rnd), w = P.toW(a, c); car.position.set(w.x, heightAt(w.x, w.y) + 0.02, -w.y); car.rotation.y = -(118 + 80) * DEG; scene.add(car); }
 }
 buildSouthPier();
+// the named buildings, after the photos: the Boathouse at the root of the pontoon, the hotel, the shop, the ferry
+// shelter on Gigha and the waiting room and office at Tayinloan
+function buildLocal() {
+  const box = (p, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; p.add(o); return o; };
+  const gable = (p, w, d, rh, m, y) => {   // a pitched roof, ridge along local z
+    const sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(0, rh); sh.closePath();
+    const g = new THREE.ExtrudeGeometry(sh, { depth: d, bevelEnabled: false }); g.translate(0, y, -d / 2);
+    const o = new THREE.Mesh(g, m); o.castShadow = o.receiveShadow = true; p.add(o); return o;
+  };
+  const glass = MAT(0x23303a), slate = MAT(0x3b4046), white = MAT(0xecebe4), cream = MAT(0xe6e1d2);
+  // a harled building with a slate roof, windows down both long sides, door in the middle
+  const building = (p, w, d, h, wallM, roofM, rh, floors = 1, chim = true) => {
+    box(p, w, h + 3, d, wallM, 0, (h - 3) / 2, 0);
+    gable(p, w + 0.5, d + 0.4, rh, roofM, h);
+    for (let fl = 0; fl < floors; fl++) for (let z = -d / 2 + 2; z <= d / 2 - 1.9; z += 2.6) for (const sx of [-1, 1]) box(p, 0.08, 1.15, 1.0, glass, sx * (w / 2 + 0.02), 1.6 + fl * 2.8, z);
+    box(p, 0.1, 2.1, 1.1, MAT(0x1f3f63), w / 2 + 0.03, 1.05, 0);
+    if (chim) for (const z of [-d / 2 + 0.5, d / 2 - 0.5]) box(p, 0.9, 1.6, 0.9, cream, 0, h + rh - 0.3, z);
+  };
+  const place = (x, y, footprint, extra = 0) => {
+    const g = new THREE.Group(), near = nearestRoad(x, y), rot = Math.atan2(near.dx, -near.dy) + extra;
+    let base = -1e9; for (const [a, b] of footprint) base = Math.max(base, heightAt(x + a, y + b, true));
+    g.position.set(x, base - 0.15, -y); g.rotation.y = rot; g.userData.local = true; scene.add(g); return g;
+  };
+  const fp = (r) => [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0]];
+  // fold each building's parts into one mesh per colour, so a building costs a handful of draw calls
+  const bake = (root) => {
+    root.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), byKey = new Map(), keep = [];
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      const rel = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      if (o.material.map) { keep.push([o, rel]); return; }
+      const key = o.material.type + o.material.color.getHex();
+      if (!byKey.has(key)) byKey.set(key, { mat: o.material, geos: [] });
+      byKey.get(key).geos.push(o.geometry.clone().applyMatrix4(rel));
+    });
+    while (root.children.length) root.remove(root.children[0]);
+    for (const { mat, geos } of byKey.values()) { const m = new THREE.Mesh(mergeGeos(geos), mat); m.castShadow = m.receiveShadow = true; root.add(m); }
+    for (const [o, rel] of keep) { rel.decompose(o.position, o.quaternion, o.scale); root.add(o); }
+  };
+  for (const [x, y, type] of BUILDINGS) {
+    if (type === 'boathouse') {
+      // charcoal timber restaurant with a glazed gable to the sea, a white annexe, a green-roofed shed and tables on the grass
+      const g = place(x, y, fp(9));
+      const timber = MAT(0x2e3235), deck = MAT(0x6b5a46);
+      box(g, 7, 6.6, 16, timber, 0, 0.3, 0); gable(g, 7.6, 16.6, 2.4, MAT(0x2a2c2f), 3.6);
+      for (let z = -6; z <= 6; z += 2.4) for (const sx of [-1, 1]) box(g, 0.08, 1.4, 1.5, glass, sx * 3.52, 1.8, z);
+      box(g, 5.6, 2.6, 0.08, glass, 0, 1.6, -8.04);
+      box(g, 8.5, 0.25, 4, deck, 0, 0.12, -10);
+      for (const [dx, dz] of [[-2.8, -11], [2.6, -11.4], [9, -6], [9, -1], [10.5, 4]]) {
+        box(g, 1.8, 0.08, 0.8, deck, dx, 0.75, dz); for (const s2 of [-0.55, 0.55]) box(g, 1.8, 0.06, 0.3, deck, dx, 0.45, dz + s2);
+      }
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.8), new THREE.MeshLambertMaterial({ map: (() => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 56; const q = c.getContext('2d');
+        q.fillStyle = '#f2efe6'; q.fillRect(0, 0, 256, 56); q.fillStyle = '#23303a'; q.font = '600 32px "Barlow Condensed", sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText('THE BOATHOUSE', 128, 30);
+        return new THREE.CanvasTexture(c); })() }));
+      sign.position.set(3.55, 3.9, 2); sign.rotation.y = Math.PI / 2; g.add(sign);
+      const ann = new THREE.Group(); ann.position.set(-10, 0, 3); g.add(ann); building(ann, 5.5, 9, 2.8, white, slate, 1.6, 1, false);
+      const shed = new THREE.Group(); shed.position.set(-8.5, 0, -6); g.add(shed); box(shed, 3.2, 5.4, 4.2, MAT(0xdcdcd4), 0, -0.3, 0); gable(shed, 3.6, 4.6, 1.1, MAT(0x3f6a42), 2.4);
+    } else if (type === 'hotel') {
+      const g = place(x, y, fp(12));
+      building(g, 9, 26, 5.8, white, slate, 3.2, 2);
+      const porch = new THREE.Group(); porch.position.set(5.6, 0, 0); g.add(porch); box(porch, 2.4, 5.4, 3.4, white, 0, 0, 0); gable(porch, 2.8, 3.6, 1.1, slate, 2.7);
+      const wing = new THREE.Group(); wing.position.set(-6, 0, 9); g.add(wing); building(wing, 6, 8, 3, cream, slate, 2, 1, false);
+    } else if (type === 'shop') {
+      const g = place(x, y, fp(7));
+      building(g, 7, 13, 3.2, white, slate, 2.2, 1);
+      box(g, 0.08, 1.6, 4.2, MAT(0x2c3a44), 3.53, 1.5, -3);
+    } else if (type === 'shelter') {
+      const g = place(x, y, fp(3));
+      box(g, 3.4, 5.8, 6, white, 0, -0.2, 0); gable(g, 3.8, 6.4, 1.2, slate, 2.7);
+      box(g, 0.08, 1.2, 3.6, glass, 1.72, 1.6, 0);
+    } else if (type === 'terminal') {
+      const g = place(x, y, fp(8));
+      building(g, 7, 15, 3.2, white, slate, 1.8, 1, false);
+      box(g, 0.08, 1.5, 6, glass, 3.53, 1.6, -2);
+      const hut = new THREE.Group(); hut.position.set(-9, 0, -14); g.add(hut); box(hut, 3, 5.6, 3.6, MAT(0xd8d6cc), 0, 0, 0); gable(hut, 3.4, 4, 1, slate, 2.8);
+    }
+  }
+  scene.children.filter(o => o.userData.local).forEach(bake);
+}
+buildLocal();
 // the floating pontoon in Ardminish Bay; it rides up and down with the tide
 const PONTOON = (() => {
   const [[x0, y0], [x1, y1]] = GEO.pontoon, L = Math.hypot(x1 - x0, y1 - y0), brg = Math.atan2(x1 - x0, y1 - y0);
