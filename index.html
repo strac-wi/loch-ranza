@@ -62,6 +62,14 @@ output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .chart{position:relative;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:4px}
 #map{display:block;width:230px;height:230px;border-radius:3px}
 #bMapZoom{position:absolute;right:8px;bottom:8px;font-size:11px;padding:3px 6px}
+#map{cursor:zoom-in}
+#mapX{position:fixed;z-index:7;top:max(16px,env(safe-area-inset-top,0px));bottom:16px;left:50%;transform:translateX(-50%);width:min(980px,calc(100vw - 32px));padding:6px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px}
+#mapX[hidden]{display:none}
+#mapXC{flex:1;min-height:0;width:100%;border-radius:4px;touch-action:none;cursor:grab}
+#mapXC.drag{cursor:grabbing}
+.mxbar{display:flex;gap:6px;justify-content:flex-end}
+.mxbar button{min-width:44px}
+@media (max-width:760px){#mapX{top:52px;bottom:max(10px,env(safe-area-inset-bottom,0px));width:calc(100vw - 16px)}}
 .check{background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:230px;box-sizing:border-box;pointer-events:auto}
 .check h3{margin:0 0 5px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);text-wrap:balance}
 .check ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
@@ -273,10 +281,14 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
     </div>
 
     <div class="hud" id="hudR">
-      <div class="chart"><canvas id="map" width="460" height="460" aria-label="Chart"></canvas><button id="bMapZoom">Harbour</button></div>
+      <div class="chart"><canvas id="map" width="460" height="460" aria-label="Chart: tap to expand" title="Click to open the full chart"></canvas><button id="bMapZoom">Harbour</button></div>
       <div class="check"><h3 id="ckTitle">Checklist</h3><ul id="ckList"></ul></div>
     </div>
 
+    <div id="mapX" class="card" hidden>
+      <canvas id="mapXC" aria-label="Chart: drag to move, pinch or scroll to zoom"></canvas>
+      <div class="mxbar"><button id="mxIn" aria-label="Zoom in">+</button><button id="mxOut" aria-label="Zoom out">−</button><button id="mxCentre" class="on">Follow boat</button><button id="mxClose">Close</button></div>
+    </div>
     <div id="mbar">
       <button id="bMenu" aria-expanded="false" aria-controls="hudL">Menu</button>
       <span class="mv"><i>Hdg</i><b id="mHdg">---</b></span>
@@ -382,6 +394,8 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <h3>The RIB: Gala Viking V500 with a Suzuki 100</h3>
         <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen.</p>
         <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
+        <h3>The chart</h3>
+        <p>Tap or click the corner chart to open it full size. Drag to move it, pinch or scroll to zoom, or use + and −; zoomed in, it shows the roads and the boats on their moorings. Follow boat keeps you in the middle again, and Close or Escape puts it away. Harbour and Route on the corner chart switch between close in and the whole passage.</p>
         <h3>Loch Sween</h3>
         <p>Pick Loch Sween under Water on the start screen (the page reloads; #sween in the address goes straight there). The RIB lies on a mooring in the arm below Achnamara. L slips the mooring; to pick it up again, come back slowly head to wind and stop with the buoy under the bow, then press L. There is no jetty in the arm, so the drills are picking up the mooring, man overboard and a slalom down the loch to the south-west. The shore, roads, woods and the tidal flats at the head of the arm are traced from OpenStreetMap and the hills come from satellite height data; depths are modelled, not charted, so the flats will put you aground near low water.</p>
         <h3>Laying up at the South Pier</h3>
@@ -2983,10 +2997,21 @@ const mapC = $('map'), mapG = mapC.getContext('2d');
 let mapZoom = 'route';
 const toPts = (p) => { const a = []; for (let i = 0; i < p.length; i += 2) a.push([p[i], p[i + 1]]); return a; };
 const COAST_PTS = COAST.map(toPts), OSM_PTS = OSM_LOOPS.map(toPts);
+function mapRouteView() { const T0 = TERMS[0], T1 = TERMS[1]; return GIGHA ? { cx: (T0.P.x + T1.P.x) / 2, cy: (T0.P.y + T1.P.y) / 2 - 900, span: 9200 } : { cx: -3600, cy: -4000, span: 11500 }; }
 function drawMap() {
-  const W = mapC.width, H = mapC.height, g = mapG;
-  const T0 = TERMS[0], T1 = TERMS[1], span = mapZoom === 'route' ? (GIGHA ? 9200 : 11500) : 900;
-  const FV = GAME === 'rib' ? RB : S, cx = mapZoom === 'route' ? (GIGHA ? (T0.P.x + T1.P.x) / 2 : -3600) : FV.x, cy = mapZoom === 'route' ? (GIGHA ? (T0.P.y + T1.P.y) / 2 - 900 : -4000) : FV.y, sc = W / span;
+  const FV = GAME === 'rib' ? RB : S, R = mapRouteView();
+  drawChart(mapG, mapC.width, mapC.height, mapZoom === 'route' ? Object.assign(R, { u: 1 }) : { cx: FV.x, cy: FV.y, span: 900, u: 1 });
+  if (MAPX.open) {
+    if (MAPX.follow) { MAPX.cx = FV.x; MAPX.cy = FV.y; }
+    drawChart(MAPX.g, MAPX.c.width, MAPX.c.height, { cx: MAPX.cx, cy: MAPX.cy, span: MAPX.span * MAPX.c.width / Math.min(MAPX.c.width, MAPX.c.height), u: MAPX.u, big: true });
+  }
+}
+// v: centre, the width in metres the canvas spans, u the size of a mark in corner-map pixels, big for the expanded chart
+function drawChart(g, W, H, v) {
+  const T0 = TERMS[0], T1 = TERMS[1], span = v.span, u = v.u, wide = span > 3000;
+  const FV = GAME === 'rib' ? RB : S, cx = v.cx, cy = v.cy, sc = W / span;
+  const font = (px) => `600 ${Math.round(px * u)}px "Barlow Condensed", sans-serif`;
+  const shoreW = v.big ? Math.max(2 * u, Math.min(90 * sc, 7 * u)) : Math.max(3, 90 * sc);   // the shallows band, kept thin when zoomed right in
   const tx = (x) => W / 2 + (x - cx) * sc, ty = (y) => H / 2 - (y - cy) * sc;
   g.fillStyle = '#17394a'; g.fillRect(0, 0, W, H);
   const landPath = (pts) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(tx(p[0]), ty(p[1])) : g.moveTo(tx(p[0]), ty(p[1]))); g.closePath(); };
@@ -2994,7 +3019,7 @@ function drawMap() {
   g.lineJoin = 'round';
   // GSHHG outside the OpenStreetMap footprint
   g.save(); g.beginPath(); g.rect(0, 0, W, H); g.rect(tx(rx0), ty(ry1), rw, rh); g.clip('evenodd');
-  g.strokeStyle = '#2f6f7a'; g.lineWidth = Math.max(3, 90 * sc);
+  g.strokeStyle = '#2f6f7a'; g.lineWidth = shoreW;
   COAST_PTS.forEach(p => { landPath(p); g.stroke(); });
   g.fillStyle = '#5a7148'; COAST_PTS.forEach(p => { landPath(p); g.fill(); });
   g.restore();
@@ -3003,67 +3028,75 @@ function drawMap() {
   g.save(); g.beginPath(); g.rect(tx(rx0) - 1, ty(ry1) - 1, rw + 2, rh + 2); g.clip();   // overlap the seam by a pixel
   g.fillStyle = '#5a7148'; g.fillRect(0, 0, W, H);
   loops(); g.fillStyle = '#17394a'; g.fill('evenodd');
-  loops(); g.clip('evenodd'); loops(); g.strokeStyle = '#2f6f7a'; g.lineWidth = Math.max(3, 90 * sc); g.stroke();
+  loops(); g.clip('evenodd'); loops(); g.strokeStyle = '#2f6f7a'; g.lineWidth = shoreW; g.stroke();
   g.restore();
-  g.strokeStyle = '#a7b0ae'; g.lineWidth = Math.max(2, 12 * sc);
+  // on the expanded chart, zoomed in: the roads, and the boats on their moorings
+  if (v.big && span < 6000) {
+    g.strokeStyle = 'rgba(214,206,178,.75)';
+    for (const Rd of ROADS) { g.lineWidth = Math.max(1.2 * u, Rd.w * sc); g.beginPath(); Rd.pts.forEach(([x, y], i) => i ? g.lineTo(tx(x), ty(y)) : g.moveTo(tx(x), ty(y))); g.stroke(); }
+  }
+  if (v.big && span < 3500 && LIFE.moored) { g.fillStyle = '#eef2f0'; for (const m of LIFE.moored) { g.beginPath(); g.arc(tx(m.x), ty(m.y), 2.6 * u, 0, 7); g.fill(); } }
+  g.strokeStyle = '#a7b0ae'; g.lineWidth = Math.max(2 * u, 12 * sc);
   for (const T of TERMS) { g.beginPath(); g.moveTo(tx(T.P.x), ty(T.P.y)); g.lineTo(tx(T.P.x + T.d.x * T.len), ty(T.P.y + T.d.y * T.len)); g.stroke(); }
   if (!GIGHA) {
     // the start mooring
-    g.fillStyle = '#e8eee8'; g.beginPath(); g.arc(tx(GEO.mooring[0]), ty(GEO.mooring[1]), 3, 0, 7); g.fill();
-    if (mapZoom === 'route') { g.font = '600 20px "Barlow Condensed", sans-serif'; g.textAlign = 'center'; for (const [nm, [x, y]] of Object.entries(GEO.named)) g.fillText(nm.toUpperCase(), tx(x), ty(y)); }
-  } else if (mapZoom === 'route') {
-    g.setLineDash([8, 8]); g.strokeStyle = 'rgba(242,179,61,.6)'; g.lineWidth = 2;
+    g.fillStyle = '#e8eee8'; g.beginPath(); g.arc(tx(GEO.mooring[0]), ty(GEO.mooring[1]), 3 * u, 0, 7); g.fill();
+    if (wide) { g.font = font(20); g.textAlign = 'center'; for (const [nm, [x, y]] of Object.entries(GEO.named)) g.fillText(nm.toUpperCase(), tx(x), ty(y)); }
+  } else if (wide) {
+    g.setLineDash([8 * u, 8 * u]); g.strokeStyle = 'rgba(242,179,61,.6)'; g.lineWidth = 2 * u;
     g.beginPath(); g.moveTo(tx(T0.P.x), ty(T0.P.y)); g.lineTo(tx(T1.P.x), ty(T1.P.y)); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#e8eee8'; g.font = '600 22px "Barlow Condensed", sans-serif'; g.textAlign = 'center';
+    g.fillStyle = '#e8eee8'; g.font = font(22); g.textAlign = 'center';
     g.fillText('TAYINLOAN', tx(T0.P.x + 1100), ty(T0.P.y - 300));
     for (const [nm, [x, y]] of Object.entries(GEO.named)) g.fillText(nm.toUpperCase(), tx(x), ty(y));
   } else {
-    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(242,179,61,.55)'; g.lineWidth = 2;
+    g.setLineDash([6 * u, 6 * u]); g.strokeStyle = 'rgba(242,179,61,.55)'; g.lineWidth = 2 * u;
     for (const T of TERMS) { g.beginPath(); g.moveTo(tx(T.P.x), ty(T.P.y)); g.lineTo(tx(T.P.x - T.d.x * 400), ty(T.P.y - T.d.y * 400)); g.stroke(); }
     g.setLineDash([]);
-    for (const [x, y, side] of BUOYS) { g.fillStyle = side < 0 ? '#e0453f' : '#3fbf6a'; g.beginPath(); g.arc(tx(x), ty(y), 5, 0, 7); g.fill(); }
+    for (const [x, y, side] of BUOYS) { g.fillStyle = side < 0 ? '#e0453f' : '#3fbf6a'; g.beginPath(); g.arc(tx(x), ty(y), 5 * u, 0, 7); g.fill(); }
   }
   // South Pier, and the lay-up route while it is in use
-  g.strokeStyle = '#a7b0ae'; g.lineWidth = Math.max(2, 6 * sc);
-  if (GIGHA) { const r = SPIER.R, e = SPIER.E; g.beginPath(); g.moveTo(tx(r.x), ty(r.y)); g.lineTo(tx(e.x), ty(e.y)); g.stroke(); const h0 = SPIER.toW(7, -20), h1 = SPIER.toW(11, 30); g.lineWidth = Math.max(3, 12 * sc); g.beginPath(); g.moveTo(tx(h0.x), ty(h0.y)); g.lineTo(tx(h1.x), ty(h1.y)); g.stroke(); }
+  g.strokeStyle = '#a7b0ae'; g.lineWidth = Math.max(2 * u, 6 * sc);
+  if (GIGHA) { const r = SPIER.R, e = SPIER.E; g.beginPath(); g.moveTo(tx(r.x), ty(r.y)); g.lineTo(tx(e.x), ty(e.y)); g.stroke(); const h0 = SPIER.toW(7, -20), h1 = SPIER.toW(11, 30); g.lineWidth = Math.max(3 * u, 12 * sc); g.beginPath(); g.moveTo(tx(h0.x), ty(h0.y)); g.lineTo(tx(h1.x), ty(h1.y)); g.stroke(); }
   if (S.layup.state === 'passage' || S.layup.state === 'chosen') {
     const pts = [[S.x, S.y], ...SPIER.route.slice(S.layup.wp), [SPIER.berth.x, SPIER.berth.y]];
-    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(242,194,48,.85)'; g.lineWidth = 2; g.beginPath();
+    g.setLineDash([6 * u, 6 * u]); g.strokeStyle = 'rgba(242,194,48,.85)'; g.lineWidth = 2 * u; g.beginPath();
     pts.forEach(([x, y], i) => i ? g.lineTo(tx(x), ty(y)) : g.moveTo(tx(x), ty(y))); g.stroke(); g.setLineDash([]);
-    SPIER.route.forEach(([x, y], i) => { if (i < S.layup.wp) return; g.fillStyle = i === S.layup.wp ? '#f2c230' : 'rgba(242,194,48,.5)'; g.beginPath(); g.arc(tx(x), ty(y), i === S.layup.wp ? 6 : 4, 0, 7); g.fill(); });
+    SPIER.route.forEach(([x, y], i) => { if (i < S.layup.wp) return; g.fillStyle = i === S.layup.wp ? '#f2c230' : 'rgba(242,194,48,.5)'; g.beginPath(); g.arc(tx(x), ty(y), (i === S.layup.wp ? 6 : 4) * u, 0, 7); g.fill(); });
   }
   // ship
-  const sp = Math.sin(S.psi), cp = Math.cos(S.psi), boost = Math.max(1, 7 / (15 * sc)), look = mapZoom === 'route' ? 120 : 30;
+  const sp = Math.sin(S.psi), cp = Math.cos(S.psi), boost = Math.max(1, 7 * u / (15 * sc)), look = wide ? 120 : 30;
   if (GIGHA) {
   const outline = [[15.1, 3.4], [12.1, 5], [-12.1, 5], [-15.1, 3.4], [-15.1, -3.4], [-12.1, -5], [12.1, -5], [15.1, -3.4]];
   g.beginPath();
   outline.forEach(([xb, yb], i) => { const X = S.x + (xb * sp + yb * cp) * boost, Y = S.y + (xb * cp - yb * sp) * boost; i ? g.lineTo(tx(X), ty(Y)) : g.moveTo(tx(X), ty(Y)); });
   g.closePath(); g.fillStyle = '#f2b33d'; g.fill();
   const k = S.dir, lx = S.x + k * 15.1 * boost * sp, ly = S.y + k * 15.1 * boost * cp;
-  g.fillStyle = '#0a1115'; g.beginPath(); g.arc(tx(lx), ty(ly), 3, 0, 7); g.fill();
+  g.fillStyle = '#0a1115'; g.beginPath(); g.arc(tx(lx), ty(ly), 3 * u, 0, 7); g.fill();
   const vx = S.u * sp + S.v * cp, vy = S.u * cp - S.v * sp;
-  g.strokeStyle = '#5fc9da'; g.lineWidth = 2; g.beginPath(); g.moveTo(tx(S.x), ty(S.y)); g.lineTo(tx(S.x + vx * look), ty(S.y + vy * look)); g.stroke();
+  g.strokeStyle = '#5fc9da'; g.lineWidth = 2 * u; g.beginPath(); g.moveTo(tx(S.x), ty(S.y)); g.lineTo(tx(S.x + vx * look), ty(S.y + vy * look)); g.stroke();
   }
   if (GAME === 'rib') {
-    const rs = Math.sin(RB.psi), rc = Math.cos(RB.psi), rb = Math.max(1, 6 / (2.5 * sc)), pts = [[2.5, 0], [-2.5, 1.1], [-2.5, -1.1]];
+    const rs = Math.sin(RB.psi), rc = Math.cos(RB.psi), rb = Math.max(1, 6 * u / (2.5 * sc)), pts = [[2.5, 0], [-2.5, 1.1], [-2.5, -1.1]];
     g.beginPath(); pts.forEach(([xb, yb], i) => { const X = RB.x + (xb * rs + yb * rc) * rb, Y = RB.y + (xb * rc - yb * rs) * rb; i ? g.lineTo(tx(X), ty(Y)) : g.moveTo(tx(X), ty(Y)); });
-    g.closePath(); g.fillStyle = '#ff7a3d'; g.fill(); g.strokeStyle = '#0a1115'; g.lineWidth = 1.5; g.stroke();
+    g.closePath(); g.fillStyle = '#ff7a3d'; g.fill(); g.strokeStyle = '#0a1115'; g.lineWidth = 1.5 * u; g.stroke();
     const rvx = RB.u * rs + RB.v * rc, rvy = RB.u * rc - RB.v * rs;
-    g.strokeStyle = '#5fc9da'; g.lineWidth = 2; g.beginPath(); g.moveTo(tx(RB.x), ty(RB.y)); g.lineTo(tx(RB.x + rvx * look), ty(RB.y + rvy * look)); g.stroke();
-    if (RB.drill.id === 'slalom') { g.fillStyle = '#f26a1b'; SLALOM.forEach(([x, y]) => { g.beginPath(); g.arc(tx(x), ty(y), 3, 0, 7); g.fill(); }); }
-    if (RB.cas) { g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(tx(RB.cas.x), ty(RB.cas.y), 5, 0, 7); g.fill(); }
+    g.strokeStyle = '#5fc9da'; g.lineWidth = 2 * u; g.beginPath(); g.moveTo(tx(RB.x), ty(RB.y)); g.lineTo(tx(RB.x + rvx * look), ty(RB.y + rvy * look)); g.stroke();
+    if (RB.drill.id === 'slalom') { g.fillStyle = '#f26a1b'; SLALOM.forEach(([x, y]) => { g.beginPath(); g.arc(tx(x), ty(y), 3 * u, 0, 7); g.fill(); }); }
+    if (RB.cas) { g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(tx(RB.cas.x), ty(RB.cas.y), 5 * u, 0, 7); g.fill(); }
   }
-  g.fillStyle = '#dbe6eb'; g.font = '600 18px "Barlow Condensed", sans-serif'; g.textAlign = 'left';
-  g.fillText('N ↑', 10, 22);
-  const bar = mapZoom === 'route' ? 1000 : 100;
-  g.fillRect(10, H - 16, bar * sc, 3); g.fillText(mapZoom === 'route' ? '1 km' : '100 m', 10, H - 22);
-  g.textAlign = 'right'; g.fillText(`velocity ${look} s`, W - 10, 22);
+  g.fillStyle = '#dbe6eb'; g.font = font(18); g.textAlign = 'left';
+  g.fillText('N ↑', 10 * u, 22 * u);
+  // a scale bar of a round length, about a sixth of the width
+  const bar = [50, 100, 200, 500, 1000, 2000, 5000].reduce((b, c) => c <= span / 6 ? c : b, 50);
+  g.fillRect(10 * u, H - 16 * u, bar * sc, 3 * u); g.fillText(bar >= 1000 ? bar / 1000 + ' km' : bar + ' m', 10 * u, H - 22 * u);
+  g.textAlign = 'right'; g.fillText(`velocity ${look} s`, W - 10 * u, 22 * u);
 }
 
 // ================= INPUT =================
 const keys = new Set();
 const CONTROL_KEYS = new Set(['KeyR', 'KeyF', 'KeyX', 'KeyK', 'KeyL', 'KeyO', 'KeyG', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyH', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract']);
 window.addEventListener('keydown', (ev) => {
+  if (ev.code === 'Escape' && MAPX.open) { mapXOpen(false); return; }
   if (!S || !$('menu').hidden) return;
   if (CONTROL_KEYS.has(ev.code)) { ev.preventDefault(); if (document.activeElement && document.activeElement.type === 'range') document.activeElement.blur(); }
   keys.add(ev.code);
@@ -3234,6 +3267,44 @@ function cycleCam() { setCam(CAMS[(CAMS.indexOf(cam.mode) + 1) % CAMS.length]); 
 $('bCam').onclick = cycleCam;
 $('tCam').onclick = cycleCam;
 $('bMapZoom').onclick = () => { mapZoom = mapZoom === 'route' ? 'harbour' : 'route'; setT($('bMapZoom'), mapZoom === 'route' ? 'Harbour' : 'Route'); };
+// the expanded chart: span is the metres across its shorter side; it follows the boat until you drag it
+const MAPX = { open: false, c: $('mapXC'), g: $('mapXC').getContext('2d'), cx: 0, cy: 0, span: 2500, follow: true, u: 1, ptrs: new Map() };
+function mapXSize() {
+  const c = MAPX.c, r = c.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 3);
+  c.width = Math.max(50, Math.round(r.width * dpr)); c.height = Math.max(50, Math.round(r.height * dpr)); MAPX.u = dpr * 0.62;
+}
+function mapXOpen(on) {
+  MAPX.open = on; $('mapX').hidden = !on;
+  if (on) { const FV = GAME === 'rib' ? RB : S; MAPX.cx = FV.x; MAPX.cy = FV.y; MAPX.follow = true; setC($('mxCentre'), 'on', true); mapXSize(); drawMap(); }
+}
+function mapXZoom(f, px, py) {   // px, py: canvas pixels to zoom about
+  const c = MAPX.c, m = MAPX.span / Math.min(c.width, c.height), ns = clamp(MAPX.span * f, 120, 40000), nm = ns / Math.min(c.width, c.height);
+  if (px !== undefined && !MAPX.follow) { MAPX.cx += (px - c.width / 2) * (m - nm); MAPX.cy -= (py - c.height / 2) * (m - nm); }
+  MAPX.span = ns; drawMap();
+}
+$('map').addEventListener('click', () => mapXOpen(true));
+$('mxClose').onclick = () => mapXOpen(false);
+$('mxCentre').onclick = () => { MAPX.follow = true; setC($('mxCentre'), 'on', true); drawMap(); };
+$('mxIn').onclick = () => mapXZoom(1 / 1.6); $('mxOut').onclick = () => mapXZoom(1.6);
+window.addEventListener('resize', () => { if (MAPX.open) { mapXSize(); drawMap(); } });
+MAPX.c.addEventListener('wheel', (ev) => { ev.preventDefault(); const r = MAPX.c.getBoundingClientRect(), k = MAPX.c.width / r.width; mapXZoom(Math.exp(ev.deltaY * 0.0015), (ev.clientX - r.left) * k, (ev.clientY - r.top) * k); }, { passive: false });
+MAPX.c.addEventListener('pointerdown', (ev) => { try { MAPX.c.setPointerCapture(ev.pointerId); } catch (e) {} MAPX.ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); MAPX.c.classList.add('drag'); });
+MAPX.c.addEventListener('pointermove', (ev) => {
+  const P = MAPX.ptrs; if (!P.has(ev.pointerId)) return;
+  const r = MAPX.c.getBoundingClientRect(), k = MAPX.c.width / r.width, m = MAPX.span / Math.min(MAPX.c.width, MAPX.c.height) * k;
+  if (P.size === 1) {
+    const p = P.get(ev.pointerId), dx = ev.clientX - p.x, dy = ev.clientY - p.y;
+    if (MAPX.follow && Math.hypot(dx, dy) < 3) return;
+    if (MAPX.follow) { MAPX.follow = false; setC($('mxCentre'), 'on', false); }
+    MAPX.cx -= dx * m; MAPX.cy += dy * m;
+  } else if (P.size === 2) {   // pinch: zoom about the midpoint, and pan with it
+    const [a, b] = [...P.entries()], o = a[0] === ev.pointerId ? b[1] : a[1], p = P.get(ev.pointerId);
+    const d0 = Math.hypot(p.x - o.x, p.y - o.y), d1 = Math.hypot(ev.clientX - o.x, ev.clientY - o.y);
+    if (d0 > 10 && d1 > 10) mapXZoom(d0 / d1, ((ev.clientX + o.x) / 2 - r.left) * k, ((ev.clientY + o.y) / 2 - r.top) * k);
+  }
+  P.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); drawMap();
+});
+for (const evn of ['pointerup', 'pointercancel', 'lostpointercapture']) MAPX.c.addEventListener(evn, (ev) => { MAPX.ptrs.delete(ev.pointerId); if (!MAPX.ptrs.size) MAPX.c.classList.remove('drag'); });
 $('bConsole').onclick = () => setConsole(!$('console').hidden);
 $('bHelp').onclick = () => { $('help').hidden = false; };
 $('bHelp2').onclick = () => { $('help').hidden = false; };
@@ -4390,12 +4461,19 @@ function buildRib() {
   { const deckM = M(0x7f8486); add(body, new THREE.BoxGeometry(1.3, 0.04, 4.0), deckM, 0, 0.15, 0.4).castShadow = false; add(body, new THREE.BoxGeometry(0.62, 0.04, 0.7), deckM, 0, 0.17, -1.95).castShadow = false; }
   const white = M(0xefefea), dark = M(0x26292c);
   add(body, new THREE.BoxGeometry(0.74, 0.92, 0.62), white, 0, 0.62, -0.2);
-  const scr = add(body, new THREE.BoxGeometry(0.72, 0.42, 0.03), new THREE.MeshLambertMaterial({ color: 0x9fb4be, transparent: true, opacity: 0.35 }), 0, 1.25, -0.42); scr.rotation.x = -0.45;
+  // a low smoked acrylic screen on the front of the console, dark-rimmed, that the helm looks over rather than through
+  const scrG = new THREE.Group(); scrG.position.set(0, 1.08, -0.47); scrG.rotation.x = -0.5; body.add(scrG);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.24), new THREE.MeshPhongMaterial({ color: 0x1c262b, transparent: true, opacity: 0.16, shininess: 90, specular: 0x667780, depthWrite: false, side: THREE.DoubleSide }));
+  scr.position.y = 0.12; scrG.add(scr);
+  add(scrG, new THREE.BoxGeometry(0.67, 0.01, 0.012), M(0x4a5054), 0, 0.243, 0);
   const mfd = add(body, new THREE.PlaneGeometry(0.26, 0.16), new THREE.MeshBasicMaterial({ color: 0x2a5f7a }), -0.14, 1.05, 0.12); mfd.rotation.x = -0.6;
   add(body, new THREE.SphereGeometry(0.06, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0.16, 1.08, -0.05);
-  const wheelG = new THREE.Group(); wheelG.position.set(0.12, 0.98, 0.14); wheelG.rotation.x = -0.75; body.add(wheelG);
-  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.017, 6, 20), dark); wheelG.add(wheel);
-  for (let a = 0; a < 3; a++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.16, 0.012), dark); s2.rotation.z = a * Math.PI * 2 / 3; s2.position.set(Math.sin(a * 2.094) * 0.08, Math.cos(a * 2.094) * 0.08, 0); wheelG.add(s2); }
+  // the wheel stands off the back of the console on a short column, far enough out that its rim clears the console top
+  const col = add(body, new THREE.CylinderGeometry(0.03, 0.035, 0.12, 10), dark, 0.12, 0.97, 0.15); col.rotation.x = Math.PI / 2 - 0.75;
+  const wheelG = new THREE.Group(); wheelG.position.set(0.12, 0.98, 0.21); wheelG.rotation.x = -0.75; body.add(wheelG);
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.016, 10, 36), M(0x34383b)); wheelG.add(wheel);
+  add(wheelG, new THREE.CylinderGeometry(0.035, 0.035, 0.04, 12), dark, 0, 0, 0).rotation.x = Math.PI / 2;
+  for (let a = 0; a < 3; a++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.15, 0.012), dark); s2.rotation.z = a * Math.PI * 2 / 3; s2.position.set(-Math.sin(a * 2.094) * 0.085, Math.cos(a * 2.094) * 0.085, 0); wheelG.add(s2); }
   RIB.wheel = wheelG;
   const lev = new THREE.Group(); lev.position.set(0.39, 0.92, -0.05); body.add(lev);
   add(lev, new THREE.BoxGeometry(0.06, 0.1, 0.12), dark, 0, 0, 0);
