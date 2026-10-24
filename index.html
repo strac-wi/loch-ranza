@@ -153,6 +153,23 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:15px;margin:6px 0 4px}
 .keys kbd{font-family:var(--f-mono);font-size:12px;background:#1b2a31;border:1px solid var(--line-hi);border-radius:3px;padding:1px 5px;white-space:nowrap;justify-self:start}
 .help ol,.help ul{margin:0 0 6px;padding-left:20px;font-size:16px;line-height:1.4}
+#ribHud{display:none;position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;z-index:3;padding:8px 10px;width:300px;box-sizing:border-box;pointer-events:auto}
+body.rib #ribHud{display:block}
+body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #bPALoad,body.rib #layup,body.rib #alarmbar{display:none!important}
+.rg{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rlev{position:relative;width:12px;height:52px;border:1px solid var(--line-hi);border-radius:3px;background:rgba(0,0,0,.25)}
+.rlev::after{content:'';position:absolute;left:-3px;right:-3px;top:50%;height:1px;background:var(--line-hi)}
+.rlev i{position:absolute;left:1px;right:1px;background:var(--amber);border-radius:2px}
+#rGear{font-family:var(--f-display);font-size:30px;width:26px;text-align:center}
+#rGear.on{color:var(--amber)}
+.rcol{flex:1;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.rtrim{height:6px;border:1px solid var(--line-hi);border-radius:3px;position:relative}
+.rtrim i{position:absolute;left:0;top:0;bottom:0;background:var(--cyan);border-radius:3px}
+.rvent{color:#ff8d8f;min-height:15px}
+.rbtns{display:flex;flex-wrap:wrap;gap:5px}
+.rbtns button{padding:4px 7px;font-size:12px}
+.rbtns button.warn{background:var(--red);color:#fff}
+@media (max-width:700px){#ribHud{top:92px;bottom:auto;width:auto;right:150px;padding:6px 8px} .rg{margin-bottom:5px;gap:8px} .rlev{height:36px} #rGear{font-size:22px;width:18px} .rcol{font-size:12px} .rbtns{gap:4px} .rbtns button{padding:5px 6px;font-size:11px} #rTrimUp,#rTrimDn{display:none}}
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -246,6 +263,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <button id="bSimple" title="Switch between full procedure and simple controls">Controls: full</button>
         <button id="bGfx" title="Shadows, clouds and wildlife">Detail: high</button>
         <button id="bTouch" title="On-screen joystick and steering">Touch controls: off</button>
+        <button id="bNew" title="Back to the start screen to pick the ferry or the RIB">New game</button>
       </div>
     </div>
 
@@ -273,6 +291,12 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <p id="fpHint" hidden>Drag to look around · drag levers, sticks and the wheel · click buttons · scroll to zoom · double-click to face ahead</p>
     <div id="alarmbar" hidden><ul id="alarmTop"></ul><button id="bAck2" class="warn">Ack</button></div>
     <div id="toasts" aria-live="polite"></div>
+    <div id="ribHud" class="card">
+      <div class="rg"><div class="rlev" title="Throttle and gear lever"><i id="rLev"></i></div><b id="rGear">–</b>
+        <div class="rcol"><span>Trim <b id="rTrim">0°</b></span><div class="rtrim"><i id="rTrimBar"></i></div><span id="rVent" class="rvent"></span></div></div>
+      <div class="rbtns"><button id="rEng" title="Start or stop the engine (X)">Stopped</button><button id="rKill" title="Clip the kill cord on or off (K)">Kill cord: on</button><button id="rLines" title="Make fast or let go (L)">Let go lines</button>
+        <button id="rTrimUp" title="Trim out, bow up (R)">Trim ▲</button><button id="rTrimDn" title="Trim in, bow down (F)">Trim ▼</button><button id="rMOB" class="warn" title="Man overboard (O)">MOB</button><button id="rDrill" title="Choose a drill (G)">Drill: Free practice</button></div>
+    </div>
     <div id="layup" class="card" hidden><p id="layupText"></p><div class="lrow"><button id="layupYes" class="go">Lay up at South Pier</button><button id="layupNo">Carry on</button></div></div>
 
     <div id="report" class="card" hidden>
@@ -285,15 +309,20 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
     <div id="menu" class="overlay">
       <div class="card">
         <p class="eyebrow">Sound of Gigha · Kintyre</p>
-        <h1>MV Loch Ranza</h1>
-        <p>Thirty metres, two Voith Schneider units and no rudder. Either end can lead. Work her across from Tayinloan to Ardminish on Gigha, land her on the slip, put the ramp down and work the cars.</p>
+        <h1 id="menuTitle">MV Loch Ranza</h1>
+        <p id="menuBlurb">Thirty metres, two Voith Schneider units and no rudder. Either end can lead. Work her across from Tayinloan to Ardminish on Gigha, land her on the slip, put the ramp down and work the cars.</p>
         <div class="opts">
           <fieldset>
+            <legend>Vessel</legend>
+            <label><input type="radio" name="game" value="ferry" checked><span>MV Loch Ranza<small>The ferry: Tayinloan to Gigha, the slips, the ramps and the cars.</small></span></label>
+            <label><input type="radio" name="game" value="rib"><span>RIB: Gala Viking V500<small>A 5 m RIB with a Suzuki 100 hp outboard, alongside the Boathouse pontoon at Ardminish. Boat-handling practice at high and low speed.</small></span></label>
+          </fieldset>
+          <fieldset class="ferryOpt">
             <legend>Start</legend>
             <label><input type="radio" name="start" value="cold" checked><span>Alongside Tayinloan<small>Engines running, held on the slip with a touch of pitch, ramp down, cars waiting to board.</small></span></label>
             <label><input type="radio" name="start" value="ready"><span>Off the slip, ready to sail<small>Loaded, engines running, clutches in, ramps up and pinned.</small></span></label>
           </fieldset>
-          <fieldset>
+          <fieldset class="ferryOpt">
             <legend>Controls</legend>
             <label><input type="radio" name="ctl" value="full"><span>Full procedure<small>Engines, clutches, hydraulics, pins, ramp and line are all yours.</small></span></label>
             <label><input type="radio" name="ctl" value="simple" checked><span>Simple<small>You steer. The crew runs the engines and ramps and holds her on the slip.</small></span></label>
@@ -339,6 +368,9 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
         <p class="fine">Map data © OpenStreetMap contributors (ODbL). Outer coastline: GSHHG (Wessel &amp; Smith, LGPL). Depths are modelled, not charted.</p>
         <h3>Simple controls</h3>
         <p>Pick Simple on the start screen, or switch with the Controls button at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
+        <h3>The RIB: Gala Viking V500 with a Suzuki 100</h3>
+        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the left pad is the lever and the bar is the wheel; both stay where you leave them, Neutral snaps the lever to the detent and the Trim buttons work while held. New game takes you back to the start screen.</p>
+        <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
         <h3>Laying up at the South Pier</h3>
         <p>When the cars are off at Gigha you are asked whether to lay her up for the night. Choose the South Pier and the waiting traffic is sent home; raise the ramp, pull away and follow the flashing yellow markers south down Gigha's east side. The last one brings you to the pier, where a green outline shows the berth along its fendered face. Come alongside parallel to the face and stop under 0.4 kn: the crew put the lines out and you get an end-of-day score. Let go to sail for Tayinloan again.</p>
         <h3>Wheelhouse view</h3>
@@ -1058,6 +1090,7 @@ function waterMaterial(amp) {
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
       uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uDetAR: TERRAIN_U.uDetAR, uDetTR: TERRAIN_U.uDetTR,
+      uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uWake: { value: new THREE.Vector4(5.5, 0.08, 30, 50) }, uKel: { value: 1 },
     },
     vertexShader: WAVE_GLSL + `varying vec3 vW; varying float vH;
       void main(){ vec4 wp = modelMatrix*vec4(position,1.0);
@@ -1067,7 +1100,7 @@ function waterMaterial(amp) {
         vW = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`,
     fragmentShader: `uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSkyTop; uniform vec3 uFog; uniform vec3 uSun;
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
-      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR;
+      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform vec4 uHullDim; uniform vec4 uWake; uniform float uKel;
       vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
       varying vec3 vW; varying float vH;
       ` + WAVE_GRAD_GLSL + `
@@ -1099,7 +1132,7 @@ function waterMaterial(amp) {
         vec2 r = p - bow; float b = -dot(r, vd), sd = abs(dot(r, vec2(-vd.y, vd.x)));
         if (b < 0.0 || b > 700.0) return 0.0;
         float kd = 9.81 / (spd * spd * 0.6667), cu = sd - b * 0.3536;
-        float amp = 0.5 * clamp((spd - 0.6) / 3.6, 0.0, 1.0) * smoothstep(0.0, 6.0, b) / sqrt(1.0 + b / 30.0);
+        float amp = 0.5 * uKel * clamp((spd - 0.6) / 3.6, 0.0, 1.0) * smoothstep(0.0, 6.0, b) / sqrt(1.0 + b / 30.0);
         float arm = exp(-pow(cu / (2.2 + 0.08 * b), 2.0)) + 0.3 * step(cu, 0.0) * smoothstep(-0.15 * b - 2.0, 0.0, cu) * smoothstep(0.12 * b, 0.25 * b + 1.0, sd);
         float ph = kd * (b * 0.8165 + sd * 0.5774);
         return amp * arm * sin(ph) * (1.0 - smoothstep(0.6, 1.6, kd * fp));
@@ -1114,10 +1147,10 @@ function waterMaterial(amp) {
         vec2 cg = chop(vW.xz, uTime, fp) * (0.04 + uRip * 1.3) * (0.6 + 0.4 * paws);
         // ship-relative coordinates for the waterline and wake
         vec2 rel = vW.xz - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
-        vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - vec2(3.2, 13.3);
-        float hd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 1.8;
+        vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - uHullDim.xy;
+        float hd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uHullDim.z, hs = (uHullDim.x + uHullDim.z) / 5.0;
         float spd = length(uVel);
-        vec2 vd = spd > 0.05 ? uVel / spd : vec2(0.0, -1.0), bow = uShip.xy + vd * 14.0;
+        vec2 vd = spd > 0.05 ? uVel / spd : vec2(0.0, -1.0), bow = uShip.xy + vd * uHullDim.w;
         vec2 kg = vec2(0.0); float kh = 0.0;
         if (spd > 0.6 && length(rel) < 720.0) {
           const float e = 0.6;
@@ -1143,14 +1176,14 @@ function waterMaterial(amp) {
         float surf = (1.0 - smoothstep(0.15, 1.5, depth))*(0.55 + 0.45*sin(uTime*1.3 - depth*5.0 + vW.x*0.03 - vW.z*0.02));
         col = mix(col, vec3(0.93, 0.96, 0.96), clamp(crest*0.65 + surf*0.7, 0.0, 0.85));
         // the hull darkens the water hard against it; churned water at the waterline and a fading wake astern
-        col *= mix(0.62, 1.0, smoothstep(0.0, 3.0, hd));
-        float churn = (1.0 - smoothstep(0.0, 0.8 + spd*0.8, hd)) * (0.18 + 0.5*clamp(spd/3.0, 0.0, 1.0));
+        col *= mix(0.62, 1.0, smoothstep(0.0, 3.0 * hs, hd));
+        float churn = (1.0 - smoothstep(0.0, (0.8 + min(spd, 5.0)*0.8) * hs, hd)) * (0.18 + 0.5*clamp(spd/3.0, 0.0, 1.0));
         float wake = 0.0;
         if (spd > 0.15) {
           // turbulent wake from the stern: streaks running back along the track, spreading and fading
-          float b = dot(rel, -vd) - 14.0, sd = dot(rel, vec2(-vd.y, vd.x));
-          float w = 5.5 + max(b, 0.0) * 0.08;
-          wake = step(0.0, b) * exp(-b / (30.0 + 50.0 * spd)) * (1.0 - smoothstep(w * 0.5, w, abs(sd))) * clamp(spd / 2.5, 0.0, 1.0);
+          float b = dot(rel, -vd) - uHullDim.w, sd = dot(rel, vec2(-vd.y, vd.x));
+          float w = uWake.x + max(b, 0.0) * uWake.y;
+          wake = step(0.0, b) * exp(-b / (uWake.z + uWake.w * spd)) * (1.0 - smoothstep(w * 0.5, w, abs(sd))) * clamp(spd / 2.5, 0.0, 1.0);
           wake *= mix(0.55 + 0.45 * wn(vec2(sd * 0.7, b * 0.045 + uTime * 0.05)), 0.8, smoothstep(0.4, 1.0, 0.7 * fp));
           // white water breaking on the Kelvin crests close to the bow
           float bb = -dot(vW.xz - bow, vd);
@@ -1733,9 +1766,12 @@ const foam = (() => {
   const pos = new Float32Array(FOAM_N * 3), col = new Float32Array(FOAM_N * 3);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 1.3, vertexColors: true, sizeAttenuation: true }));
+  // a soft round blob rather than the default square point
+  const cv = document.createElement('canvas'); cv.width = cv.height = 32; const cx = cv.getContext('2d'), gr = cx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, 32, 32);
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 1.3, vertexColors: true, sizeAttenuation: true, map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
   pts.frustumCulled = false; scene.add(pts);
-  return { pos, col, g, vel: new Float32Array(FOAM_N * 2), life: new Float32Array(FOAM_N), max: new Float32Array(FOAM_N), i: 0 };
+  return { pts, pos, col, g, vel: new Float32Array(FOAM_N * 2), life: new Float32Array(FOAM_N), max: new Float32Array(FOAM_N), i: 0 };
 })();
 const SEA_RGB = [0.16, 0.33, 0.38];
 function spawnFoam(x, y, z, vx, vz, life) {
@@ -2772,7 +2808,7 @@ const COAST_PTS = COAST.map(toPts), OSM_PTS = OSM_LOOPS.map(toPts);
 function drawMap() {
   const W = mapC.width, H = mapC.height, g = mapG;
   const T0 = TERMS[0], T1 = TERMS[1], span = mapZoom === 'route' ? 9200 : 900;
-  const cx = mapZoom === 'route' ? (T0.P.x + T1.P.x) / 2 : S.x, cy = mapZoom === 'route' ? (T0.P.y + T1.P.y) / 2 - 900 : S.y, sc = W / span;
+  const FV = GAME === 'rib' ? RB : S, cx = mapZoom === 'route' ? (T0.P.x + T1.P.x) / 2 : FV.x, cy = mapZoom === 'route' ? (T0.P.y + T1.P.y) / 2 - 900 : FV.y, sc = W / span;
   const tx = (x) => W / 2 + (x - cx) * sc, ty = (y) => H / 2 - (y - cy) * sc;
   g.fillStyle = '#17394a'; g.fillRect(0, 0, W, H);
   const landPath = (pts) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(tx(p[0]), ty(p[1])) : g.moveTo(tx(p[0]), ty(p[1]))); g.closePath(); };
@@ -2824,6 +2860,15 @@ function drawMap() {
   g.fillStyle = '#0a1115'; g.beginPath(); g.arc(tx(lx), ty(ly), 3, 0, 7); g.fill();
   const vx = S.u * sp + S.v * cp, vy = S.u * cp - S.v * sp, look = mapZoom === 'route' ? 120 : 30;
   g.strokeStyle = '#5fc9da'; g.lineWidth = 2; g.beginPath(); g.moveTo(tx(S.x), ty(S.y)); g.lineTo(tx(S.x + vx * look), ty(S.y + vy * look)); g.stroke();
+  if (GAME === 'rib') {
+    const rs = Math.sin(RB.psi), rc = Math.cos(RB.psi), rb = Math.max(1, 6 / (2.5 * sc)), pts = [[2.5, 0], [-2.5, 1.1], [-2.5, -1.1]];
+    g.beginPath(); pts.forEach(([xb, yb], i) => { const X = RB.x + (xb * rs + yb * rc) * rb, Y = RB.y + (xb * rc - yb * rs) * rb; i ? g.lineTo(tx(X), ty(Y)) : g.moveTo(tx(X), ty(Y)); });
+    g.closePath(); g.fillStyle = '#ff7a3d'; g.fill(); g.strokeStyle = '#0a1115'; g.lineWidth = 1.5; g.stroke();
+    const rvx = RB.u * rs + RB.v * rc, rvy = RB.u * rc - RB.v * rs;
+    g.strokeStyle = '#5fc9da'; g.lineWidth = 2; g.beginPath(); g.moveTo(tx(RB.x), ty(RB.y)); g.lineTo(tx(RB.x + rvx * look), ty(RB.y + rvy * look)); g.stroke();
+    if (RB.drill.id === 'slalom') { g.fillStyle = '#f26a1b'; SLALOM.forEach(([x, y]) => { g.beginPath(); g.arc(tx(x), ty(y), 3, 0, 7); g.fill(); }); }
+    if (RB.cas) { g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(tx(RB.cas.x), ty(RB.cas.y), 5, 0, 7); g.fill(); }
+  }
   g.fillStyle = '#dbe6eb'; g.font = '600 18px "Barlow Condensed", sans-serif'; g.textAlign = 'left';
   g.fillText('N ↑', 10, 22);
   const bar = mapZoom === 'route' ? 1000 : 100;
@@ -2833,12 +2878,25 @@ function drawMap() {
 
 // ================= INPUT =================
 const keys = new Set();
-const CONTROL_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyH', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract']);
+const CONTROL_KEYS = new Set(['KeyR', 'KeyF', 'KeyX', 'KeyK', 'KeyL', 'KeyO', 'KeyG', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyH', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract']);
 window.addEventListener('keydown', (ev) => {
   if (!S || !$('menu').hidden) return;
   if (CONTROL_KEYS.has(ev.code)) { ev.preventDefault(); if (document.activeElement && document.activeElement.type === 'range') document.activeElement.blur(); }
   keys.add(ev.code);
   if (ev.repeat) return;
+  if (GAME === 'rib') {
+    if (ev.code === 'Space') RB.lever = 0;
+    if (ev.code === 'KeyX') ribEngine();
+    if (ev.code === 'KeyK') ribKill();
+    if (ev.code === 'KeyL') ribLines();
+    if (ev.code === 'KeyO') ribMOB();
+    if (ev.code === 'KeyC') RB.wheel = 0;
+    if (ev.code === 'KeyG') ribSetDrill(DRILLS[(DRILLS.indexOf(RB.drill.id) + 1) % DRILLS.length]);
+    if (ev.code === 'KeyV') cycleCam();
+    if (ev.code === 'KeyT') cycleWarp();
+    if (ev.code === 'KeyM') toggleSound();
+    return;
+  }
   if (ev.code === 'Space') zeroPitch();
   if (ev.code === 'KeyV') cycleCam();
   if (ev.code === 'KeyT') cycleWarp();
@@ -2884,17 +2942,22 @@ function bindPad(el, move, end) {
 }
 const KNOB = 29;
 bindPad($('tJoy'), (ev) => {
+  if (GAME === 'rib') {   // the left pad is the throttle and gear lever: up ahead, down astern, and it stays where you leave it
+    const r = $('tJoy').getBoundingClientRect(), R = r.width / 2 - KNOB, y = -clamp((ev.clientY - r.top - r.height / 2) / R, -1, 1);
+    RB.lever = Math.abs(y) < 0.1 ? 0 : y; TOUCH.joy = true; return;
+  }
   if (S.mode !== 'combined') setMode('combined');
   const r = $('tJoy').getBoundingClientRect(), R = r.width / 2 - KNOB;
   let x = (ev.clientX - r.left - r.width / 2) / R, y = (ev.clientY - r.top - r.height / 2) / R; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
   S.lev.S = -y; S.lev.Y = x; TOUCH.joy = true;
-}, () => { TOUCH.joy = false; TOUCH.springY = true; });
+}, () => { TOUCH.joy = false; TOUCH.springY = GAME !== 'rib'; });
 bindPad($('tSteer'), (ev) => {
+  if (GAME === 'rib') { const r = $('tSteer').getBoundingClientRect(), R = r.width / 2 - KNOB - 4; RB.wheel = clamp((ev.clientX - r.left - r.width / 2) / R, -1, 1); TOUCH.steer = true; return; }
   if (S.mode !== 'combined') setMode('combined');
   const r = $('tSteer').getBoundingClientRect(), R = r.width / 2 - KNOB - 4;
   S.lev.W = clamp((ev.clientX - r.left - r.width / 2) / R, -1, 1); TOUCH.steer = true;
-}, () => { TOUCH.steer = false; TOUCH.springW = true; });
-$('tStop').onclick = () => zeroPitch();
+}, () => { TOUCH.steer = false; TOUCH.springW = GAME !== 'rib'; });
+$('tStop').onclick = () => { if (GAME === 'rib') RB.lever = 0; else zeroPitch(); };
 $('tHorn').addEventListener('pointerdown', () => { hornBtn = true; });
 function setTouch(on) { TOUCH.on = on; setT($('bTouch'), on ? 'Touch controls: on' : 'Touch controls: off'); setC($('bTouch'), 'on', on); }
 $('bTouch').onclick = () => setTouch(!TOUCH.on);
@@ -2903,8 +2966,9 @@ function updateTouch() {
   $('touch').hidden = !show;
   if (!show) return;
   const J = $('tJoy'), R = J.clientWidth / 2 - KNOB, ST = $('tSteer'), R2 = ST.clientWidth / 2 - KNOB - 4;
-  $('tJoyK').style.transform = `translate(${(S.lev.Y * R).toFixed(1)}px, ${(-S.lev.S * R).toFixed(1)}px)`;
-  $('tSteerK').style.transform = `translate(${(S.lev.W * R2).toFixed(1)}px, 0)`;
+  const jx = GAME === 'rib' ? 0 : S.lev.Y, jy = GAME === 'rib' ? RB.lever : S.lev.S, sw = GAME === 'rib' ? RB.wheel : S.lev.W;
+  $('tJoyK').style.transform = `translate(${(jx * R).toFixed(1)}px, ${(-jy * R).toFixed(1)}px)`;
+  $('tSteerK').style.transform = `translate(${(sw * R2).toFixed(1)}px, 0)`;
 }
 $('bMenu').onclick = () => { const o = $('hudL').classList.toggle('open'); $('bMenu').setAttribute('aria-expanded', String(o)); setT($('bMenu'), o ? 'Close' : 'Menu'); };
 function zeroPitch() { S.lev = { S: 0, W: 0, Y: 0 }; S.pad = [{ up: 0, right: 0 }, { up: 0, right: 0 }]; }
@@ -2936,7 +3000,12 @@ function setDir(d) {
   S.pendDir = 0; S.dir = d; cam.az = 0; syncControls(); log(`Conning from the No.${d === 1 ? 1 : 2} end`);
 }
 const swapEnds = () => setDir(-S.dir);
-$('tDir').onclick = swapEnds;
+$('tDir').onclick = () => { if (GAME !== 'rib') swapEnds(); };
+// in the RIB the two spare overlay buttons trim the engine while held
+for (const [id, d] of [['tDir', 1], ['tPA', -1]]) {
+  $(id).addEventListener('pointerdown', () => { if (GAME === 'rib') TOUCH.trim = d; });
+  for (const evn of ['pointerup', 'pointercancel', 'pointerleave']) $(id).addEventListener(evn, () => { TOUCH.trim = 0; });
+}
 $('tWarp').onclick = () => cycleWarp();
 $('dir1').onclick = () => setDir(1);
 $('dir2').onclick = () => setDir(-1);
@@ -2961,6 +3030,7 @@ function setCam(m) {
   if (m === 'wheelhouse' && was !== 'wheelhouse') { WH.consolePrev = $('console').hidden; setConsole(true); WH.yaw = 0; WH.pitch = -0.3; drawScreens(); }
   if (was === 'wheelhouse' && m !== 'wheelhouse') { setConsole(WH.consolePrev); WH.active = null; hideTip(); canvas.style.cursor = ''; }
   $('fpHint').hidden = m !== 'wheelhouse';
+  if (m === 'helm' && was !== 'helm') { WH.yaw = 0; WH.pitch = -0.12; }
   setT($('bCam'), 'View: ' + m);
 }
 function cycleCam() { setCam(CAMS[(CAMS.indexOf(cam.mode) + 1) % CAMS.length]); }
@@ -2971,6 +3041,7 @@ $('bConsole').onclick = () => setConsole(!$('console').hidden);
 $('bHelp').onclick = () => { $('help').hidden = false; };
 $('bHelp2').onclick = () => { $('help').hidden = false; };
 $('helpClose').onclick = () => { $('help').hidden = true; };
+$('bNew').onclick = () => location.reload();
 $('repClose').onclick = () => { $('report').hidden = true; };
 
 // ---------- pointer: orbit / look, and operating wheelhouse controls ----------
@@ -3000,10 +3071,11 @@ function hideTip() { tipEl.hidden = true; }
 // zoom: chase pulls in to just off the ship, then narrows the lens; top view changes height; wheelhouse narrows the lens
 function zoomBy(f) {
   if (cam.mode === 'chase') {
-    if (f < 1) { if (cam.dist > CHASE_MIN) cam.dist = Math.max(CHASE_MIN, cam.dist * f); else cam.fov = Math.max(24, cam.fov * f); }
+    const cmin = GAME === 'rib' ? 6 : CHASE_MIN;
+    if (f < 1) { if (cam.dist > cmin) cam.dist = Math.max(cmin, cam.dist * f); else cam.fov = Math.max(24, cam.fov * f); }
     else if (cam.fov < 55) cam.fov = Math.min(55, cam.fov * f); else cam.dist = Math.min(900, cam.dist * f);
   } else if (cam.mode === 'top') cam.topH = clamp(cam.topH * f, 60, 4000);
-  else if (cam.mode === 'wheelhouse') WH.fov = clamp(WH.fov * f, 28, 75);
+  else if (cam.mode === 'wheelhouse' || cam.mode === 'helm') WH.fov = clamp(WH.fov * f, 28, 75);
 }
 // two fingers on the view pinch to zoom
 const ptrs = new Map(); let pinch = null;
@@ -3029,7 +3101,7 @@ canvas.addEventListener('pointermove', (ev) => {
   if (drag) {
     const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; drag = { x: ev.clientX, y: ev.clientY };
     if (cam.mode === 'chase') { cam.az -= dx * 0.005; cam.el = clamp(cam.el + dy * 0.004, 0.03, 1.45); }
-    else if (cam.mode === 'wheelhouse') { const k = WH.fov / 66; WH.yaw = clamp(WH.yaw - dx * 0.004 * k, -2.9, 2.9); WH.pitch = clamp(WH.pitch - dy * 0.003 * k, -1.2, 0.6); }
+    else if (cam.mode === 'wheelhouse' || cam.mode === 'helm') { const k = WH.fov / 66; WH.yaw = clamp(WH.yaw - dx * 0.004 * k, -2.9, 2.9); WH.pitch = clamp(WH.pitch - dy * 0.003 * k, -1.2, 0.6); }
     return;
   }
   if (cam.mode === 'wheelhouse' && S && S.running) {
@@ -3281,7 +3353,19 @@ function updateWheelhouse() {
     st.buttons.forEach(b => setLamp(b.m, b.lamp()));
   }
 }
+const RIB_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 function renderView() {
+  if (cam.mode === 'helm') {
+    // the world with a normal near plane, then the boat close up over it, cut off at the water so nothing below shows
+    camera.fov = WH.fov; camera.near = 0.5; camera.updateProjectionMatrix(); camera.layers.set(0);
+    RIB.root.visible = false; renderer.render(scene, camera); RIB.root.visible = true;
+    const bg = scene.background; scene.background = null; renderer.autoClear = false; renderer.clearDepth(); renderer.shadowMap.autoUpdate = false;
+    RIB_CLIP.constant = -(S.tide + waveH(RB.x, -RB.y, S.t) - 0.02); renderer.clippingPlanes = [RIB_CLIP];
+    camera.near = 0.05; camera.updateProjectionMatrix(); camera.layers.set(2);
+    renderer.render(scene, camera);
+    renderer.clippingPlanes = []; scene.background = bg; renderer.autoClear = true; renderer.shadowMap.autoUpdate = true; camera.layers.set(0);
+    return;
+  }
   if (cam.mode !== 'wheelhouse') {
     const fov = cam.mode === 'chase' ? cam.fov : 55;
     if (camera.near !== 0.5 || camera.fov !== fov) { camera.near = 0.5; camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -3428,8 +3512,8 @@ const AU = { ctx: null, on: true };
 // cam rate, with very little above a couple of kHz. So each firing is a smooth pressure bump rather than a crack,
 // the three firings of each crank turn differ a little (the crankshaft-rate throb) and the two turns of each
 // cycle differ again (the slower cam-rate throb), with a little cycle-to-cycle wander.
-function engineBuffer(ctx, seed) {
-  const sr = ctx.sampleRate, CYL = 6, REF = 1000, cycle = 120 / REF, cycles = 25, n = Math.round(cycle * cycles * sr);
+function engineBuffer(ctx, seed, CYL = 6) {
+  const sr = ctx.sampleRate, REF = 1000, cycle = 120 / REF, cycles = 25, n = Math.round(cycle * cycles * sr);
   const buf = ctx.createBuffer(1, n, sr), d = buf.getChannelData(0), r = mulberry(seed);
   const turn = [1.0, 0.68 + r() * 0.06], inTurn = [1.0, 0.74 + r() * 0.06, 0.87 + r() * 0.05];
   const W = 0.55 * cycle / CYL, pl = Math.round(0.02 * sr);
@@ -3584,14 +3668,28 @@ async function paPlay(auto) {
   if (S) log(auto ? 'Passenger announcement' : 'Passenger announcement (by hand)');
 }
 $('bPA').onclick = () => paPlay(false);
-$('tPA').onclick = () => paPlay(false);
+$('tPA').onclick = () => { if (GAME !== 'rib') paPlay(false); };
+$('rEng').onclick = () => ribEngine(); $('rKill').onclick = () => ribKill(); $('rLines').onclick = () => ribLines(); $('rMOB').onclick = () => ribMOB();
+$('rDrill').onclick = () => ribSetDrill(DRILLS[(DRILLS.indexOf(RB.drill.id) + 1) % DRILLS.length]);
+for (const [id, d] of [['rTrimUp', 1], ['rTrimDn', -1]]) {
+  $(id).addEventListener('pointerdown', () => { TOUCH.trim = d; });
+  for (const evn of ['pointerup', 'pointercancel', 'pointerleave']) $(id).addEventListener(evn, () => { TOUCH.trim = 0; });
+}
+// the start screen: the ferry's start and control options do not apply to the RIB
+document.querySelectorAll('input[name=game]').forEach(r => r.addEventListener('change', () => {
+  const rib = document.querySelector('input[name=game]:checked').value === 'rib';
+  document.querySelectorAll('.ferryOpt').forEach(f => { f.style.display = rib ? 'none' : ''; });
+  const k = rib ? 'rib' : 'ferry'; setT($('menuTitle'), MENU_TXT[k][0]); setT($('menuBlurb'), MENU_TXT[k][1]);
+}));
 function updateAudio() {
   if (!AU.ctx) return;
+  ribAudio(AU.ctx.currentTime, AU.on ? 1 : 0);
   const t = AU.ctx.currentTime, m = AU.on ? 1 : 0;
   // where you are listening from: below decks the hull carries the low end; outside it fades with distance
   const dist = cam.mode === 'chase' ? cam.dist : cam.mode === 'top' ? cam.topH : 8, fade = cam.mode === 'wheelhouse' ? 1 : 1 / (1 + Math.max(0, dist - 25) / 70);
   AU.room.frequency.setTargetAtTime(cam.mode === 'wheelhouse' ? 520 : 1300, t, 0.2);
   S.units.forEach((U, i) => {
+    if (GAME === 'rib') U = { rpm: 0, p: { x: 0, y: 0 }, rotor: 0, eng: 'off' };   // the ferry is shut down on the slip
     const E = AU.eng[i], rf = U.rpm / ENG_MAX, load = Math.hypot(U.p.x, U.p.y) * U.rotor, on = U.rpm > 40 ? 1 : 0;
     // the heard revs rise far less than the gauge between idle and full throttle, so she keeps the low rumble and
     // works harder rather than screaming; governors never match exactly, so the twins drift in and out of step
@@ -3611,7 +3709,7 @@ function updateAudio() {
   const wash = (Math.abs(S.units[0].fx) + Math.abs(S.units[0].fy) + Math.abs(S.units[1].fx) + Math.abs(S.units[1].fy)) / (4 * TMAX) + Math.hypot(S.u, S.v) * 0.04;
   AU.wash.gain.setTargetAtTime(m * clamp(wash, 0, 1) * 0.12, t, 0.2);
   AU.alarm.gain.setTargetAtTime(m * (S.alarmSound && (Math.floor(performance.now() / 260) % 2) ? 0.05 : 0), t, 0.01);
-  AU.horn.gain.setTargetAtTime(m * (S.horn ? 0.2 : 0), t, 0.04);
+  AU.horn.gain.setTargetAtTime(m * (S.horn && GAME !== 'rib' ? 0.2 : 0), t, 0.04);
 }
 
 // ================= CAMERA & RENDER =================
@@ -3633,6 +3731,7 @@ $('bSimple').onclick = () => {
 };
 resizeObs.observe($('view'));
 function updateCamera() {
+  if (GAME === 'rib') return updateRibCamera();
   const conH = S.psi + (S.dir < 0 ? Math.PI : 0);
   if (cam.mode === 'chase') {
     const h = conH + cam.az, horiz = cam.dist * Math.cos(cam.el);
@@ -3720,9 +3819,17 @@ function updateVisuals(dt) {
 let last = performance.now(), uiAcc = 0, mapAcc = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const rdt = Math.min(0.05, (now - last) / 1000); last = now;
+  const rdt = clamp((now - last) / 1000, 0, 0.05); last = now;   // the first frame's timestamp can predate the end of loading
   if (!S) { renderer.render(scene, camera); return; }
-  if (S.running) {
+  if (S.running && GAME === 'rib') {
+    ribHandleKeys(rdt);
+    const sdt = rdt * S.warp; S.t += sdt;
+    updateEnv(sdt);
+    ribUpdate(sdt);
+    updateShipTransform(sdt);
+    updateRibVisuals(sdt);
+    updateLife(sdt);
+  } else if (S.running) {
     handleKeys(rdt);
     computeCommands();
     const sdt = rdt * S.warp; S.t += sdt;
@@ -3756,16 +3863,500 @@ function frame(now) {
   waterNear.position.set(sx, S.tide, sz); waterFar.position.set(sx, S.tide, sz);
   waterNearMat.uniforms.uTime.value = S.t; waterNearMat.uniforms.uAmp.value = S.wx.wave; waterFarMat.uniforms.uTime.value = S.t; TERRAIN_U.uTide.value = S.tide;
   {
-    const sp = Math.sin(S.psi), cp = Math.cos(S.psi), U = waterNearMat.uniforms;
-    U.uShip.value.set(S.x, -S.y, sp, cp); U.uVel.value.set(S.u * sp + S.v * cp, -(S.u * cp - S.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
+    // the wake, waterline darkening and foam belong to whichever vessel you are driving
+    const V = GAME === 'rib' ? RB : S, sp = Math.sin(V.psi), cp = Math.cos(V.psi), U = waterNearMat.uniforms;
+    U.uShip.value.set(V.x, -V.y, sp, cp); U.uVel.value.set(V.u * sp + V.v * cp, -(V.u * cp - V.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
+    if (GAME === 'rib') { const spd = Math.hypot(RB.u, RB.v); U.uHullDim.value.set(0.2, 1.6, 0.9, 2.5); foam.pts.material.size = 0.45; U.uWake.value.set(1.6, 0.05, 40, 10); U.uKel.value = 0.6 * (1 - 0.6 * smooth(8, 16, spd)); }
+    else { U.uHullDim.value.set(3.2, 13.3, 1.8, 14); foam.pts.material.size = 1.3; U.uWake.value.set(5.5, 0.08, 30, 50); U.uKel.value = 1; }
   }
-  sun.target.position.set(S.x, S.tide, -S.y); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 300);
+  const FX = GAME === 'rib' ? RB : S;
+  sun.target.position.set(FX.x, S.tide, -FX.y); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 300);
   scene.userData.sky.position.copy(camera.position);
   renderView();
   drawPad(0); drawPad(1);
   uiAcc += rdt; mapAcc += rdt;
-  if (uiAcc > 0.1) { uiAcc = 0; updateUI(); updateAudio(); }
+  if (uiAcc > 0.1) { uiAcc = 0; if (GAME === 'rib') updateRibUI(); else updateUI(); updateAudio(); }
   if (mapAcc > 0.2) { mapAcc = 0; drawMap(); }
+}
+
+// ================= RIB: GALA VIKING V500 WITH A SUZUKI DF100B =================
+// A separate game on the same water: a 5 m RIB with a 100 hp four-stroke outboard, starting alongside the Boathouse
+// pontoon at Ardminish. Specs: hull 5.0 x 2.15 m, about 265 kg dry; engine 157 kg, 1,502 cc in-line four, 2.59:1
+// gearbox, full throttle 5,700-6,300 rpm. All-up mass, propeller and the resistance curve are estimates, tuned so she
+// idles at about 2.5 kn in gear, gets onto the plane in a few seconds and tops out at about 37 kn at 5,900 rpm.
+let GAME = 'ferry';
+const RIBC = { m: 640, L: 5.0, B: 2.15, xe: -2.45, gr: 2.59, D: 0.337, P: 0.533, rho: 1025, idle: 700, limit: 6300, Je: 0.13, Alu: 0.03, Al: 2.6, Af: 1.8 };
+const RIB_RW = [[0, 0], [1, 0.008], [2, 0.03], [3, 0.075], [4, 0.16], [5, 0.23], [5.8, 0.262], [7, 0.25], [8.5, 0.215], [10, 0.195], [12, 0.19], [14, 0.2], [16, 0.218], [18, 0.24], [19.5, 0.26], [22, 0.3]];
+function ribRW(V) { V = Math.abs(V); for (let i = 1; i < RIB_RW.length; i++) if (V <= RIB_RW[i][0]) { const [a, ra] = RIB_RW[i - 1], [b, rb] = RIB_RW[i]; return ra + (rb - ra) * (V - a) / (b - a); } return 0.3 * (V / 22) ** 2; }
+const ribTmax = (rpm) => 135 * Math.max(0.35, 1 - ((rpm - 4000) / 5200) ** 2);
+// points round the hull for contacts and grounding: [x forward, y starboard, draft]
+const RIB_PTS = [[2.45, 0, 0.15], [1.8, 0.75, 0.2], [1.8, -0.75, 0.2], [0.6, 1.07, 0.28], [0.6, -1.07, 0.28], [-0.9, 1.07, 0.32], [-0.9, -1.07, 0.32], [-2.3, 1.0, 0.35], [-2.3, -1.0, 0.35], [-2.75, 0, 0.62]];
+const RB = { x: 0, y: 0, psi: 0, u: 0, v: 0, r: 0, rpm: 0, lever: 0, wheel: 0, trim: 0, eng: 'off', crank: 0, kill: true, vent: 0, T: 0, gear: 0, plane: 0,
+  fast: false, pose: null, detent: 0, heave: 0, pitch: 0, roll: 0, prop: 0, contactT: -99, groundT: -99, gearWarned: 0, foamAcc: 0, sprayAcc: 0,
+  drill: { id: 'free', stage: 0 }, cas: null };
+const RIB = {};
+function ribPontoon() {
+  const [[x0, y0], [x1, y1]] = GEO.pontoon, L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+  return { x0, y0, L, ux, uy, at: (s, t) => [x0 + ux * s + uy * t, y0 + uy * s - ux * t] };   // t > 0: to the right looking seaward
+}
+// the berth: alongside the north side of the pontoon, between the boats already lying there
+function ribBerth() { const P = ribPontoon(), [x, y] = P.at(P.L * 0.62, -2.55); return { x, y, psi: Math.atan2(P.ux, P.uy) }; }
+// obstacles: boxes {cx, cy, ax, ay, hu, hv, soft, name} and circles {x, y, r, name}
+function ribBoxes() {
+  const B = [], box = (cx, cy, ax, ay, hu, hv, name) => B.push({ cx, cy, ax, ay, hu, hv, name });
+  const P = ribPontoon();
+  { const [cx, cy] = P.at((12 + P.L) / 2, 0); box(cx, cy, P.ux, P.uy, (P.L - 12) / 2, 1.35, 'the pontoon'); }
+  { const [cx, cy] = P.at(P.L - 1.5, 0); box(cx, cy, P.ux, P.uy, 1.5, 4, 'the pontoon'); }
+  for (const T of TERMS) box(T.P.x + T.d.x * T.len / 2, T.P.y + T.d.y * T.len / 2, T.d.x, T.d.y, T.len / 2 + 1, 6, T.id === 'gig' ? 'the Gigha slip' : 'the Tayinloan slip');
+  for (const b of SPIER.boxes) { const c = SPIER.toW((b.a0 + b.a1) / 2, (b.c0 + b.c1) / 2); box(c.x, c.y, SPIER.A.x, SPIER.A.y, (b.a1 - b.a0) / 2, (b.c1 - b.c0) / 2, 'the South Pier'); }
+  return B;
+}
+let RIB_BOXES = null;
+function ribCircles() {
+  const C = [];
+  const ferry = () => { const sp = Math.sin(S.psi), cp = Math.cos(S.psi); for (let k = -12; k <= 12; k += 4) C.push({ x: S.x + k * sp, y: S.y + k * cp, r: 4.8, name: 'the ferry' }); };
+  ferry();
+  if (LIFE.moored) for (const m of LIFE.moored) { const p = m.g.position, a = m.g.rotation.y, fx = -Math.sin(a), fy = Math.cos(a); for (const k of [-0.25, 0.25]) C.push({ x: p.x + fx * k * m.len, y: -p.z + fy * k * m.len, r: m.len * 0.19, name: 'a moored boat' }); C.push({ x: m.x, y: m.y, r: 0.4, name: 'a mooring buoy' }); }
+  if (LIFE.alongside) for (const b of LIFE.alongside) C.push({ x: b.x, y: b.y, r: 1.6, name: 'a boat on the pontoon' });
+  for (const b of LIFE.buoys) C.push({ x: b.userData.x, y: b.userData.y, r: 1.1, name: 'a buoy' });
+  if (RB.drill.id === 'slalom') for (const s of SLALOM) C.push({ x: s[0], y: s[1], r: 0.7, name: 'a slalom buoy', slalom: true });
+  return C;
+}
+const SLALOM = [];
+for (let i = 0; i < 6; i++) SLALOM.push([-3450 + i * 50, 1570]);   // in line, 50 m apart, in 5 to 16 m of water clear of the moorings
+// ---------- physics ----------
+function ribPhys(dt) {
+  const C = RIBC, R = RB, g = 9.81, W = C.m * g, sp = Math.sin(R.psi), cp = Math.cos(R.psi);
+  const cur = currentAt(R.x, R.y), ur = R.u - (cur.x * sp + cur.y * cp), vr = R.v - (cur.x * cp - cur.y * sp), U = Math.hypot(ur, vr);
+  // engine and propeller
+  const gear = R.eng !== 'run' ? 0 : R.lever > 0.12 ? 1 : R.lever < -0.12 ? -1 : 0;
+  if (gear && !R.gear && R.rpm > 1400 && S.t - R.gearWarned > 4) { R.gearWarned = S.t; msg(`Clunk: shifted into gear at ${Math.round(R.rpm)} rpm. Let the revs drop first.`); }
+  R.gear = gear;
+  const tau = gear === 0 ? 0 : clamp((Math.abs(R.lever) - 0.16) / 0.84, 0, 1) ** 1.15;
+  const delta = R.wheel * 32 * DEG;
+  const ve = vr + R.r * C.xe, Va = (ur * Math.cos(delta) - ve * Math.sin(delta)) * 0.96;
+  const np = R.rpm / 60 / C.gr, nD = Math.max(np * C.D, 0.05);
+  let Kt = 0, Kq = 0;
+  if (gear === 1) { const J = Va / nD; Kt = 0.55 - 0.1192 * J - 0.136 * J * J; Kq = 0.162 * (1 - J / 1.95); }
+  else if (gear === -1) { const J = -Va / nD; Kt = -0.6 * (0.55 - 0.1192 * J - 0.136 * J * J); Kq = 0.13 * (1 - J / 1.95); }
+  // the prop draws air: trimmed right out at low speed, or hard over at speed with the leg trimmed out
+  const ventT = gear ? clamp(smooth(7, 13, R.trim) * (1 - smooth(6, 12, U)) + smooth(0.35, 0.7, Math.abs(R.r) * U / g) * smooth(2, 9, R.trim) * smooth(9, 14, U), 0, 1) : 0;
+  R.vent += (ventT - R.vent) * Math.min(1, dt * (ventT > R.vent ? 6 : 2));
+  const n2D4 = C.rho * np * np * C.D ** 4, T = Kt * n2D4 * (1 - 0.65 * R.vent), Qp = Math.max(0, Kq) * n2D4 * C.D * (1 - 0.7 * R.vent);
+  R.T = T;
+  let Te = 0;
+  if (R.eng === 'run') { Te = ribTmax(R.rpm) * tau + clamp((C.idle - R.rpm) * 1.5, 0, 48); if (R.rpm > C.limit) Te = 0; }
+  else if (R.eng === 'crank') Te = R.rpm < 280 ? 40 : 0;
+  const drag = (3 + 0.0026 * R.rpm) * (1 - tau * 0.85), w = R.rpm * Math.PI / 30;
+  R.rpm = Math.max(0, (w + (Te - Qp / (C.gr * 0.95) - drag) / C.Je * dt) * 30 / Math.PI);
+  // hull
+  const p = smooth(7, 11, Math.abs(ur)); R.plane = p;
+  const trimF = 1 + (1 - p) * 0.018 * (R.trim + 2) + p * 0.0042 * (R.trim - 5) ** 2;
+  const waveF = 1 + 0.35 * S.wx.wave * clamp(Math.abs(ur) / 15, 0, 1);
+  const mx = C.m * 1.06, my = C.m * (1.4 - 0.25 * p), Iz = C.m * (C.L * C.L + C.B * C.B) / 12 * 1.45;
+  let X = 0, Y = 0, N = 0;
+  const tx = T * Math.cos(delta), ty = -T * Math.sin(delta);
+  X += tx; Y += ty; N += C.xe * ty;
+  const Ue2 = ur * ur + ve * ve, alpha = delta + Math.atan2(ve, Math.abs(ur) + 0.3) * Math.sign(ur || 1);
+  const CLu = 1.1 * Math.tanh(3 * alpha / 1.1) * (1 - 0.45 * smooth(0.42, 0.8, Math.abs(alpha))), Ylu = -0.5 * C.rho * C.Alu * Ue2 * CLu * (ur >= 0 ? 1 : -0.8);
+  Y += Ylu * Math.cos(delta); X -= Math.abs(Ylu * Math.sin(delta)) * 0.25; N += C.xe * Ylu;
+  X -= W * ribRW(ur) * trimF * waveF * Math.sign(ur) * (ur < 0 ? 2.2 : 1);
+  const Yh = -(140 + 230 * p) * U * vr - 800 * vr * Math.abs(vr);
+  Y += Yh; N += (0.35 - 0.55 * p) * Yh;
+  N += -(260 + 340 * U) * R.r - 3200 * R.r * Math.abs(R.r) - 0.5 * (my - mx) * ur * vr;
+  X -= 0.06 * C.m * Math.abs(R.r) * Math.abs(ur);
+  // windage, centred forward of the pivot so the bow blows off
+  const vxw = R.u * sp + R.v * cp, vyw = R.u * cp - R.v * sp, ax = S.wind.x - vxw, ay = S.wind.y - vyw, au = ax * sp + ay * cp, av = ax * cp - ay * sp;
+  const Fwy = 0.5 * 1.225 * 1.1 * C.Al * av * Math.abs(av);
+  X += 0.5 * 1.225 * 0.8 * C.Af * au * Math.abs(au); Y += Fwy; N += 0.55 * Fwy;
+  // contacts: tubes against the pontoon, piers, the ferry and moored boats; grounding and prop strikes
+  let groundNow = false, contactNow = null, contactV = 0;
+  const circles = R._circles;
+  for (const [xb, yb, dr] of RIB_PTS) {
+    const wx = R.x + xb * sp + yb * cp, wy = R.y + xb * cp - yb * sp;
+    const pu = R.u - R.r * yb, pv = R.v + R.r * xb, vx = pu * sp + pv * cp, vy = pu * cp - pv * sp;
+    let fx = 0, fy = 0;
+    const push = (nx, ny, pen, name) => {
+      const vn = vx * nx + vy * ny, vt = -vx * ny + vy * nx, Fn = Math.max(0, 7e4 * pen - (vn < 0 ? 7e3 : 2e3) * vn), Ft = clamp(-vt * 900, -0.5 * Fn, 0.5 * Fn);
+      fx += nx * Fn - ny * Ft; fy += ny * Fn + nx * Ft;
+      if (vn < -contactV) { contactV = -vn; contactNow = name; }
+    };
+    if (xb > -2.6) {
+      for (const b of RIB_BOXES) {
+        const dx = wx - b.cx, dy = wy - b.cy, u = dx * b.ax + dy * b.ay, v = -dx * b.ay + dy * b.ax;
+        const pu2 = b.hu + 0.05 - Math.abs(u), pv2 = b.hv + 0.05 - Math.abs(v);
+        if (pu2 <= 0 || pv2 <= 0) continue;
+        if (pu2 < pv2) push(b.ax * Math.sign(u), b.ay * Math.sign(u), pu2, b.name); else push(-b.ay * Math.sign(v), b.ax * Math.sign(v), pv2, b.name);
+      }
+      for (const c of circles) {
+        const dx = wx - c.x, dy = wy - c.y, d = Math.hypot(dx, dy);
+        if (d < c.r && d > 1e-3) { push(dx / d, dy / d, c.r - d, c.name); if (c.slalom) R.slalomHit = true; }
+      }
+    }
+    const h = heightAt(wx, wy), depth = S.tide - h, draft = xb < -2.6 ? 0.62 - 0.025 * Math.max(0, R.trim) : dr;
+    if (depth < draft) {
+      const pen = Math.min(draft - depth, 1.5), gx = heightAt(wx + 1, wy) - heightAt(wx - 1, wy), gy = heightAt(wx, wy + 1) - heightAt(wx, wy - 1), gl = Math.hypot(gx, gy) || 1;
+      fx += -gx / gl * 2e4 * pen - 1500 * vx; fy += -gy / gl * 2e4 * pen - 1500 * vy;
+      groundNow = true;
+      if (xb < -2.6 && R.gear && R.rpm > 900 && S.t - R.groundT > 3) { R.groundT = S.t; ribPen('Prop strike: the leg hit the bottom', 120); }
+      else if (xb >= -2.6 && S.t - R.groundT > 3 && Math.hypot(R.u, R.v) > 1) { R.groundT = S.t; ribPen(`Ran aground at ${(Math.hypot(R.u, R.v) / KN).toFixed(1)} kn`, Math.round(60 + Math.hypot(R.u, R.v) / KN * 25)); }
+    }
+    if (fx || fy) { const fu = fx * sp + fy * cp, fv = fx * cp - fy * sp; X += fu; Y += fv; N += xb * fv - yb * fu; }
+  }
+  if (contactNow && S.t - R.contactT > 1.2 && contactV > 0.12) {
+    const kn = contactV / KN; R.contactMax = Math.max(R.contactMax || 0, kn);
+    if (kn > 3) ribPen(`Hit ${contactNow} at ${kn.toFixed(1)} kn`, Math.round(40 + kn * 40)); else log(`Touched ${contactNow} at ${kn.toFixed(1)} kn`);
+  }
+  if (contactNow) R.contactT = S.t;
+  R.grounded = groundNow;
+  // made fast alongside: bow, stern and spring lines hold her where she lay
+  if (R.fast && R.pose) {
+    const Pz = R.pose, vxw2 = R.u * sp + R.v * cp, vyw2 = R.u * cp - R.v * sp;
+    const fx = -3000 * (R.x - Pz.x) - 2600 * vxw2, fy = -3000 * (R.y - Pz.y) - 2600 * vyw2;
+    X += fx * sp + fy * cp; Y += fx * cp - fy * sp;
+    N += -9000 * Math.atan2(Math.sin(R.psi - Pz.psi), Math.cos(R.psi - Pz.psi)) - 2500 * R.r;
+  }
+  R.u += (X + my * R.v * R.r) / mx * dt;
+  R.v += (Y - mx * R.u * R.r) / my * dt;
+  R.r += N / Iz * dt;
+  R.x += (R.u * sp + R.v * cp) * dt; R.y += (R.u * cp - R.v * sp) * dt; R.psi += R.r * dt;
+  R.prop += (R.gear || 0) * R.rpm / C.gr / 60 * Math.PI * 2 * dt;
+}
+function ribPen(text, pts) { log(`${text} (−${pts})`, 'warn'); toast(text, 'warn'); (RB.drill.pen = RB.drill.pen || []).push({ text, pts }); }
+// ---------- engine, lines, man overboard ----------
+function ribEngine() {
+  const R = RB;
+  if (R.eng !== 'off') { R.eng = 'off'; log('Engine stopped'); return; }
+  if (!R.kill) return msg('Clip the kill cord on first');
+  if (Math.abs(R.lever) > 0.12) return msg('Put the lever in neutral to start');
+  R.eng = 'crank'; R.crank = 1.1; log('Starting the engine');
+}
+function ribKill() {
+  RB.kill = !RB.kill;
+  if (!RB.kill && RB.eng !== 'off') { RB.eng = 'off'; msg('Kill cord pulled: engine stopped'); }
+  else msg(RB.kill ? 'Kill cord clipped on' : 'Kill cord off');
+}
+function ribLines() {
+  const R = RB;
+  if (R.fast) { R.fast = false; log('Lines let go'); if (R.drill.id === 'alongside' && R.drill.stage === 0) { R.drill.stage = 1; R.drill.t0 = S.t; } return; }
+  const P = ribPontoon(), dx = R.x - P.x0, dy = R.y - P.y0, s = dx * P.ux + dy * P.uy, t = dx * P.uy - dy * P.ux;
+  const hd = ((R.psi - Math.atan2(P.ux, P.uy)) % Math.PI + Math.PI) % Math.PI, par = Math.min(hd, Math.PI - hd) / DEG;
+  const gap = Math.abs(t) - 1.35 - 1.08, sog = Math.hypot(R.u, R.v) / KN;
+  if (s > 12 && s < P.L && gap < 0.7 && par < 20 && sog < 0.7) {
+    R.fast = true; R.pose = { x: R.x, y: R.y, psi: R.psi }; log('Crew stepped across: lines made fast', 'good');
+    if (R.drill.id === 'alongside' && R.drill.stage === 2) ribDrillDone();
+  } else msg(gap >= 0.7 ? 'Get her alongside the pontoon first: closer than a step' : par >= 20 ? 'Lie her parallel to the pontoon' : sog >= 0.7 ? 'Stop her alongside first' : 'Come alongside the pontoon to make fast');
+}
+function ribMOB() {
+  const R = RB, sp = Math.sin(R.psi), cp = Math.cos(R.psi);
+  R.cas = { x: R.x - sp * 4, y: R.y - cp * 4, t: S.t, warned: false };
+  RIB.cas.visible = true; R.drill = { id: 'mob', stage: 1, t0: S.t, pen: [] };
+  toast('Man overboard! Turn back, keep them in sight and come alongside slowly', 'warn'); log('Man overboard!', 'warn');
+}
+// ---------- drills ----------
+const DRILLS = ['free', 'alongside', 'mob', 'slalom'];
+const DRILL_NAME = { free: 'Free practice', alongside: 'Come alongside', mob: 'Man overboard', slalom: 'High-speed slalom' };
+function ribSetDrill(id) {
+  const R = RB; R.drill = { id, stage: 0, t0: S.t, pen: [] }; R.contactMax = 0; R.cas = null; RIB.cas.visible = false; R.slalomHit = false;
+  if (id === 'alongside') { R.drill.stage = R.fast ? 0 : 1; R.drill.t0 = S.t; }
+  if (id === 'mob') { R.drill.stage = 0; R.drill.due = S.t + 4 + Math.random() * 8; }
+  if (id === 'slalom') { R.drill.next = 0; R.drill.missed = 0; R.drill.side = null; }
+  setT($('rDrill'), 'Drill: ' + DRILL_NAME[id]); log('Drill: ' + DRILL_NAME[id]);
+}
+function ribDrillDone() {
+  const R = RB, D = R.drill, rows = [], pen = (D.pen || []).reduce((a, p) => a + p.pts, 0);
+  let pts = 600, title = '';
+  if (D.id === 'alongside') {
+    const t = S.t - D.t0; title = 'Alongside and made fast';
+    rows.push(['Time from casting off', mmss(t), '']); rows.push(['Hardest touch', (R.contactMax || 0).toFixed(1) + ' kn', '']);
+    if ((R.contactMax || 0) < 0.6) { rows.push(['Laid her alongside without a bump', '+150', 'pos']); pts += 150; }
+  } else if (D.id === 'mob') {
+    const t = S.t - D.t0; title = 'Casualty recovered';
+    rows.push(['Time to recover', mmss(t), '']);
+    const tp = Math.round(clamp((90 - t) * 3, -200, 200)); rows.push([tp >= 0 ? 'Quick recovery (under 1:30)' : 'Slow recovery (over 1:30)', (tp >= 0 ? '+' : '') + tp, tp >= 0 ? 'pos' : 'neg']); pts += tp;
+  } else if (D.id === 'slalom') {
+    const t = D.tEnd - D.tStart + 5 * (D.missed + (D.hits || 0)); title = 'Slalom run complete';
+    rows.push(['Run time', t.toFixed(1) + ' s', '']); if (D.missed) rows.push([`Gates missed: ${D.missed}`, `+${5 * D.missed} s`, 'neg']); if (D.hits) rows.push([`Buoys touched: ${D.hits}`, `+${5 * D.hits} s`, 'neg']);
+    pts = Math.round(clamp(1200 - t * 15, 0, 1000));
+  }
+  (D.pen || []).forEach(p => rows.push([p.text, '−' + p.pts, 'neg']));
+  const score = Math.max(0, pts - pen); rows.push(['Score', String(score), 'pos']);
+  $('repEyebrow').textContent = DRILL_NAME[D.id]; $('repTitle').textContent = title;
+  $('repTable').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="${r[2]}">${r[1]}</td></tr>`).join('');
+  $('report').hidden = false; log(`${title}. Scored ${score}.`, 'good');
+  R.drill = { id: 'free', stage: 0, pen: [] }; setT($('rDrill'), 'Drill: ' + DRILL_NAME.free);
+}
+function ribDrillUpdate(dt) {
+  const R = RB, D = R.drill, sp = Math.sin(R.psi), cp = Math.cos(R.psi), sog = Math.hypot(R.u, R.v) / KN;
+  if (D.id === 'mob') {
+    if (D.stage === 0 && S.t > D.due && sog > 4) ribMOB();
+    if (R.cas) {
+      const c = R.cas, cur = currentAt(c.x, c.y); c.x += (cur.x + S.wind.x * 0.02) * dt; c.y += (cur.y + S.wind.y * 0.02) * dt;
+      const dx = c.x - R.x, dy = c.y - R.y, bx = dx * sp + dy * cp, by = dx * cp - dy * sp;
+      const propD = Math.hypot(bx + 2.75, by);
+      if (R.gear && propD < 3.5 && !c.warned && S.t - c.t > 1.5) { c.warned = true; ribPen('Prop turning close to the casualty', 200); }
+      if (propD > 6) c.warned = false;
+      if (Math.abs(by) < 1.0 && bx > -2.5 && bx < 2.5 && sog > 1.5 && !c.hit) { c.hit = true; ribPen('Ran over the casualty', 400); }
+      if (bx > -1.4 && bx < 1.9 && Math.abs(by) > 0.9 && Math.abs(by) < 2.1 && sog < 0.8 && !R.gear) { R.cas = null; RIB.cas.visible = false; ribDrillDone(); }
+    }
+  } else if (D.id === 'alongside') {
+    const P = ribPontoon(), [mx, my] = P.at(P.L + 160, 0), dm = Math.hypot(R.x - mx, R.y - my);
+    if (D.stage === 1 && dm < 25) { D.stage = 2; log('Marker rounded: bring her back alongside the berth'); }
+  } else if (D.id === 'slalom') {
+    // gates are the lines through each buoy across the course; each must be passed on the opposite side to the last
+    const i = D.next; if (i >= SLALOM.length) return;
+    const [bx, by] = SLALOM[i], ahead = R.x - bx;
+    if (D.prevX !== undefined && Math.sign(D.prevX - bx) !== Math.sign(ahead) && Math.abs(R.y - by) < 40) {
+      const side = Math.sign(R.y - by) || 1, want = i === 0 ? side : -D.side;
+      if (i === 0) D.tStart = S.t; else if (side !== want) { D.missed++; log(`Gate ${i + 1} missed`, 'warn'); }
+      D.side = i === 0 ? side : want; D.next++;
+      if (R.slalomHit) { D.hits = (D.hits || 0) + 1; R.slalomHit = false; }
+      if (D.next === SLALOM.length) { D.tEnd = S.t; ribDrillDone(); }
+    }
+    D.prevX = R.x;
+  }
+}
+function ribChecklist() {
+  const R = RB, D = R.drill, sog = Math.hypot(R.u, R.v) / KN, run = R.eng === 'run';
+  if (D.id === 'free') return ['Free practice', [['Kill cord on', R.kill], ['Engine running (X)', run], ['Lines let go (L)', !R.fast], ['W/S lever: ahead, neutral, astern', false, 'note'], ['R/F trim: in to plane, out once she is up', false, 'note'], ['O: man overboard drill at any time', false, 'note']]];
+  if (D.id === 'alongside') return ['Come alongside', [['Cast off from the pontoon', D.stage > 0], ['Round the yellow marker beyond the pontoon end', D.stage > 1], ['Come back alongside the green berth, slow and parallel', false, 'note'], ['Stop, then make fast (L)', false, 'note']]];
+  if (D.id === 'mob') return ['Man overboard', R.cas ? [['Turn back towards the casualty', false, 'note'], ['Approach slowly, into the wind', sog < 4], ['Neutral before they are near the prop', !R.gear], ['Stop with them alongside the console', false, 'note']] : [['Get under way, above 4 kn', sog > 4], ['Someone will go over the side...', false, 'note']]];
+  return ['High-speed slalom', [[`Run the six buoys west to east, alternate sides (${Math.min(D.next || 0, 6)}/6)`, (D.next || 0) >= 6], ['Trim in for the turns: a trimmed-out leg blows out', false, 'note'], ['Touching a buoy or missing a gate costs 5 s', false, 'note']]];
+}
+// ---------- the boat ----------
+function buildRib() {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body); scene.add(root); root.visible = false;
+  const M = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
+  const add = (p, geo, mat, x, y, z) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; p.add(o); return o; };
+  // GRP deep-V hull, sections from the stem (-z) to the transom (+z)
+  {
+    const pos = [], secs = [];
+    for (let i = 0; i <= 18; i++) {
+      const t = i / 18, z = -2.42 + t * 4.84, b = smooth(0, 0.42, t), w = 0.74 * Math.sqrt(b), ky = -0.36 + 0.24 * (1 - smooth(0, 0.4, t)) ** 2;
+      secs.push([[0, ky, z], [w, ky + 0.27 * w / 0.74, z], [0.8 * Math.sqrt(smooth(0, 0.3, t)) + 0.02, 0.16, z]]);
+    }
+    const tri = (a, b2, c) => pos.push(...a, ...b2, ...c), mir = (p) => [-p[0], p[1], p[2]];
+    for (let i = 0; i < secs.length - 1; i++) {
+      const A = secs[i], Bs = secs[i + 1];
+      for (const s of [1, -1]) {
+        const f = (p) => s > 0 ? p : mir(p);
+        for (let k = 0; k < 2; k++) { const a = f(A[k]), b2 = f(A[k + 1]), c = f(Bs[k]), d = f(Bs[k + 1]); if (s > 0) { tri(a, c, b2); tri(b2, c, d); } else { tri(a, b2, c); tri(b2, d, c); } }
+      }
+    }
+    const tr = secs[secs.length - 1]; for (const s of [1, -1]) { const f = (p) => s > 0 ? p : mir(p); if (s > 0) { tri(tr[0], f(tr[2]), f(tr[1])); } else { tri(tr[0], f(tr[1]), f(tr[2])); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    const hull = add(body, g, new THREE.MeshLambertMaterial({ color: 0xe9e9e4, side: THREE.DoubleSide }), 0, 0, 0);
+  }
+  // grey Hypalon tubes with a black rubbing strake, coned at the stern
+  const tubePts = [[0.86, 0.2, 2.45], [0.88, 0.2, 1.0], [0.86, 0.21, -0.5], [0.75, 0.25, -1.5], [0.52, 0.31, -2.15], [0.22, 0.37, -2.5], [0, 0.39, -2.58]];
+  const path = tubePts.concat(tubePts.slice(0, -1).reverse().map(p => [-p[0], p[1], p[2]])).map(p => new THREE.Vector3(...p));
+  const curve = new THREE.CatmullRomCurve3(path);
+  add(body, new THREE.TubeGeometry(curve, 90, 0.24, 12, false), M(0x596066), 0, 0, 0);
+  add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p.x * 1.1, p.y - 0.13, p.z * 1.02))), 90, 0.06, 6, false), M(0x1b1d1f), 0, 0, 0);
+  for (const s of [-1, 1]) { const c = add(body, new THREE.ConeGeometry(0.24, 0.36, 12), M(0x596066), s * 0.86, 0.2, 2.62); c.rotation.x = Math.PI / 2; }
+  // deck, console with wheel, screen, compass and throttle, jockey seat, lights
+  { const deckM = M(0x7f8486); add(body, new THREE.BoxGeometry(1.3, 0.04, 4.0), deckM, 0, 0.15, 0.4).castShadow = false; add(body, new THREE.BoxGeometry(0.62, 0.04, 0.7), deckM, 0, 0.17, -1.95).castShadow = false; }
+  const white = M(0xefefea), dark = M(0x26292c);
+  add(body, new THREE.BoxGeometry(0.74, 0.92, 0.62), white, 0, 0.62, -0.2);
+  const scr = add(body, new THREE.BoxGeometry(0.72, 0.42, 0.03), new THREE.MeshLambertMaterial({ color: 0x9fb4be, transparent: true, opacity: 0.35 }), 0, 1.25, -0.42); scr.rotation.x = -0.45;
+  const mfd = add(body, new THREE.PlaneGeometry(0.26, 0.16), new THREE.MeshBasicMaterial({ color: 0x2a5f7a }), -0.14, 1.05, 0.12); mfd.rotation.x = -0.6;
+  add(body, new THREE.SphereGeometry(0.06, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0.16, 1.08, -0.05);
+  const wheelG = new THREE.Group(); wheelG.position.set(0.12, 0.98, 0.14); wheelG.rotation.x = -0.75; body.add(wheelG);
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.017, 6, 20), dark); wheelG.add(wheel);
+  for (let a = 0; a < 3; a++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.16, 0.012), dark); s2.rotation.z = a * Math.PI * 2 / 3; s2.position.set(Math.sin(a * 2.094) * 0.08, Math.cos(a * 2.094) * 0.08, 0); wheelG.add(s2); }
+  RIB.wheel = wheelG;
+  const lev = new THREE.Group(); lev.position.set(0.39, 0.92, -0.05); body.add(lev);
+  add(lev, new THREE.BoxGeometry(0.06, 0.1, 0.12), dark, 0, 0, 0);
+  const arm = new THREE.Group(); lev.add(arm); add(arm, new THREE.BoxGeometry(0.025, 0.22, 0.025), M(0xb9bdbd), 0, 0.11, 0); add(arm, new THREE.BoxGeometry(0.1, 0.035, 0.035), dark, 0.03, 0.22, 0);
+  RIB.lever = arm;
+  // a two-up jockey seat behind the console, straddled, with a grab rail at its back
+  add(body, new THREE.BoxGeometry(0.42, 0.5, 1.0), white, 0, 0.4, 0.98);
+  add(body, new THREE.BoxGeometry(0.46, 0.12, 1.04), dark, 0, 0.71, 0.98);
+  add(body, new THREE.BoxGeometry(0.5, 0.05, 0.05), M(0xb9bdbd), 0, 0.98, 1.5); for (const s of [-1, 1]) add(body, new THREE.BoxGeometry(0.04, 0.3, 0.04), M(0xb9bdbd), s * 0.23, 0.83, 1.5);
+  const lite = (c) => new THREE.MeshBasicMaterial({ color: c });
+  add(body, new THREE.BoxGeometry(0.04, 1.1, 0.04), M(0xb9bdbd), 0.55, 0.75, 2.25); add(body, new THREE.SphereGeometry(0.05, 8, 6), lite(0xffffff), 0.55, 1.32, 2.25);
+  add(body, new THREE.BoxGeometry(0.06, 0.05, 0.08), lite(0x33ff66), 0.12, 0.47, -2.42); add(body, new THREE.BoxGeometry(0.06, 0.05, 0.08), lite(0xff3333), -0.12, 0.47, -2.42);
+  // helm and crew in lifejackets
+  const person = (x, z, y0, jacket) => {
+    const p = new THREE.Group(); p.position.set(x, 0.17, z); body.add(p);
+    for (const s of [-1, 1]) { const l = add(p, new THREE.BoxGeometry(0.15, y0, 0.2), M(0x23303f), s * 0.28, y0 / 2, 0); l.rotation.z = s * 0.12; }
+    add(p, new THREE.BoxGeometry(0.44, 0.6, 0.26), M(jacket), 0, y0 + 0.3, 0);
+    add(p, new THREE.SphereGeometry(0.12, 10, 8), M(0xd9b08c), 0, y0 + 0.75, 0);
+    add(p, new THREE.SphereGeometry(0.125, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), M(0x22262a), 0, y0 + 0.78, 0);
+    for (const s of [-1, 1]) { const a2 = add(p, new THREE.BoxGeometry(0.1, 0.5, 0.1), M(jacket), s * 0.22, y0 + 0.36, -0.18); a2.rotation.x = 0.9; }
+    return p;
+  };
+  RIB.helm = person(0.04, 0.62, 0.8, 0xc8392b);
+  person(0, 1.2, 0.74, 0xe2a81c);
+  // the outboard: trim and tilt on the transom bracket, steering on the swivel, prop on the gearcase
+  const ob = new THREE.Group(); ob.position.set(0, 0.3, 2.42); body.add(ob);
+  const trimG = new THREE.Group(); ob.add(trimG); const steerG = new THREE.Group(); steerG.position.set(0, 0, 0.18); trimG.add(steerG);
+  add(trimG, new THREE.BoxGeometry(0.3, 0.42, 0.14), dark, 0, -0.05, 0.06);
+  const cowl = M(0xeceeee), lower = M(0x1e2022), alu = M(0x2b2e31);
+  add(steerG, new THREE.BoxGeometry(0.46, 0.5, 0.7), cowl, 0, 0.62, 0.16); add(steerG, new THREE.BoxGeometry(0.47, 0.24, 0.72), lower, 0, 0.27, 0.16);
+  add(steerG, new THREE.BoxGeometry(0.4, 0.12, 0.6), cowl, 0, 0.91, 0.16);
+  add(steerG, new THREE.BoxGeometry(0.15, 0.82, 0.26), alu, 0, -0.26, 0.12);
+  add(steerG, new THREE.BoxGeometry(0.3, 0.02, 0.46), alu, 0, -0.5, 0.14);
+  const tor = add(steerG, new THREE.CylinderGeometry(0.075, 0.06, 0.46, 10), alu, 0, -0.68, 0.14); tor.rotation.x = Math.PI / 2;
+  add(steerG, new THREE.BoxGeometry(0.03, 0.18, 0.18), alu, 0, -0.82, 0.24);
+  const prop = new THREE.Group(); prop.position.set(0, -0.68, 0.4); steerG.add(prop);
+  for (let k = 0; k < 3; k++) { const bl = add(prop, new THREE.BoxGeometry(0.06, 0.17, 0.02), M(0x8d9398), 0, 0, 0); bl.geometry.translate(0, 0.085, 0); bl.rotation.z = k * Math.PI * 2 / 3; bl.rotation.y = 0.5; }
+  RIB.trim = trimG; RIB.steer = steerG; RIB.prop = prop;
+  RIB.root = root; RIB.body = body;
+  root.traverse(o => { if (o.isMesh) o.layers.enable(2); });
+  // the casualty, a berth outline, the turning marker and the slalom buoys
+  const cas = new THREE.Group(); add(cas, new THREE.TorusGeometry(0.28, 0.1, 8, 14), M(0xf06a1c), 0, 0, 0).rotation.x = Math.PI / 2; add(cas, new THREE.SphereGeometry(0.13, 10, 8), M(0xd9b08c), 0, 0.12, 0);
+  cas.visible = false; scene.add(cas); RIB.cas = cas;
+  const ghost = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.15, 5.2), new THREE.MeshBasicMaterial({ color: 0x3fdc8a, transparent: true, opacity: 0.32, depthWrite: false }));
+  ghost.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.2, 0.15, 5.2)), new THREE.LineBasicMaterial({ color: 0x7dffb6 }))); ghost.visible = false; scene.add(ghost); RIB.ghost = ghost;
+  const mk = new THREE.Group(); add(mk, new THREE.CylinderGeometry(0.5, 0.9, 3.0, 10), M(0xf2c230), 0, 0.6, 0); add(mk, new THREE.ConeGeometry(0.7, 1.2, 10), M(0xf2c230), 0, 2.6, 0); mk.visible = false; scene.add(mk); RIB.marker = mk;
+  RIB.slalom = SLALOM.map(() => { const b = new THREE.Group(); add(b, new THREE.SphereGeometry(0.6, 12, 8), M(0xf26a1b), 0, 0.15, 0); add(b, new THREE.CylinderGeometry(0.03, 0.03, 1.6, 5), M(0x333638), 0, 1.0, 0); add(b, new THREE.BoxGeometry(0.02, 0.3, 0.45), M(0xf2c230), 0, 1.6, 0.22); b.visible = false; scene.add(b); return b; });
+}
+// ---------- per-frame ----------
+function ribNewGame(wx) {
+  newGame('cold', wx, true);
+  GAME = 'rib'; document.body.classList.add('rib');
+  // the ferry lies on the Gigha slip with her ramp down, as scenery
+  const T = TERM('gig'); S.x = T.P.x - T.d.x * 15.07; S.y = T.P.y - T.d.y * 15.07; S.psi = T.brg * DEG; S.u = S.v = S.r = 0;
+  S.ends[1].ramp = Object.assign(S.ends[1].ramp, { pins: true, lever: 'hold', ang: RAMP_STOW, landed: false });
+  updateShipTransform(0); computeEndGeo();
+  const E = S.ends[0]; E.ramp.pins = false; E.ramp.lever = 'float'; const la = landingAngle(0); E.ramp.ang = la === null ? -12 : la; E.ramp.landed = true;
+  S.units.forEach(U => { U.eng = 'run'; U.rpm = ENG_IDLE; U.thr = 0; U.clutch = false; });
+  const b = ribBerth();
+  Object.assign(RB, { x: b.x, y: b.y, psi: b.psi, u: 0, v: 0, r: 0, rpm: 0, lever: 0, wheel: 0, trim: 0, eng: 'off', kill: true, vent: 0, fast: true, pose: { x: b.x, y: b.y, psi: b.psi }, gear: 0, contactMax: 0, cas: null });
+  RIB_BOXES = ribBoxes();
+  RIB.root.visible = true; RIB.ghost.visible = false; RIB.marker.visible = false;
+  ribSetDrill('free');
+  CAMS.splice(0, CAMS.length, 'chase', 'helm', 'top');
+  cam.az = 0.5; cam.el = 0.28; cam.dist = 16; cam.fov = 55; setCam('chase');
+  document.querySelectorAll('#hudL .nv span').forEach(sp => { if (sp.textContent === 'UKC m') sp.textContent = 'Depth m'; if (sp.textContent === 'To slip') sp.textContent = 'RPM'; });
+  const mi = $('mDist').previousElementSibling; if (mi) mi.textContent = 'rpm';
+  setT($('routeTag'), 'Viking V500 · Suzuki 100'); setT($('tStop'), 'Neutral'); setT($('tDir'), 'Trim ▲'); setT($('tPA'), 'Trim ▼');
+  log('Alongside the Boathouse pontoon. Kill cord on, start the engine (X), let go the lines (L).');
+}
+function ribHandleKeys(dt) {
+  const R = RB, ax = (a, b) => (keys.has(a) ? 1 : 0) - (keys.has(b) ? 1 : 0);
+  const lv = ax('KeyW', 'KeyS') + ax('ArrowUp', 'ArrowDown');
+  if (lv) {
+    if (R.detent !== lv) {
+      const nl = clamp(R.lever + lv * 0.65 * dt, -1, 1);
+      if ((R.lever > 0 && nl <= 0) || (R.lever < 0 && nl >= 0)) { R.lever = 0; R.detent = lv; }   // the lever stops in the neutral detent
+      else R.lever = nl;
+    }
+  } else R.detent = 0;
+  const st = ax('KeyD', 'KeyA') + ax('ArrowRight', 'ArrowLeft');
+  if (st) R.wheel = clamp(R.wheel + st * 0.9 * dt, -1, 1);
+  const tr = ax('KeyR', 'KeyF') + (TOUCH.trim || 0);
+  if (tr) R.trim = clamp(R.trim + tr * 3 * dt, -4, 16);
+  S.horn = keys.has('KeyH') || hornBtn;
+}
+function ribUpdate(sdt) {
+  const R = RB;
+  if (R.eng === 'crank') { R.crank -= sdt; if (R.crank <= 0) { R.eng = 'run'; log('Engine running'); } }
+  R._circles = ribCircles();
+  const n = Math.max(1, Math.ceil(sdt * 240)), h = sdt / n;
+  for (let i = 0; i < n; i++) ribPhys(h);
+  ribDrillUpdate(sdt);
+}
+function updateRibVisuals(dt) {
+  const R = RB, sp = Math.sin(R.psi), cp = Math.cos(R.psi), V = Math.hypot(R.u, R.v), t = S.t;
+  const at = (xb, yb) => waveH(R.x + xb * sp + yb * cp, -(R.y + xb * cp - yb * sp), t);
+  const hf = at(2, 0), ha = at(-2, 0), hs = at(0, 0.9), hpp = at(0, -0.9), a = Math.min(1, dt * (V > 8 ? 5 : 3));
+  const hump = Math.exp(-(((V - 5.5) / 2.2) ** 2)), p = R.plane;
+  let pitch = Math.atan((hf - ha) / 4) * (1 - 0.6 * p) + DEG * (6.5 * hump + 2.2 * p + 0.3 * R.trim * p + 0.6 * clamp(R.T / 2500, -1, 1) * (1 - p));
+  if (p > 0.8 && R.trim > 9) { pitch += DEG * (R.trim - 9) * 0.5 * Math.sin(t * 11); if (!R.porp || t - R.porp > 15) { R.porp = t; msg('Porpoising: trim in a little'); } }
+  pitch += DEG * 1.6 * S.wx.wave * p * Math.sin(t * 7.3 + R.x * 0.2);
+  const lat = R.u * R.r, roll = Math.atan((hs - hpp) / 1.8) * (1 - 0.5 * p) - clamp(lat / 9.81 * (0.38 * p - 0.1 * (1 - p)), -0.32, 0.32);
+  R.heave += ((hf + ha + hs + hpp) / 4 * (1 - 0.5 * p) - R.heave) * a; R.pitch += (pitch - R.pitch) * a; R.roll += (roll - R.roll) * a;
+  RIB.root.position.set(R.x, S.tide + R.heave + 0.08 * p - 0.06, -R.y); RIB.root.rotation.y = -R.psi;
+  RIB.body.rotation.set(R.pitch, 0, R.roll);
+  RIB.steer.rotation.y = -R.wheel * 32 * DEG; RIB.trim.rotation.x = -R.trim * DEG; RIB.prop.rotation.z = R.prop;
+  RIB.wheel.rotation.z = -R.wheel * 2.6; RIB.lever.rotation.x = -R.lever * 0.8;
+  RIB.helm.visible = cam.mode !== 'helm';
+  // prop wash astern and spray off the chines once she is planing
+  R.foamAcc += Math.abs(R.T) / 2500 * 60 * dt + (R.vent * 30 + (R.gear ? 3 : 0)) * dt;
+  const vxw = R.u * sp + R.v * cp, vyw = R.u * cp - R.v * sp;
+  let k = 0;
+  while (R.foamAcc >= 1 && k++ < 40) {
+    R.foamAcc -= 1; const back = Math.random() * dt, px = R.x - 2.9 * sp - vxw * back + (Math.random() - 0.5) * 0.8, py = R.y - 2.9 * cp - vyw * back + (Math.random() - 0.5) * 0.8;
+    const d = Math.sign(R.T || 1), jx = -sp * d * (1 + Math.abs(R.T) / 800), jy = -cp * d * (1 + Math.abs(R.T) / 800);
+    spawnFoam(px, S.tide + waveH(px, -py, t) + 0.15, -py, jx + (Math.random() - 0.5), -(jy + (Math.random() - 0.5)), 1.5 + Math.random() * 2);
+  }
+  R.sprayAcc += smooth(5, 14, V) * 50 * dt;
+  while (R.sprayAcc >= 1) {
+    R.sprayAcc -= 1; const s = Math.random() < 0.5 ? -1 : 1, xb = 0.6 + Math.random() * 0.8, px = R.x + xb * sp + s * 1.15 * cp, py = R.y + xb * cp - s * 1.15 * sp;
+    spawnFoam(px, S.tide + waveH(px, -py, t) + 0.1, -py, (s * cp) * 2.2, -(-s * sp) * 2.2, 1 + Math.random() * 1.5);
+  }
+  updateFoam(dt);
+  // drill furniture
+  const D = R.drill;
+  RIB.ghost.visible = D.id === 'alongside' && D.stage >= 1;
+  if (RIB.ghost.visible) { const b = ribBerth(); RIB.ghost.position.set(b.x, S.tide + 0.1, -b.y); RIB.ghost.rotation.y = -b.psi; }
+  RIB.marker.visible = D.id === 'alongside' && D.stage === 1;
+  if (RIB.marker.visible) { const P = ribPontoon(), [mx, my] = P.at(P.L + 160, 0); RIB.marker.position.set(mx, S.tide + waveH(mx, -my, t) * 0.8 - 0.5, -my); }
+  RIB.slalom.forEach((b, i) => { b.visible = D.id === 'slalom'; if (b.visible) { const [x, y] = SLALOM[i]; b.position.set(x, S.tide + waveH(x, -y, t) * 0.8, -y); } });
+  if (R.cas) { RIB.cas.position.set(R.cas.x, S.tide + waveH(R.cas.x, -R.cas.y, t) - 0.05, -R.cas.y); RIB.cas.rotation.z = Math.sin(t * 1.3) * 0.2; }
+}
+function updateRibUI() {
+  const R = RB, sp = Math.sin(R.psi), cp = Math.cos(R.psi);
+  const vx = R.u * sp + R.v * cp, vy = R.u * cp - R.v * sp, sog = Math.hypot(vx, vy), cur = currentAt(R.x, R.y), stw = Math.hypot(vx - cur.x, vy - cur.y);
+  setT($('nHdg'), fmt3(R.psi / DEG) + '°'); setT($('nSog'), (sog / KN).toFixed(1)); setT($('nCog'), sog > 0.15 ? fmt3(Math.atan2(vx, vy) / DEG) + '°' : '---');
+  setT($('nStw'), (stw / KN).toFixed(1)); const rot = R.r / DEG * 60; setT($('nRot'), Math.abs(rot) < 0.5 ? '0' : Math.abs(rot).toFixed(0) + (rot > 0 ? ' S' : ' P'));
+  setT($('nUkc'), (S.tide - heightAt(R.x, R.y)).toFixed(1)); setT($('nWind'), `${fmt3(S.wind.from)}° ${(S.wind.spd / KN).toFixed(0)}`);
+  setT($('nCur'), `${fmt3(Math.atan2(cur.x, cur.y) / DEG)}° ${(Math.hypot(cur.x, cur.y) / KN).toFixed(1)}`);
+  setT($('nDist'), String(Math.round(R.rpm / 10) * 10)); setT($('nClock'), clock().slice(0, 5));
+  setT($('mHdg'), fmt3(R.psi / DEG) + '°'); setT($('mSog'), (sog / KN).toFixed(1)); setT($('mDist'), String(Math.round(R.rpm / 50) * 50));
+  setT($('rGear'), R.eng !== 'run' ? '–' : R.gear > 0 ? 'F' : R.gear < 0 ? 'R' : 'N'); setC($('rGear'), 'on', R.gear !== 0);
+  $('rLev').style.height = (Math.abs(R.lever) * 50).toFixed(0) + '%'; $('rLev').style.bottom = R.lever >= 0 ? '50%' : (50 - Math.abs(R.lever) * 50).toFixed(0) + '%';
+  setT($('rTrim'), (R.trim >= 0 ? '+' : '') + R.trim.toFixed(0) + '°'); $('rTrimBar').style.width = ((R.trim + 4) / 20 * 100).toFixed(0) + '%';
+  setT($('rEng'), R.eng === 'run' ? 'Running' : R.eng === 'crank' ? 'Cranking' : 'Stopped'); setC($('rEng'), 'on', R.eng === 'run');
+  setT($('rKill'), R.kill ? 'Kill cord: on' : 'Kill cord: off'); setC($('rKill'), 'warn', !R.kill);
+  setT($('rLines'), R.fast ? 'Let go lines' : 'Make fast'); setC($('rLines'), 'on', R.fast);
+  setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
+  const [title, items] = ribChecklist(), html = items.map(([t2, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${t2}</li>`).join('');
+  const ul = $('ckList'); if (ul.dataset.h !== html) { ul.dataset.h = html; ul.innerHTML = html; } setT($('ckTitle'), title);
+  const nxt = items.find(it => !it[1]); setT($('mNext'), nxt ? nxt[0] : title);
+  $('alarmbar').hidden = true;
+}
+function updateRibCamera() {
+  const R = RB;
+  if (cam.mode === 'chase') {
+    const h = R.psi + cam.az, horiz = cam.dist * Math.cos(cam.el);
+    camera.position.set(R.x - Math.sin(h) * horiz, S.tide + 1.2 + cam.dist * Math.sin(cam.el), -(R.y - Math.cos(h) * horiz));
+    camera.up.set(0, 1, 0); camera.lookAt(R.x, S.tide + 1.2, -R.y);
+  } else if (cam.mode === 'helm') {
+    RIB.root.updateMatrixWorld(true);
+    const cy = Math.cos(WH.pitch), eye = RIB.body.localToWorld(new V3(0.04, 1.72, 0.52)), tgt = RIB.body.localToWorld(new V3(0.04 - Math.sin(WH.yaw) * cy, 1.72 + Math.sin(WH.pitch), 0.52 - Math.cos(WH.yaw) * cy));
+    camera.position.copy(eye); camera.up.set(0, 1, 0); camera.lookAt(tgt); return;
+  } else {
+    camera.position.set(R.x, S.tide + cam.topH, -R.y + 0.01); camera.up.set(0, 0, -1); camera.lookAt(R.x, S.tide, -R.y);
+  }
+  const wy = waveH(camera.position.x, camera.position.z, S.t) + S.tide + 0.6;
+  if (camera.position.y < wy) camera.position.y = wy;
+}
+// the outboard's voice: a four-cylinder buffer replayed with rpm, louder and brighter with load; water and wind noise with speed
+function ribAudio(t, m) {
+  if (!AU.ob) {
+    const ctx = AU.ctx, src = ctx.createBufferSource(); src.buffer = engineBuffer(ctx, 77, 4); src.loop = true; src.playbackRate.value = 0.7;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7; const g = ctx.createGain(); g.gain.value = 0;
+    src.connect(lp); lp.connect(g); g.connect(AU.master); src.start();
+    const ns = ctx.createBufferSource(); ns.buffer = AU.noiseBuf || (AU.noiseBuf = (() => { const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), x = b.getChannelData(0); for (let j = 0; j < x.length; j++) x[j] = Math.random() * 2 - 1; return b; })());
+    ns.loop = true; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 600; nf.Q.value = 0.6; const ng = ctx.createGain(); ng.gain.value = 0;
+    ns.connect(nf); nf.connect(ng); ng.connect(AU.master); ns.start(0, 0.5);
+    // a small boat's electric horn, not the ferry's
+    const hf = ctx.createBiquadFilter(); hf.type = 'bandpass'; hf.frequency.value = 900; hf.Q.value = 1.2; const hg = ctx.createGain(); hg.gain.value = 0; hf.connect(hg); hg.connect(AU.master);
+    for (const f of [415, 498]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hf); o.start(); }
+    AU.ob = { src, lp, g, ng, nf, hg };
+  }
+  const R = RB, O = AU.ob, on = GAME === 'rib' && R.rpm > 60 ? 1 : 0, rf = R.rpm / 6000, load = clamp(Math.abs(R.T) / 2500, 0, 1), V = Math.hypot(R.u, R.v);
+  const dist = cam.mode === 'chase' ? cam.dist : cam.mode === 'top' ? cam.topH : 2, fade = 1 / (1 + Math.max(0, dist - 8) / 25);
+  O.src.playbackRate.setTargetAtTime(Math.max(0.05, R.rpm / 1000), t, 0.05);
+  // exhaust goes out through the prop hub, so in gear at speed it is muffled under the water
+  O.lp.frequency.setTargetAtTime((500 + 2600 * rf + 900 * load) * (R.gear ? 1 - 0.35 * R.plane : 1), t, 0.1);
+  O.g.gain.setTargetAtTime(m * on * fade * (0.08 + 0.12 * load + 0.1 * rf + (R.vent > 0.3 ? 0.05 : 0)), t, 0.08);
+  O.nf.frequency.setTargetAtTime(400 + V * 40, t, 0.2);
+  O.hg.gain.setTargetAtTime(GAME === 'rib' && S.horn ? m * 0.08 : 0, t, 0.02);
+  O.ng.gain.setTargetAtTime(GAME === 'rib' ? m * fade * clamp(V / 18, 0, 1) ** 1.5 * (0.18 + 0.12 * S.wx.wave) : 0, t, 0.2);
 }
 
 // ================= BOOT =================
@@ -3894,6 +4485,7 @@ function buildLocal() {
   scene.children.filter(o => o.userData.local).forEach(bake);
 }
 buildLocal();
+buildRib();
 // the floating pontoon in Ardminish Bay; it rides up and down with the tide
 const PONTOON = (() => {
   const [[x0, y0], [x1, y1]] = GEO.pontoon, L = Math.hypot(x1 - x0, y1 - y0), brg = Math.atan2(x1 - x0, y1 - y0);
@@ -3921,9 +4513,21 @@ buildSeaLife();
 newGame('cold', 'calm', true);
 S.running = false;
 cam.az = 0.6; cam.el = 0.22; cam.dist = 110;
+// the start screen's heading follows the vessel choice
+const MENU_TXT = {
+  ferry: ['MV Loch Ranza', $('menuBlurb').textContent],
+  rib: ['Viking V500 RIB', 'Five metres of deep-V GRP and Hypalon with a 100 hp four-stroke on the transom. Single engine, single lever, steered by the outboard: she has no grip astern, stops in her own length at idle and carves at speed. Start alongside the Boathouse pontoon in Ardminish Bay and practise close-quarters work, man overboard and high-speed handling.'],
+};
 $('bGo').onclick = () => {
   const start = document.querySelector('input[name=start]:checked').value, wx = document.querySelector('input[name=wx]:checked').value;
   logEl.innerHTML = '';
+  if (document.querySelector('input[name=game]:checked').value === 'rib') {
+    ribNewGame(wx);
+    $('menu').hidden = true; S.running = true; setTouch(TOUCH.on); setConsole(true);
+    initAudio(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
+    toast('Alongside the Boathouse pontoon. X to start, L to let go, W for ahead.', 'good');
+    return;
+  }
   const simple = document.querySelector('input[name=ctl]:checked').value === 'simple';
   newGame(start, wx, simple);
   cam.az = 0; cam.el = 0.3; cam.dist = 80; cam.fov = 55;
@@ -3934,7 +4538,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribSetDrill, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
