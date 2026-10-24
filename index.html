@@ -188,6 +188,12 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
 .tsteer{width:200px;height:66px;border-radius:33px}
 .tknob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(242,179,61,.92);box-shadow:0 2px 10px rgba(0,0,0,.45);pointer-events:none}
 .tright{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+/* the RIB's single lever: a narrow slot with a neutral notch, dragged rather than tapped so a stray touch cannot open the throttle */
+.tlev{display:none;pointer-events:auto;touch-action:none;position:relative;flex:none;width:56px;height:232px;border-radius:28px;background-color:rgba(10,18,22,.5);border:2px solid rgba(219,230,235,.3);-webkit-user-select:none;user-select:none;
+  background-image:linear-gradient(rgba(219,230,235,.55),rgba(219,230,235,.55)),linear-gradient(90deg,rgba(219,230,235,.22),rgba(219,230,235,.22));background-size:30px 2px,4px calc(100% - 64px);background-position:center;background-repeat:no-repeat}
+.tlev-n{right:5px;top:50%;transform:translateY(-50%);font-size:10px}
+.tlev-k{position:absolute;left:50%;top:50%;width:46px;height:24px;margin:-12px 0 0 -23px;border-radius:7px;background:rgba(242,179,61,.92);box-shadow:0 2px 10px rgba(0,0,0,.45);pointer-events:none}
+body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{width:min(300px,calc(100vw - 116px))}
 .trow{display:flex;gap:8px;pointer-events:auto}
 .trow button{background:var(--glass);padding:8px 12px}
 .trow{flex-wrap:wrap;justify-content:flex-end}
@@ -282,6 +288,7 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
     <p id="mNext"></p>
     <div id="touch" hidden>
       <div class="tjoy" id="tJoy" aria-label="Joystick: ahead, astern and sideways"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><span class="tl t-l">P</span><span class="tl t-r">S</span><div class="tknob" id="tJoyK"></div></div>
+      <div class="tlev" id="tLev" aria-label="Throttle and gear lever: ahead, neutral, astern"><span class="tl t-top">Ahead</span><span class="tl tlev-n">N</span><span class="tl t-bot">Astern</span><div class="tlev-k" id="tLevK"></div></div>
       <div class="tright">
         <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change direction: the other end leads">Change dir</button><button id="tCam" title="Change camera view">View</button><button id="tPA" title="Passenger announcement">PA</button></div>
         <div class="tsteer" id="tSteer" aria-label="Steer"><span class="tl t-l">Port</span><span class="tl t-mid">Steer</span><span class="tl t-r">Stbd</span><div class="tknob" id="tSteerK"></div></div>
@@ -369,7 +376,7 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
         <h3>Simple controls</h3>
         <p>Pick Simple on the start screen, or switch with the Controls button at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
         <h3>The RIB: Gala Viking V500 with a Suzuki 100</h3>
-        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the left pad is the lever and the bar is the wheel; both stay where you leave them, Neutral snaps the lever to the detent and the Trim buttons work while held. New game takes you back to the start screen.</p>
+        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen.</p>
         <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
         <h3>Laying up at the South Pier</h3>
         <p>When the cars are off at Gigha you are asked whether to lay her up for the night. Choose the South Pier and the waiting traffic is sent home; raise the ramp, pull away and follow the flashing yellow markers south down Gigha's east side. The last one brings you to the pier, where a green outline shows the berth along its fendered face. Come alongside parallel to the face and stop under 0.4 kn: the crew put the lines out and you get an end-of-day score. Let go to sail for Tayinloan again.</p>
@@ -1090,7 +1097,7 @@ function waterMaterial(amp) {
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
       uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uDetAR: TERRAIN_U.uDetAR, uDetTR: TERRAIN_U.uDetTR,
-      uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uWake: { value: new THREE.Vector4(5.5, 0.08, 30, 50) }, uKel: { value: 1 },
+      uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 },
     },
     vertexShader: WAVE_GLSL + `varying vec3 vW; varying float vH;
       void main(){ vec4 wp = modelMatrix*vec4(position,1.0);
@@ -1100,7 +1107,7 @@ function waterMaterial(amp) {
         vW = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`,
     fragmentShader: `uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSkyTop; uniform vec3 uFog; uniform vec3 uSun;
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
-      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform vec4 uHullDim; uniform vec4 uWake; uniform float uKel;
+      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform vec4 uHullDim; uniform float uKelLen; uniform float uKel;
       vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
       varying vec3 vW; varying float vH;
       ` + WAVE_GRAD_GLSL + `
@@ -1130,9 +1137,9 @@ function waterMaterial(amp) {
       // back from the bow; their wavelength follows the ship's speed. Returns the surface height they add.
       float kelvin(vec2 p, vec2 bow, vec2 vd, float spd, float fp){
         vec2 r = p - bow; float b = -dot(r, vd), sd = abs(dot(r, vec2(-vd.y, vd.x)));
-        if (b < 0.0 || b > 700.0) return 0.0;
+        if (b < 0.0 || b > uKelLen) return 0.0;   // the pattern only reaches back as far as she has run in a straight line
         float kd = 9.81 / (spd * spd * 0.6667), cu = sd - b * 0.3536;
-        float amp = 0.5 * uKel * clamp((spd - 0.6) / 3.6, 0.0, 1.0) * smoothstep(0.0, 6.0, b) / sqrt(1.0 + b / 30.0);
+        float amp = 0.5 * uKel * clamp((spd - 0.6) / 3.6, 0.0, 1.0) * smoothstep(0.0, 6.0, b) / sqrt(1.0 + b / 30.0) * (1.0 - smoothstep(uKelLen * 0.6, uKelLen, b));
         float arm = exp(-pow(cu / (2.2 + 0.08 * b), 2.0)) + 0.3 * step(cu, 0.0) * smoothstep(-0.15 * b - 2.0, 0.0, cu) * smoothstep(0.12 * b, 0.25 * b + 1.0, sd);
         float ph = kd * (b * 0.8165 + sd * 0.5774);
         return amp * arm * sin(ph) * (1.0 - smoothstep(0.6, 1.6, kd * fp));
@@ -1175,16 +1182,11 @@ function waterMaterial(amp) {
         float crest = smoothstep(0.6, 1.0, vH)*smoothstep(0.22, 0.6, uAmp);
         float surf = (1.0 - smoothstep(0.15, 1.5, depth))*(0.55 + 0.45*sin(uTime*1.3 - depth*5.0 + vW.x*0.03 - vW.z*0.02));
         col = mix(col, vec3(0.93, 0.96, 0.96), clamp(crest*0.65 + surf*0.7, 0.0, 0.85));
-        // the hull darkens the water hard against it; churned water at the waterline and a fading wake astern
+        // the hull darkens the water hard against it, with churned water at the waterline (the wake astern is its own mesh)
         col *= mix(0.62, 1.0, smoothstep(0.0, 3.0 * hs, hd));
         float churn = (1.0 - smoothstep(0.0, (0.8 + min(spd, 5.0)*0.8) * hs, hd)) * (0.18 + 0.5*clamp(spd/3.0, 0.0, 1.0));
         float wake = 0.0;
         if (spd > 0.15) {
-          // turbulent wake from the stern: streaks running back along the track, spreading and fading
-          float b = dot(rel, -vd) - uHullDim.w, sd = dot(rel, vec2(-vd.y, vd.x));
-          float w = uWake.x + max(b, 0.0) * uWake.y;
-          wake = step(0.0, b) * exp(-b / (uWake.z + uWake.w * spd)) * (1.0 - smoothstep(w * 0.5, w, abs(sd))) * clamp(spd / 2.5, 0.0, 1.0);
-          wake *= mix(0.55 + 0.45 * wn(vec2(sd * 0.7, b * 0.045 + uTime * 0.05)), 0.8, smoothstep(0.4, 1.0, 0.7 * fp));
           // white water breaking on the Kelvin crests close to the bow
           float bb = -dot(vW.xz - bow, vd);
           wake += smoothstep(0.3, 0.8, kh / 0.5) * exp(-max(bb, 0.0) / 60.0) * clamp((spd - 2.0) / 2.5, 0.0, 1.0);
@@ -1789,6 +1791,77 @@ function updateFoam(dt) {
     foam.col[i * 3] = lerp(SEA_RGB[0], 0.93, f); foam.col[i * 3 + 1] = lerp(SEA_RGB[1], 0.96, f); foam.col[i * 3 + 2] = lerp(SEA_RGB[2], 0.96, f);
   }
   foam.g.attributes.position.needsUpdate = true; foam.g.attributes.color.needsUpdate = true;
+}
+
+// ---------- wake ----------
+// White water left astern, laid along the track actually run. Each stretch is born as strong as her speed and
+// screw-race make it, then spreads and fades with age, so the wake's length comes from how far and how fast she has
+// gone: a short smudge at idle, a long white road behind a planing RIB, and nothing left a minute after stopping.
+const WAKE_N = 520;
+const WAKE = (() => {
+  const g = new THREE.BufferGeometry(), pos = new Float32Array(WAKE_N * 6), aw = new Float32Array(WAKE_N * 6);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aw', new THREE.BufferAttribute(aw, 3));
+  const idx = new Uint16Array((WAKE_N - 1) * 6); g.setIndex(new THREE.BufferAttribute(idx, 1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog]),
+    vertexShader: 'attribute vec3 aw; varying vec3 vAw;\n#include <fog_pars_vertex>\nvoid main(){ vAw = aw; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;\n#include <fog_vertex>\n}',
+    fragmentShader: `varying vec3 vAw;
+      #include <fog_pars_fragment>
+      float wh(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+      float wnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1.0, 0.0)), f.x), mix(wh(i + vec2(0.0, 1.0)), wh(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main(){
+        // x: across the wake (-1..1), y: metres along the track, z: strength now. Fresh wash is nearly solid white,
+        // brightest in the two lines rolling off the chines; as it weakens it breaks up into lace and patches.
+        float lace = wnz(vec2(vAw.x * 4.0, vAw.y * 0.035)) * 0.5 + wnz(vec2(vAw.x * 13.0 + 3.0, vAw.y * 0.16)) * 0.3 + wnz(vec2(vAw.x * 31.0, vAw.y * 0.55)) * 0.2;
+        float ax = abs(vAw.x) + (wnz(vec2(sign(vAw.x) * 5.0, vAw.y * 0.3)) - 0.5) * 0.35, z = vAw.z;   // ragged edges
+        float profile = (1.0 - smoothstep(0.55, 1.0, ax)) * (0.55 + 0.45 * smoothstep(0.3, 0.7, ax));
+        float th = 1.0 - min(1.0, z * 1.15);
+        float a = smoothstep(th - 0.08, th + 0.14, lace) * profile * (0.35 + 0.45 * z);
+        gl_FragColor = vec4(0.9, 0.94, 0.94, clamp(a, 0.0, 0.8));
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 1; scene.add(mesh);
+  return { g, pos, aw, idx, pts: [], kelLen: 0 };
+})();
+function updateWake() {
+  const rib = GAME === 'rib', V = rib ? RB : S, t = S.t, P = WAKE.pts;
+  const sp = Math.sin(V.psi), cp = Math.cos(V.psi), vx = V.u * sp + V.v * cp, vy = V.u * cp - V.v * sp, spd = Math.hypot(vx, vy);
+  const ux = spd > 0.05 ? vx / spd : sp, uy = spd > 0.05 ? vy / spd : cp;
+  const half = rib ? 2.4 : HALF_L, x = V.x - ux * half, y = V.y - uy * half;   // the trailing end, whichever way she is going
+  let last = P[P.length - 1];
+  if (last && Math.hypot(x - last.x, y - last.y) > 80) { P.length = 0; last = null; }   // a new game: start afresh
+  // strength at birth: displacement wash is faint and soon gone; a planing hull or the ferry's screw-race is solid white
+  const I = rib ? clamp(0.14 * smooth(0.3, 1.2, spd) + smooth(1.2, 4, spd) * 0.3 + smooth(5, 11, spd) * 0.45 + 0.15 * clamp(Math.abs(RB.T) / 2500, 0, 1) * smooth(0.3, 2, spd), 0, 1)
+    : smooth(0.4, 2.5, spd) * 0.8;
+  const tau = rib ? 3 + 0.9 * spd : 16 + 7 * spd, hw0 = rib ? 0.9 : 3.6, grow = rib ? 0.22 : 0.32;
+  const gap = last ? Math.hypot(x - last.x, y - last.y) : 1e9;
+  if (I > 0.02 && gap > (rib ? 1.5 : 3)) { P.push({ x, y, t, I, tau, s: last ? last.s + Math.min(gap, 80) : 0 }); if (P.length > WAKE_N - 1) P.shift(); }
+  while (P.length && P[0].I * Math.exp(-(t - P[0].t) / P[0].tau) < 0.03) P.shift();
+  // the stretch still joined to the stern, then the breadcrumbs back along the track
+  const pts = P.slice(); if (I > 0.02 && P.length && gap > 0.2) pts.push({ x, y, t, I, tau, s: P[P.length - 1].s + gap });
+  const n = pts.length, pos = WAKE.pos, aw = WAKE.aw, idx = WAKE.idx; let q = 0;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let tx = b.x - a.x, ty = b.y - a.y; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    const age = t - p.t, str = p.I * Math.exp(-age / p.tau), hw = hw0 * (0.75 + 0.25 * p.I) + grow * age;
+    for (const sd of [-1, 1]) {
+      const wx = p.x - ty * hw * sd, wy = p.y + tx * hw * sd, k = (i * 2 + (sd > 0 ? 1 : 0)) * 3;
+      pos[k] = wx; pos[k + 1] = S.tide + waveH(wx, -wy, t) + 0.06; pos[k + 2] = -wy;
+      aw[k] = sd; aw[k + 1] = p.s; aw[k + 2] = str;
+    }
+    if (i > 0 && Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) < 40) { const v = (i - 1) * 2; idx[q++] = v; idx[q++] = v + 2; idx[q++] = v + 1; idx[q++] = v + 1; idx[q++] = v + 2; idx[q++] = v + 3; }
+  }
+  WAKE.g.setDrawRange(0, q); WAKE.g.attributes.position.needsUpdate = true; WAKE.g.attributes.aw.needsUpdate = true; WAKE.g.index.needsUpdate = true;
+  // the Kelvin pattern trails back over the straight run just made, and no further than about a minute of it
+  let L = half, px = x, py = y;
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i], dx = px - p.x, dy = py - p.y, dl = Math.hypot(dx, dy);
+    if (t - p.t > (rib ? 45 : 120) || (dl > 0.5 && (dx * ux + dy * uy) / dl < 0.94)) break;
+    L += dl; px = p.x; py = p.y;
+  }
+  WAKE.kelLen = spd > 0.6 ? Math.min(700, L) : 0;
 }
 
 // ================= SIM STATE =================
@@ -2951,12 +3024,24 @@ bindPad($('tJoy'), (ev) => {
   let x = (ev.clientX - r.left - r.width / 2) / R, y = (ev.clientY - r.top - r.height / 2) / R; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
   S.lev.S = -y; S.lev.Y = x; TOUCH.joy = true;
 }, () => { TOUCH.joy = false; TOUCH.springY = GAME !== 'rib'; });
+// the RIB lever moves with the finger from wherever it was, and parks in neutral as it passes through
+const levTravel = () => $('tLev').clientHeight / 2 - 40;
+{
+  let grab = null;
+  bindPad($('tLev'), (ev) => {
+    if (!grab) grab = { y: ev.clientY, lev: RB.lever };
+    let v = clamp(grab.lev + (grab.y - ev.clientY) / levTravel(), -1, 1);
+    if (grab.lev !== 0 && Math.sign(v) !== Math.sign(grab.lev)) { grab = { y: ev.clientY, lev: 0 }; v = 0; }   // it stops in neutral; drag on to go through
+    else if (Math.abs(v) < 0.15) v = 0;
+    RB.lever = v; TOUCH.joy = true;
+  }, () => { grab = null; TOUCH.joy = false; });
+}
 bindPad($('tSteer'), (ev) => {
-  if (GAME === 'rib') { const r = $('tSteer').getBoundingClientRect(), R = r.width / 2 - KNOB - 4; RB.wheel = clamp((ev.clientX - r.left - r.width / 2) / R, -1, 1); TOUCH.steer = true; return; }
+  if (GAME === 'rib') { const r = $('tSteer').getBoundingClientRect(), R = r.width / 2 - KNOB - 4; RB.wheel = clamp((ev.clientX - r.left - r.width / 2) / R, -1, 1); TOUCH.steer = true; TOUCH.springRW = false; return; }
   if (S.mode !== 'combined') setMode('combined');
   const r = $('tSteer').getBoundingClientRect(), R = r.width / 2 - KNOB - 4;
   S.lev.W = clamp((ev.clientX - r.left - r.width / 2) / R, -1, 1); TOUCH.steer = true;
-}, () => { TOUCH.steer = false; TOUCH.springW = GAME !== 'rib'; });
+}, () => { TOUCH.steer = false; TOUCH.springW = GAME !== 'rib'; TOUCH.springRW = GAME === 'rib'; });
 $('tStop').onclick = () => { if (GAME === 'rib') RB.lever = 0; else zeroPitch(); };
 $('tHorn').addEventListener('pointerdown', () => { hornBtn = true; });
 function setTouch(on) { TOUCH.on = on; setT($('bTouch'), on ? 'Touch controls: on' : 'Touch controls: off'); setC($('bTouch'), 'on', on); }
@@ -2969,6 +3054,7 @@ function updateTouch() {
   const jx = GAME === 'rib' ? 0 : S.lev.Y, jy = GAME === 'rib' ? RB.lever : S.lev.S, sw = GAME === 'rib' ? RB.wheel : S.lev.W;
   $('tJoyK').style.transform = `translate(${(jx * R).toFixed(1)}px, ${(-jy * R).toFixed(1)}px)`;
   $('tSteerK').style.transform = `translate(${(sw * R2).toFixed(1)}px, 0)`;
+  if (GAME === 'rib') $('tLevK').style.transform = `translate(0, ${(-RB.lever * levTravel()).toFixed(1)}px)`;
 }
 $('bMenu').onclick = () => { const o = $('hudL').classList.toggle('open'); $('bMenu').setAttribute('aria-expanded', String(o)); setT($('bMenu'), o ? 'Close' : 'Menu'); };
 function zeroPitch() { S.lev = { S: 0, W: 0, Y: 0 }; S.pad = [{ up: 0, right: 0 }, { up: 0, right: 0 }]; }
@@ -3828,6 +3914,7 @@ function frame(now) {
     ribUpdate(sdt);
     updateShipTransform(sdt);
     updateRibVisuals(sdt);
+    updateWake();
     updateLife(sdt);
   } else if (S.running) {
     handleKeys(rdt);
@@ -3849,6 +3936,7 @@ function frame(now) {
     if (S.paAt && S.t >= S.paAt) { S.paAt = 0; paPlay(true); }
     updateAlarms(sdt);
     updateVisuals(sdt);
+    updateWake();
     updateLayupGfx();
     updateLife(sdt);
   }
@@ -3866,8 +3954,9 @@ function frame(now) {
     // the wake, waterline darkening and foam belong to whichever vessel you are driving
     const V = GAME === 'rib' ? RB : S, sp = Math.sin(V.psi), cp = Math.cos(V.psi), U = waterNearMat.uniforms;
     U.uShip.value.set(V.x, -V.y, sp, cp); U.uVel.value.set(V.u * sp + V.v * cp, -(V.u * cp - V.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
-    if (GAME === 'rib') { const spd = Math.hypot(RB.u, RB.v); U.uHullDim.value.set(0.2, 1.6, 0.9, 2.5); foam.pts.material.size = 0.45; U.uWake.value.set(1.6, 0.05, 40, 10); U.uKel.value = 0.6 * (1 - 0.6 * smooth(8, 16, spd)); }
-    else { U.uHullDim.value.set(3.2, 13.3, 1.8, 14); foam.pts.material.size = 1.3; U.uWake.value.set(5.5, 0.08, 30, 50); U.uKel.value = 1; }
+    if (GAME === 'rib') { const spd = Math.hypot(RB.u, RB.v); U.uHullDim.value.set(0.2, 1.6, 0.9, 2.5); foam.pts.material.size = 0.45; U.uKel.value = 0.6 * (1 - 0.6 * smooth(8, 16, spd)); }
+    else { U.uHullDim.value.set(3.2, 13.3, 1.8, 14); foam.pts.material.size = 1.3; U.uKel.value = 1; }
+    U.uKelLen.value = WAKE.kelLen;
   }
   const FX = GAME === 'rib' ? RB : S;
   sun.target.position.set(FX.x, S.tide, -FX.y); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 300);
@@ -4245,7 +4334,8 @@ function ribHandleKeys(dt) {
     }
   } else R.detent = 0;
   const st = ax('KeyD', 'KeyA') + ax('ArrowRight', 'ArrowLeft');
-  if (st) R.wheel = clamp(R.wheel + st * 0.9 * dt, -1, 1);
+  if (st) { R.wheel = clamp(R.wheel + st * 0.9 * dt, -1, 1); TOUCH.springRW = false; }
+  else if (TOUCH.springRW && !TOUCH.steer) { R.wheel = approach(R.wheel, 0, 2.5 * dt); if (!R.wheel) TOUCH.springRW = false; }
   const tr = ax('KeyR', 'KeyF') + (TOUCH.trim || 0);
   if (tr) R.trim = clamp(R.trim + tr * 3 * dt, -4, 16);
   S.horn = keys.has('KeyH') || hornBtn;
@@ -4538,7 +4628,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribSetDrill, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribSetDrill, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
