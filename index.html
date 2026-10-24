@@ -4461,11 +4461,6 @@ function buildRib() {
   { const deckM = M(0x7f8486); add(body, new THREE.BoxGeometry(1.3, 0.04, 4.0), deckM, 0, 0.15, 0.4).castShadow = false; add(body, new THREE.BoxGeometry(0.62, 0.04, 0.7), deckM, 0, 0.17, -1.95).castShadow = false; }
   const white = M(0xefefea), dark = M(0x26292c);
   add(body, new THREE.BoxGeometry(0.74, 0.92, 0.62), white, 0, 0.62, -0.2);
-  // a low smoked acrylic screen on the front of the console, dark-rimmed, that the helm looks over rather than through
-  const scrG = new THREE.Group(); scrG.position.set(0, 1.08, -0.47); scrG.rotation.x = -0.5; body.add(scrG);
-  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.24), new THREE.MeshPhongMaterial({ color: 0x1c262b, transparent: true, opacity: 0.16, shininess: 90, specular: 0x667780, depthWrite: false, side: THREE.DoubleSide }));
-  scr.position.y = 0.12; scrG.add(scr);
-  add(scrG, new THREE.BoxGeometry(0.67, 0.01, 0.012), M(0x4a5054), 0, 0.243, 0);
   const mfd = add(body, new THREE.PlaneGeometry(0.26, 0.16), new THREE.MeshBasicMaterial({ color: 0x2a5f7a }), -0.14, 1.05, 0.12); mfd.rotation.x = -0.6;
   add(body, new THREE.SphereGeometry(0.06, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0.16, 1.08, -0.05);
   // the wheel stands off the back of the console on a short column, far enough out that its rim clears the console top
