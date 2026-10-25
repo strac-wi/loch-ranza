@@ -3266,7 +3266,7 @@ function setCam(m) {
   if (m === 'wheelhouse' && was !== 'wheelhouse') { WH.consolePrev = $('console').hidden; setConsole(true); WH.yaw = 0; WH.pitch = -0.3; drawScreens(); }
   if (was === 'wheelhouse' && m !== 'wheelhouse') { setConsole(WH.consolePrev); WH.active = null; hideTip(); canvas.style.cursor = ''; }
   $('fpHint').hidden = m !== 'wheelhouse';
-  if (m === 'helm' && was !== 'helm') { WH.yaw = 0; WH.pitch = -0.3; WH.fov = 72; }
+  if (m === 'helm' && was !== 'helm') { WH.yaw = 0; WH.pitch = -0.35; WH.fov = 72; }
   setT($('bCam'), 'View: ' + m);
 }
 function cycleCam() { setCam(CAMS[(CAMS.indexOf(cam.mode) + 1) % CAMS.length]); }
@@ -4562,7 +4562,7 @@ function buildRib() {
     const fc = add(STAT, new THREE.CircleGeometry(0.03, 16), new THREE.MeshBasicMaterial({ color: 0xe8ecef }), gx, y + DN[1] * 0.0065, z + DN[0] * 0.0065); fc.rotation.x = -0.519;
   }
   { const [z, y] = dash(0.3, 0.004); const sw = add(STAT, new THREE.BoxGeometry(0.16, 0.06, 0.008), black, 0.24, y, z); sw.rotation.x = -0.519; }
-  add(STAT, new THREE.SphereGeometry(0.055, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), black, -0.2, 1.205, -0.66);
+  add(STAT, new THREE.SphereGeometry(0.035, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), black, -0.22, 1.205, -0.72);
   // the steering wheel on a short column out of the lower dash, clear of the console and below the chartplotter
   {
     const [z, y] = dash(0.12, 0), col = add(STAT, new THREE.CylinderGeometry(0.028, 0.034, 0.13, 10), black, 0.08, y + DN[1] * 0.065, z + DN[0] * 0.065); col.rotation.x = 1.052;
