@@ -190,6 +190,7 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
+.hdlink{align-self:center;margin-left:auto;color:var(--cyan);font-size:14px;text-decoration:underline;text-underline-offset:3px}
 #report{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:4;max-width:min(420px,calc(100% - 32px))}
 #report table{width:100%;border-collapse:collapse;font-size:15px;margin:6px 0 12px}
 #report td{padding:3px 0;border-bottom:1px solid var(--line)}
@@ -379,7 +380,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
             <label><input type="radio" name="wx" value="fresh"><span>Fresh westerly<small>26 kn gusting, a lumpy sea on the beam.</small></span></label>
           </fieldset>
         </div>
-        <div class="row"><button id="bGo" class="go">Start</button><button id="bHelp2">How she handles</button></div>
+        <div class="row"><button id="bGo" class="go">Start</button><button id="bHelp2">How she handles</button><a id="hdLink" class="hdlink" hidden></a></div>
         <p class="fine" style="margin-top:12px">Loch Sween: shore, roads, woods and tidal flats traced from OpenStreetMap (© OpenStreetMap contributors, ODbL), GSHHG beyond; land heights from Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA). Press V in game for the first-person wheelhouse. Coastline in the Sound traced from OpenStreetMap (© OpenStreetMap contributors, ODbL); beyond it, the GSHHG shoreline (Wessel &amp; Smith, LGPL). An unofficial fan simulator, not affiliated with or endorsed by Caledonian MacBrayne. The coastline is stylised and the handling figures are estimates, so treat it as a game rather than a training aid.</p>
       </div>
     </div>
@@ -484,6 +485,10 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
 'use strict';
 const $ = (id) => document.getElementById(id);
 const DEG = Math.PI / 180, KN = 0.514444;
+// HD: water that reflects the land, boats and sky, a physically based sky and textured ground. The /hd/ page is this same
+// file built with LR_HD set (tools/build_hd.py); ?hd on the standard page does the same. LR_BASE finds files next to the
+// standard page from there.
+const HD = !!window.LR_HD || /[?&]hd\b/i.test(location.search), BASE = window.LR_BASE || '';
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
@@ -905,9 +910,9 @@ scene.add(sun, sun.target);
 // south-east standing in for the sun. The exposure dims everything lit by the scene; lamps are drawn untone-mapped so they
 // stay bright. Navigation lights are glow sprites a constant size on screen, each shown only over its proper arc.
 const LIGHTS = {
-  day:   { exp: 1, hemi: [0xd6e2ea, 0x3e4a35, 0.72], sun: [0xffedd0, 0.95], dir: [-3000, 4200, 2600], hor: 0xb1c3cf, top: 0x6f93ad, glow: [1, 0.88, 0.68], cloud: [1, 1, 1], spec: [0.75, 0.71, 0.64], clock: 8 * 3600 + 40 * 60 },
-  dusk:  { exp: 0.62, hemi: [0x9aa0c0, 0x2e2a28, 0.75], sun: [0xff8a50, 0.45], dir: [-0.93, 0.03, 0.34], hor: 0xe0a27a, top: 0x41587e, glow: [1.6, 0.75, 0.35], cloud: [0.95, 0.66, 0.6], spec: [1.2, 0.6, 0.3], clock: 17 * 3600 + 55 * 60 },
-  night: { exp: 0.42, hemi: [0x4a5c80, 0x0b0d10, 0.75], sun: [0xb4c4e6, 0.7], dir: [0.45, 0.55, 0.62], hor: 0x2a3a58, top: 0x0b1428, glow: [2.4, 2.5, 2.7], cloud: [0.22, 0.25, 0.32], spec: [1.4, 1.5, 1.7], clock: 21 * 3600 + 30 * 60 },
+  day:   { exp: 1, hemi: [0xd6e2ea, 0x3e4a35, 0.72], sun: [0xffedd0, 0.95], dir: [-3000, 4200, 2600], hor: 0xb1c3cf, top: 0x6f93ad, glow: [1, 0.88, 0.68], cloud: [1, 1, 1], spec: [0.75, 0.71, 0.64], clock: 8 * 3600 + 40 * 60, sky: [1, 0.5, 1.5] },
+  dusk:  { exp: 0.62, hemi: [0x9aa0c0, 0x2e2a28, 0.75], sun: [0xff8a50, 0.45], dir: [-0.93, 0.03, 0.34], hor: 0xe0a27a, top: 0x41587e, glow: [1.6, 0.75, 0.35], cloud: [0.95, 0.66, 0.6], spec: [1.2, 0.6, 0.3], clock: 17 * 3600 + 55 * 60, sky: [0.55, 1.2, 1.1] },
+  night: { exp: 0.42, hemi: [0x4a5c80, 0x0b0d10, 0.75], sun: [0xb4c4e6, 0.7], dir: [0.45, 0.55, 0.62], hor: 0x2a3a58, top: 0x0b1428, glow: [2.4, 2.5, 2.7], cloud: [0.22, 0.25, 0.32], spec: [1.4, 1.5, 1.7], clock: 21 * 3600 + 30 * 60, sky: [0, 1, 1] },
 };
 const NAV = { list: [], on: false, wins: null, rockLight: null, tex: (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -920,7 +925,7 @@ function setLight(mode) {
   hemi.color.setHex(L.hemi[0]); hemi.groundColor.setHex(L.hemi[1]); hemi.intensity = L.hemi[2];
   sun.color.setHex(L.sun[0]); sun.intensity = L.sun[1]; SUN_DIR.set(...L.dir).normalize();
   SKY.setHex(L.hor); SKY_TOP.setHex(L.top); scene.fog.color.setHex(L.hor);
-  const su = scene.userData.sky.material.uniforms; su.uGlow.value.setRGB(...L.glow); su.uCloudCol.value.setRGB(...L.cloud);
+  const su = scene.userData.sky.material.uniforms; su.uGlow.value.setRGB(...L.glow); su.uCloudCol.value.setRGB(...L.cloud); su.uDay.value = L.sky[0]; su.uSkyExp.value = L.sky[1]; su.uSkySat.value = L.sky[2];
   WATER_SPEC.setRGB(...L.spec);
   NAV.on = mode !== 'day';
   if (NAV.wins) { NAV.wins[0].visible = !NAV.on; NAV.wins[1].visible = NAV.on; }
@@ -986,15 +991,46 @@ function cloudTex() {
 {
   const g = new THREE.SphereGeometry(36000, 32, 16);
   const m = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
+    side: THREE.BackSide, depthWrite: false, fog: false, defines: HD ? { HD: '' } : {},
     uniforms: { top: { value: SKY_TOP }, hor: { value: SKY }, sunDir: { value: SUN_DIR }, uCloud: { value: cloudTex() }, uOff: { value: new THREE.Vector2() }, uCov: { value: 0.5 },
-      uGlow: { value: new THREE.Color(1, 0.88, 0.68) }, uCloudCol: { value: new THREE.Color(1, 1, 1) } },
+      uGlow: { value: new THREE.Color(1, 0.88, 0.68) }, uCloudCol: { value: new THREE.Color(1, 1, 1) }, uDay: { value: 1 }, uTurb: { value: 3 }, uRay: { value: 3 }, uSkyExp: { value: 0.5 }, uSkySat: { value: 1.5 } },
     vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader: `uniform vec3 top; uniform vec3 hor; uniform vec3 sunDir; uniform sampler2D uCloud; uniform vec2 uOff; uniform float uCov; uniform vec3 uGlow; uniform vec3 uCloudCol; varying vec3 vD;
+      uniform float uDay; uniform float uTurb; uniform float uRay; uniform float uSkyExp; uniform float uSkySat;
+      #ifdef HD
+      // HD: the Preetham daylight model (as in three.js's Sky), tone mapped here with the ACES curve so the rest of the
+      // scene keeps the colours it was tuned with
+      const vec3 totalRayleigh = vec3(5.804542996261093E-6, 1.3562911419845635E-5, 3.0265902468824876E-5);
+      const vec3 MieConst = vec3(1.8399918514433978E14, 2.7798023919660528E14, 4.0790479543861094E14);
+      vec3 skyACES(vec3 v){
+        const mat3 A = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+        const mat3 B = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+        v = A * (v / 0.6); vec3 a = v * (v + 0.0245786) - 0.000090537, b = v * (0.983729 * v + 0.4329510) + 0.238081;
+        return clamp(B * (a / b), 0.0, 1.0);
+      }
+      vec3 preetham(vec3 d, vec3 sd){
+        float sunE = 1000.0 * max(0.0, 1.0 - exp(-((1.6110731556870734 - acos(clamp(sd.y, -1.0, 1.0))) / 1.5)));
+        vec3 betaR = totalRayleigh * uRay, betaM = 0.434 * (0.2 * uTurb) * 10E-18 * MieConst * 0.005;
+        float zen = acos(max(0.0, d.y)), inv = 1.0 / (cos(zen) + 0.15 * pow(93.885 - zen * 57.2957795, -1.253));
+        vec3 Fex = exp(-(betaR * 8.4E3 + betaM * 1.25E3) * inv);
+        float ct = dot(d, sd), rPh = 0.05968310365946075 * (1.0 + pow(ct * 0.5 + 0.5, 2.0));
+        const float g = 0.8; float mPh = 0.07957747154594767 * (1.0 - g * g) / pow(1.0 - 2.0 * g * ct + g * g, 1.5);
+        vec3 bt = (betaR * rPh + betaM * mPh) / (betaR + betaM);
+        vec3 Lin = pow(sunE * bt * (1.0 - Fex), vec3(1.5));
+        Lin *= mix(vec3(1.0), pow(sunE * bt * Fex, vec3(0.5)), clamp(pow(1.0 - sd.y, 5.0), 0.0, 1.0));
+        vec3 L0 = vec3(0.1) * Fex + sunE * 19000.0 * Fex * smoothstep(0.999956677, 0.999976677, ct);
+        vec3 c = skyACES(pow((Lin + L0) * 0.04 + vec3(0.0, 0.0003, 0.00075), vec3(1.0 / 2.4)) * uSkyExp);
+        return max(mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, uSkySat), 0.0);   // the curve greys it; give back the blue
+      }
+      #endif
       void main(){ vec3 d = normalize(vD);
         vec3 c = mix(hor, top, smoothstep(0.0, 0.42, d.y));
         float s = max(dot(d, sunDir), 0.0);
         c += uGlow * (pow(s, 600.0) * 1.4 + pow(s, 14.0) * 0.16);
+        #ifdef HD
+        c = mix(c, preetham(normalize(vec3(d.x, max(d.y, 0.002), d.z)), sunDir), uDay);
+        c = mix(c, hor, (1.0 - smoothstep(-0.01, 0.1, d.y)) * 0.8 * uDay);   // haze at the horizon, the fog's colour
+        #endif
         if (d.y > 0.0) {
           // a flat cloud deck seen in perspective, thinning into the haze at the horizon
           vec2 uv = d.xz / (d.y + 0.05) * 0.16 + uOff;
@@ -1141,17 +1177,60 @@ function buildBayTint(R, N) {
   const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
 }
 const DETAIL = { ard: buildGroundDetail(DETAIL_R.ard, GIGHA ? 1024 : 1536, GIGHA ? 2048 : 1536), tay: buildGroundDetail(DETAIL_R.tay, GIGHA ? 1536 : 640, GIGHA ? 1152 : 560), bayA: buildBayTint(DETAIL_R.ard, 384), bayT: buildBayTint(DETAIL_R.tay, 256) };
-const TERRAIN_U = { uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay },
+// HD ground texture, made here rather than downloaded: four tileable greyscale detail maps in one RGBA image, each about
+// mid-grey on average so it adds texture without shifting the colours: R pasture (fine speckle over tussocks), G heather
+// and bracken (clumps with dark gaps), B rock (cracked slabs, mottled), A sand (grain and ripples)
+function groundTex(N = 512) {
+  const rnd = mulberry(9157), P = 64, lat = new Float32Array(P * P).map(() => rnd());
+  const vn = (x, y, f) => {   // value noise with f cells across the tile, wrapping
+    x *= f; y *= f; const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    const L = (a, b) => lat[((((a % f) + f) % f) * 7 + (((b % f) + f) % f) * 13 + f * 3) % (P * P)];
+    return lerp(lerp(L(i, j), L(i + 1, j), ux), lerp(L(i, j + 1), L(i + 1, j + 1), ux), uy);
+  };
+  const fbm2 = (x, y, f, o) => { let v = 0, a = 0.5, s = 0; for (let k = 0; k < o; k++) { v += a * vn(x, y, f << k); s += a; a *= 0.5; } return v / s; };
+  const cells = (f) => { const c = new Float32Array(f * f * 2); for (let i = 0; i < c.length; i++) c[i] = rnd(); return c; };
+  const worley = (x, y, f, C) => {   // distances to the nearest two feature points, in cell units, wrapping
+    const gx = x * f, gy = y * f, i = Math.floor(gx), j = Math.floor(gy); let d1 = 9, d2 = 9;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const ci = ((i + a) % f + f) % f, cj = ((j + b) % f + f) % f, k = (cj * f + ci) * 2;
+      const d = Math.hypot(i + a + C[k] - gx, j + b + C[k + 1] - gy);
+      if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+    }
+    return [d1, d2];
+  };
+  const C1 = cells(24), C2 = cells(7), C3 = cells(40);
+  const ch = [new Float32Array(N * N), new Float32Array(N * N), new Float32Array(N * N), new Float32Array(N * N)];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const u = x / N, v = y / N, k = y * N + x;
+    const tus = worley(u, v, 40, C3)[0];
+    ch[0][k] = 0.45 * fbm2(u, v, 64, 3) + 0.3 * (1 - smooth(0.15, 0.75, tus)) + 0.25 * vn(u, v, 6);
+    const [h1] = worley(u, v, 24, C1);
+    ch[1][k] = 0.55 * (1 - smooth(0.05, 0.62, h1)) + 0.3 * fbm2(u, v, 96, 2) + 0.15 * vn(u, v, 5);
+    const [r1, r2] = worley(u, v, 7, C2);
+    ch[2][k] = 0.55 * fbm2(u, v, 8, 5) + 0.25 * smooth(0.0, 0.07, r2 - r1) + 0.2 * (fbm2(u, v, 48, 2) > 0.62 ? 1 : 0.4);
+    const w = fbm2(u, v, 4, 3);
+    ch[3][k] = 0.5 * fbm2(u, v, 128, 2) + 0.3 * (0.5 + 0.5 * Math.sin((v + 0.08 * w) * Math.PI * 2 * 22)) + 0.2 * vn(u, v, 10);
+  }
+  const data = new Uint8Array(N * N * 4);
+  ch.forEach((c, i) => {   // each to a mean of 0.5 and a spread of about 0.17
+    let m = 0, s2 = 0; for (const q of c) m += q; m /= c.length; for (const q of c) s2 += (q - m) ** 2; const sd = Math.sqrt(s2 / c.length) || 1;
+    for (let k = 0; k < c.length; k++) data[k * 4 + i] = Math.round(clamp(0.5 + (c[k] - m) / sd * 0.17, 0, 1) * 255);
+  });
+  const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
+  return t;
+}
+const TERRAIN_U = { uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay }, uGround: { value: HD ? groundTex() : null },
   uDetAR: { value: new THREE.Vector4(...DETAIL_R.ard) }, uDetTR: { value: new THREE.Vector4(...DETAIL_R.tay) } };
 const TERRAIN_MAT = (() => {
   const m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 4, specular: 0x111111 });
-  m.extensions = { derivatives: true };
+  m.extensions = { derivatives: true }; if (HD) m.defines = { HD: '' };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, TERRAIN_U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWP; uniform float uTide; uniform sampler2D uDetA; uniform sampler2D uDetT; uniform vec4 uDetAR; uniform vec4 uDetTR;
+      varying vec3 vWP; uniform float uTide; uniform sampler2D uDetA; uniform sampler2D uDetT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform sampler2D uGround;
       vec4 detailAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.05, e); }
       float th12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
       float tnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
@@ -1176,6 +1255,22 @@ const TERRAIN_MAT = (() => {
         // pale dry sand above the tide, darker wet sand and weed just above the water
         float wet = (1.0 - smoothstep(0.05, 0.9, h)) * step(-0.6, h);
         diffuseColor.rgb *= 1.0 - 0.3 * wet;
+        #ifdef HD
+        // ground texture close in, picked by what the ground is: rock on the steep, sand along the top of the beach,
+        // pasture where it is green, heather and bracken where it is brown; two scales so the repeat does not show
+        float dn = 1.0 - smoothstep(80.0, 750.0, dist);
+        if (dn > 0.0) {
+          vec4 g1 = texture2D(uGround, p * 0.07), g2 = texture2D(uGround, p * 0.016 + 0.37), g3 = texture2D(uGround, p * 0.31 + 0.71);
+          vec4 gt = mix(g1 * 0.6 + g2 * 0.4, g3, (1.0 - smoothstep(10.0, 60.0, dist)) * 0.5);
+          vec3 c = diffuseColor.rgb;
+          float green = clamp((c.g - max(c.r, c.b)) * 7.0, 0.0, 1.0);
+          float wR = smoothstep(0.38, 0.62, slope + (n1 - 0.5) * 0.2) * step(1.2, h);
+          float wS = (1.0 - smoothstep(0.6, 2.8, h)) * (1.0 - green) * step(-0.6, h);
+          float wG = green * (1.0 - wR), wH = (1.0 - green) * (1.0 - wR) * (1.0 - wS);
+          float d = (gt.r * wG + gt.g * wH + gt.b * wR + gt.a * wS) / max(wG + wH + wR + wS, 0.001);
+          diffuseColor.rgb *= mix(1.0, 0.3 + 1.4 * d, dn * (1.0 - 0.6 * dt.a));
+        }
+        #endif
       }`);
   };
   return m;
@@ -1296,6 +1391,7 @@ function waveH(x, z, t) {
 }
 const depthTex = buildDepthTexture();
 const WATER_SPEC = new THREE.Color(0.75, 0.71, 0.64);
+const REFL_U = { tex: { value: null }, mat: { value: new THREE.Matrix4() }, on: { value: 0 }, y: { value: 0 } };
 function waterMaterial(amp) {
   return new THREE.ShaderMaterial({
     extensions: { derivatives: true },
@@ -1307,6 +1403,7 @@ function waterMaterial(amp) {
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
       uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uDetAR: TERRAIN_U.uDetAR, uDetTR: TERRAIN_U.uDetTR,
       uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 }, uSpec: { value: WATER_SPEC },
+      uRefl: REFL_U.tex, uReflMat: REFL_U.mat, uReflOn: REFL_U.on, uWaterY: REFL_U.y,
     },
     vertexShader: WAVE_GLSL + `varying vec3 vW; varying float vH;
       void main(){ vec4 wp = modelMatrix*vec4(position,1.0);
@@ -1317,6 +1414,7 @@ function waterMaterial(amp) {
     fragmentShader: `uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSkyTop; uniform vec3 uFog; uniform vec3 uSun;
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
       uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform vec4 uHullDim; uniform float uKelLen; uniform float uKel; uniform vec3 uSpec;
+      uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn; uniform float uWaterY;
       vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
       varying vec3 vW; varying float vH;
       ` + WAVE_GRAD_GLSL + `
@@ -1384,8 +1482,17 @@ function waterMaterial(amp) {
         vec3 V = normalize(cameraPosition - vW);
         vec3 R = reflect(-V, n);
         vec3 sky = mix(uFog, uSkyTop, smoothstep(0.0, 0.5, R.y));
-        float fres = 0.04 + 0.96*pow(1.0 - max(dot(n, V), 0.0), 5.0);
-        col = mix(col, sky*0.9, clamp(fres*0.75, 0.0, 0.72));
+        float fres = 0.04 + 0.96*pow(1.0 - max(dot(n, V), 0.0), 5.0), fmax = 0.72;
+        if (uReflOn > 0.5) {
+          // HD: the mirror image of the scene, rippled by the surface normal; the sky gradient fills in at the frame edges
+          vec4 rp = uReflMat * vec4(vW.x, uWaterY, vW.z, 1.0);
+          vec2 ruv = clamp(rp.xy / rp.w + vec2(n.x, n.z) * 0.07, 0.001, 0.999);
+          float sm = 0.004 + 0.02 * clamp(uAmp, 0.0, 1.0);   // ripples stretch a reflection up and down
+          vec3 rc = texture2D(uRefl, ruv).rgb * 0.4 + texture2D(uRefl, clamp(ruv + vec2(0.0, sm), 0.001, 0.999)).rgb * 0.3 + texture2D(uRefl, clamp(ruv - vec2(0.0, sm), 0.001, 0.999)).rgb * 0.3;
+          sky = rc;
+          fmax = 0.86;
+        }
+        col = mix(col, sky*0.9, clamp(fres*0.8, 0.0, fmax));
         vec3 H = normalize(V + uSun);
         col += uSpec*pow(max(dot(n, H), 0.0), 140.0);
         float crest = smoothstep(0.6, 1.0, vH)*smoothstep(0.22, 0.6, uAmp);
@@ -1421,6 +1528,53 @@ const waterFar = (() => {
   const m = new THREE.Mesh(g, waterFarMat); m.material.side = THREE.DoubleSide; m.frustumCulled = false; return m;
 })();
 scene.add(waterNear, waterFar);
+// HD reflections: each frame the scene is drawn once more from a camera mirrored in the water plane, at reduced size, into a
+// texture the water samples. An oblique near plane cuts off anything below the surface (Lengyel's method, as three.js's
+// Reflector does). Phones draw it smaller and every other frame.
+const REFL = !HD ? null : (() => {
+  const rt = new THREE.WebGLRenderTarget(16, 16, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, generateMipmaps: false });
+  REFL_U.tex.value = rt.texture;
+  return { rt, cam: new THREE.PerspectiveCamera(), rot: new THREE.Matrix4(), cp: new THREE.Vector3(), pp: new THREE.Vector3(), look: new THREE.Vector3(), view: new THREE.Vector3(), tgt: new THREE.Vector3(),
+    n: new THREE.Vector3(0, 1, 0), plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), size: new THREE.Vector2(), frame: 0 };
+})();
+function hdReflect() {
+  if (!REFL) return;
+  if (!sun.castShadow) { REFL_U.on.value = 0; return; }   // Detail: low turns them off
+  const R = REFL, phone = Math.min(innerWidth, innerHeight) < 700;
+  if (phone && (R.frame++ & 1) && REFL_U.on.value) return;   // phones: every other frame
+  renderer.getDrawingBufferSize(R.size);
+  const k = phone ? 0.35 : 0.5, w = Math.max(16, Math.round(R.size.x * k)), h = Math.max(16, Math.round(R.size.y * k));
+  if (R.rt.width !== w || R.rt.height !== h) R.rt.setSize(w, h);
+  camera.updateMatrixWorld(); R.cp.setFromMatrixPosition(camera.matrixWorld);
+  const y0 = S.tide; R.pp.set(R.cp.x, y0, R.cp.z);
+  R.view.subVectors(R.pp, R.cp);
+  if (R.view.dot(R.n) > -0.05) { REFL_U.on.value = 0; return; }   // at or below the surface
+  R.view.reflect(R.n).negate().add(R.pp);
+  R.rot.extractRotation(camera.matrixWorld);
+  R.look.set(0, 0, -1).applyMatrix4(R.rot).add(R.cp);
+  R.tgt.subVectors(R.pp, R.look).reflect(R.n).negate().add(R.pp);
+  const vc = R.cam; vc.position.copy(R.view); vc.up.set(0, 1, 0).applyMatrix4(R.rot).reflect(R.n); vc.lookAt(R.tgt);
+  vc.near = camera.near; vc.far = camera.far; vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix); vc.matrixWorldInverse.copy(vc.matrixWorld).invert();
+  REFL_U.mat.value.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
+  REFL_U.y.value = y0;
+  // oblique near plane on the water
+  R.plane.setFromNormalAndCoplanarPoint(R.n, R.pp).applyMatrix4(vc.matrixWorldInverse);
+  R.clip.set(R.plane.normal.x, R.plane.normal.y, R.plane.normal.z, R.plane.constant);
+  const e = vc.projectionMatrix.elements;
+  R.q.set((Math.sign(R.clip.x) + e[8]) / e[0], (Math.sign(R.clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+  R.clip.multiplyScalar(2 / R.clip.dot(R.q));
+  e[2] = R.clip.x; e[6] = R.clip.y; e[10] = R.clip.z + 1 - 0.003; e[14] = R.clip.w;
+  vc.projectionMatrixInverse.copy(vc.projectionMatrix).invert();
+  // draw it: no water, wake or foam in their own reflection, no fresh shadow map, and the exposure left to the water
+  const hide = [waterNear, waterFar, WAKE.mesh, WAKE2.mesh, foam.pts, ...PLACE_LABELS], was = hide.map(o => o.visible);
+  hide.forEach(o => { o.visible = false; });
+  const exp = renderer.toneMappingExposure, au = renderer.shadowMap.autoUpdate;
+  renderer.toneMappingExposure = 1; renderer.shadowMap.autoUpdate = false;
+  renderer.setRenderTarget(R.rt); renderer.clear(); renderer.render(scene, vc); renderer.setRenderTarget(null);
+  renderer.toneMappingExposure = exp; renderer.shadowMap.autoUpdate = au;
+  hide.forEach((o, i) => { o.visible = was[i]; });
+  REFL_U.on.value = 1;
+}
 
 // ---------- scenery ----------
 const MAT = (c) => new THREE.MeshLambertMaterial({ color: c });
@@ -1782,8 +1936,9 @@ function makeLabel(text, x, y, h) {
   g.fillStyle = '#f4f1e8'; g.fillText(text.toUpperCase(), 256, 48);
   const tex = new THREE.CanvasTexture(c);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, fog: false, transparent: true, toneMapped: false }));
-  s.scale.set(0.16, 0.03, 1); s.position.set(x, h, -y); s.renderOrder = 5; scene.add(s); return s;
+  s.scale.set(0.16, 0.03, 1); s.position.set(x, h, -y); s.renderOrder = 5; scene.add(s); PLACE_LABELS.push(s); return s;
 }
+const PLACE_LABELS = [];   // kept out of the water's reflection
 
 // ================= SHIP MODEL =================
 function hullShape(inset) {
@@ -2070,7 +2225,7 @@ function makeWake() {
     transparent: true, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 1; scene.add(mesh);
-  return { g, pos, aw, idx, pts: [], kelLen: 0 };
+  return { g, pos, aw, idx, pts: [], kelLen: 0, mesh };
 }
 const WAKE = makeWake(), WAKE2 = makeWake();
 function updateWake(WAKE_ = WAKE, rib = GAME === 'rib') {
@@ -3863,6 +4018,7 @@ function renderView() {
   if (cam.mode === 'helm') {
     // the world with a normal near plane, then the boat close up over it, cut off at the water so nothing below shows
     camera.fov = WH.fov; camera.near = 0.5; camera.updateProjectionMatrix(); camera.layers.set(0);
+    hdReflect();
     RIB.root.visible = false; renderer.render(scene, camera); RIB.root.visible = true;
     const bg = scene.background; scene.background = null; renderer.autoClear = false; renderer.clearDepth(); renderer.shadowMap.autoUpdate = false;
     RIB_CLIP.constant = -(S.tide + waveH(RB.x, -RB.y, S.t) - 0.02);
@@ -3874,11 +4030,13 @@ function renderView() {
   if (cam.mode !== 'wheelhouse') {
     const fov = cam.mode === 'chase' ? cam.fov : 55;
     if (camera.near !== 0.5 || camera.fov !== fov) { camera.near = 0.5; camera.fov = fov; camera.updateProjectionMatrix(); }
+    hdReflect();
     renderer.render(scene, camera);
     return;
   }
   // two passes: the world with a normal near plane, then the wheelhouse interior over it with a very short one
   camera.fov = WH.fov; camera.near = 0.5; camera.updateProjectionMatrix(); camera.layers.set(0);
+  hdReflect();
   renderer.render(scene, camera);
   const bg = scene.background; scene.background = null; renderer.autoClear = false; renderer.clearDepth(); renderer.shadowMap.autoUpdate = false;
   camera.near = 0.03; camera.updateProjectionMatrix(); camera.layers.set(LAYER_FP);
@@ -4095,7 +4253,7 @@ PA.mode = (() => { try { const m = localStorage.getItem('lr.pa'); if (PA_LABEL[m
 function paSetMode(m) { PA.mode = m; setT($('bPALoad'), PA_LABEL[m]); try { localStorage.setItem('lr.pa', m); } catch (e) { /* no storage */ } }
 setT($('bPALoad'), PA_LABEL[PA.mode]);
 (async () => {
-  for (const name of ['announcement.mp3', 'announcement.wav']) {
+  for (const name of [BASE + 'announcement.mp3', BASE + 'announcement.wav']) {
     try {
       const r = await fetch(name, { method: 'HEAD', cache: 'no-cache' });
       if (r.ok) { PA.hostedUrl = name; let m = null; try { m = localStorage.getItem('lr.pa'); } catch (e) { /* no storage */ } if (!m || m === 'hosted') paSetMode('hosted'); return; }
@@ -4234,6 +4392,7 @@ function setGfx(high) {
   setT($('bGfx'), high ? 'Detail: high' : 'Detail: low'); setC($('bGfx'), 'on', !high);
 }
 $('bGfx').onclick = () => setGfx(!sun.castShadow);
+if (HD) $('bGfx').title = 'Shadows, clouds, wildlife and reflections';
 $('bSimple').onclick = () => {
   S.simple = !S.simple; syncControls();
   log(S.simple ? 'Simple controls: the crew runs the engines, ramps and lines.' : 'Full procedure: everything is yours.');
@@ -5438,6 +5597,13 @@ if (!GIGHA) {
   document.querySelector('.brand b').textContent = 'Loch Sween';
   setT($('ribWhere'), 'A 5 m RIB with a Suzuki 100 hp outboard, on a mooring off Achnamara. Boat-handling practice at high and low speed.');
 }
+// the HD page and the standard one link to each other where both are published
+if (/github\.io$/.test(location.hostname) || location.protocol === 'file:') {
+  const a = $('hdLink'); a.hidden = false;
+  a.textContent = HD ? 'Standard graphics' : 'HD graphics (beta)';
+  a.title = HD ? 'Lighter on the phone: no reflections or ground textures' : 'Reflections, a physically based sky and textured ground. Needs a recent phone or a computer.';
+  a.href = (window.LR_HD ? '../' : HD ? location.pathname : 'hd/') + location.hash;
+}
 $('bGo').onclick = () => {
   const val = (k) => document.querySelector(`input[name=${k}]:checked`).value;
   const start = val('start'), wx = val('wx');
@@ -5461,7 +5627,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
