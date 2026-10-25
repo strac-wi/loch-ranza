@@ -4548,6 +4548,7 @@ function ribNewGame(wx) {
   updateShipTransform(0); computeEndGeo();
   const E = S.ends[0]; E.ramp.pins = false; E.ramp.lever = 'float'; const la = landingAngle(0); E.ramp.ang = la === null ? -12 : la; E.ramp.landed = true;
   S.units.forEach(U => { U.eng = 'run'; U.rpm = ENG_IDLE; U.thr = 0; U.clutch = false; });
+  updateVisuals(0);   // the ferry is not animated in the RIB game, so put her ramps where they now are: No.1 down on the slip, No.2 up
   if (!GIGHA) { SHIP.root.visible = false; S.curDir = S.curDir < 100 ? 30 : 210; }   // no ferry here; what stream there is runs along the loch
   const b = ribStart();
   Object.assign(RB, { x: b.x, y: b.y, psi: b.psi, u: 0, v: 0, r: 0, rpm: 0, lever: 0, wheel: 0, trim: 0, eng: 'off', kill: true, vent: 0, fast: true, fastAt: GIGHA ? 'pontoon' : 'mooring', pose: { x: b.x, y: b.y, psi: b.psi }, gear: 0, contactMax: 0, cas: null });
@@ -4638,7 +4639,7 @@ function updateRibUI() {
   setT($('rGear'), R.eng !== 'run' ? '–' : R.gear > 0 ? 'F' : R.gear < 0 ? 'R' : 'N'); setC($('rGear'), 'on', R.gear !== 0);
   $('rLev').style.height = (Math.abs(R.lever) * 50).toFixed(0) + '%'; $('rLev').style.bottom = R.lever >= 0 ? '50%' : (50 - Math.abs(R.lever) * 50).toFixed(0) + '%';
   setT($('rTrim'), (R.trim >= 0 ? '+' : '') + R.trim.toFixed(0) + '°'); $('rTrimBar').style.width = ((R.trim + 4) / 20 * 100).toFixed(0) + '%';
-  setT($('rEng'), R.eng === 'run' ? 'Running' : R.eng === 'crank' ? 'Cranking' : 'Stopped'); setC($('rEng'), 'on', R.eng === 'run');
+  setT($('rEng'), R.eng === 'run' ? 'Running' : R.eng === 'crank' ? 'Cranking' : 'Start eng'); setC($('rEng'), 'on', R.eng === 'run'); setC($('rEng'), 'warn', R.eng === 'off');
   setT($('rKill'), R.kill ? 'Kill cord: on' : 'Kill cord: off'); setC($('rKill'), 'warn', !R.kill);
   setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? 'Slip mooring' : 'Let go lines') : GIGHA ? 'Make fast' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
   setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
