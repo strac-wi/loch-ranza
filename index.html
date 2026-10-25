@@ -3010,28 +3010,31 @@ function drawMap() {
   }
 }
 // v: centre, the width in metres the canvas spans, u the size of a mark in corner-map pixels, big for the expanded chart
+const CHART_PAL = { sea: '#17394a', shore: '#2f6f7a', land: '#5a7148', label: '#e8eee8', ink: '#dbe6eb' };
+const GARMIN_PAL = { sea: '#d3e9f6', shore: '#93c8ea', land: '#ecd99c', label: '#55503a', ink: '#1d2327' };
 function drawChart(g, W, H, v) {
+  const PAL = v.pal || CHART_PAL;
   const T0 = TERMS[0], T1 = TERMS[1], span = v.span, u = v.u, wide = span > 3000;
   const FV = GAME === 'rib' ? RB : S, cx = v.cx, cy = v.cy, sc = W / span;
   const font = (px) => `600 ${Math.round(px * u)}px "Barlow Condensed", sans-serif`;
   const shoreW = v.big ? Math.max(2 * u, Math.min(90 * sc, 7 * u)) : Math.max(3, 90 * sc);   // the shallows band, kept thin when zoomed right in
   const tx = (x) => W / 2 + (x - cx) * sc, ty = (y) => H / 2 - (y - cy) * sc;
-  g.fillStyle = '#17394a'; g.fillRect(0, 0, W, H);
+  g.fillStyle = PAL.sea; g.fillRect(0, 0, W, H);
   const landPath = (pts) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(tx(p[0]), ty(p[1])) : g.moveTo(tx(p[0]), ty(p[1]))); g.closePath(); };
   const [rx0, ry0, rx1, ry1] = OSM_RECT, rw = (rx1 - rx0) * sc, rh = (ry1 - ry0) * sc;
   g.lineJoin = 'round';
   // GSHHG outside the OpenStreetMap footprint
   g.save(); g.beginPath(); g.rect(0, 0, W, H); g.rect(tx(rx0), ty(ry1), rw, rh); g.clip('evenodd');
-  g.strokeStyle = '#2f6f7a'; g.lineWidth = shoreW;
+  g.strokeStyle = PAL.shore; g.lineWidth = shoreW;
   COAST_PTS.forEach(p => { landPath(p); g.stroke(); });
-  g.fillStyle = '#5a7148'; COAST_PTS.forEach(p => { landPath(p); g.fill(); });
+  g.fillStyle = PAL.land; COAST_PTS.forEach(p => { landPath(p); g.fill(); });
   g.restore();
   // OpenStreetMap inside it: the loops bound the sea
   const loops = () => { g.beginPath(); for (const p of OSM_PTS) { p.forEach((q, i) => i ? g.lineTo(tx(q[0]), ty(q[1])) : g.moveTo(tx(q[0]), ty(q[1]))); g.closePath(); } };
   g.save(); g.beginPath(); g.rect(tx(rx0) - 1, ty(ry1) - 1, rw + 2, rh + 2); g.clip();   // overlap the seam by a pixel
-  g.fillStyle = '#5a7148'; g.fillRect(0, 0, W, H);
-  loops(); g.fillStyle = '#17394a'; g.fill('evenodd');
-  loops(); g.clip('evenodd'); loops(); g.strokeStyle = '#2f6f7a'; g.lineWidth = shoreW; g.stroke();
+  g.fillStyle = PAL.land; g.fillRect(0, 0, W, H);
+  loops(); g.fillStyle = PAL.sea; g.fill('evenodd');
+  loops(); g.clip('evenodd'); loops(); g.strokeStyle = PAL.shore; g.lineWidth = shoreW; g.stroke();
   g.restore();
   // on the expanded chart, zoomed in: the roads, and the boats on their moorings
   if (v.big && span < 6000) {
@@ -3043,12 +3046,12 @@ function drawChart(g, W, H, v) {
   for (const T of TERMS) { g.beginPath(); g.moveTo(tx(T.P.x), ty(T.P.y)); g.lineTo(tx(T.P.x + T.d.x * T.len), ty(T.P.y + T.d.y * T.len)); g.stroke(); }
   if (!GIGHA) {
     // the start mooring
-    g.fillStyle = '#e8eee8'; g.beginPath(); g.arc(tx(GEO.mooring[0]), ty(GEO.mooring[1]), 3 * u, 0, 7); g.fill();
+    g.fillStyle = PAL.label; g.beginPath(); g.arc(tx(GEO.mooring[0]), ty(GEO.mooring[1]), 3 * u, 0, 7); g.fill();
     if (wide) { g.font = font(20); g.textAlign = 'center'; for (const [nm, [x, y]] of Object.entries(GEO.named)) g.fillText(nm.toUpperCase(), tx(x), ty(y)); }
   } else if (wide) {
     g.setLineDash([8 * u, 8 * u]); g.strokeStyle = 'rgba(242,179,61,.6)'; g.lineWidth = 2 * u;
     g.beginPath(); g.moveTo(tx(T0.P.x), ty(T0.P.y)); g.lineTo(tx(T1.P.x), ty(T1.P.y)); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#e8eee8'; g.font = font(22); g.textAlign = 'center';
+    g.fillStyle = PAL.label; g.font = font(22); g.textAlign = 'center';
     g.fillText('TAYINLOAN', tx(T0.P.x + 1100), ty(T0.P.y - 300));
     for (const [nm, [x, y]] of Object.entries(GEO.named)) g.fillText(nm.toUpperCase(), tx(x), ty(y));
   } else {
@@ -3087,7 +3090,7 @@ function drawChart(g, W, H, v) {
     if (RB.drill.id === 'slalom') { g.fillStyle = '#f26a1b'; SLALOM.forEach(([x, y]) => { g.beginPath(); g.arc(tx(x), ty(y), 3 * u, 0, 7); g.fill(); }); }
     if (RB.cas) { g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(tx(RB.cas.x), ty(RB.cas.y), 5 * u, 0, 7); g.fill(); }
   }
-  g.fillStyle = '#dbe6eb'; g.font = font(18); g.textAlign = 'left';
+  g.fillStyle = PAL.ink; g.font = font(18); g.textAlign = 'left';
   g.fillText('N ↑', 10 * u, 22 * u);
   // a scale bar of a round length, about a sixth of the width
   const bar = [50, 100, 200, 500, 1000, 2000, 5000].reduce((b, c) => c <= span / 6 ? c : b, 50);
@@ -3263,7 +3266,7 @@ function setCam(m) {
   if (m === 'wheelhouse' && was !== 'wheelhouse') { WH.consolePrev = $('console').hidden; setConsole(true); WH.yaw = 0; WH.pitch = -0.3; drawScreens(); }
   if (was === 'wheelhouse' && m !== 'wheelhouse') { setConsole(WH.consolePrev); WH.active = null; hideTip(); canvas.style.cursor = ''; }
   $('fpHint').hidden = m !== 'wheelhouse';
-  if (m === 'helm' && was !== 'helm') { WH.yaw = 0; WH.pitch = -0.12; }
+  if (m === 'helm' && was !== 'helm') { WH.yaw = 0; WH.pitch = -0.3; WH.fov = 72; }
   setT($('bCam'), 'View: ' + m);
 }
 function cycleCam() { setCam(CAMS[(CAMS.indexOf(cam.mode) + 1) % CAMS.length]); }
@@ -4434,98 +4437,236 @@ function buildRib() {
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body); scene.add(root); root.visible = false;
   const M = (c, o) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, o || {}));
   const add = (p, geo, mat, x, y, z) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; p.add(o); return o; };
-  // the outside of the boat, cut off at the waterline in the helm view so it never shows through the sea
-  const OUTER = [];
-  // GRP deep-V hull, sections from the stem (-z) to the transom (+z)
+  // ---- the boat, after the builder's photos of a Gala Viking V500: pale grey tubes with a mid-grey rubbing band and dark
+  // end caps, an anthracite deck and mouldings, tan cushions with grey quilted panels, and a black Suzuki on the transom.
+  // Body frame: x to starboard, y up, -z forward; 5.0 m from the bow of the tubes to the stern caps, 2.18 m over the tubes.
+  const OUTER = [], STAT = new THREE.Group(); body.add(STAT);
+  const anth = M(0x3b4045), deckM = M(0x2f3438, { side: THREE.DoubleSide }), tan = M(0x9a7254), black = M(0x161819);
+  const steel = new THREE.MeshPhongMaterial({ color: 0xc8ced2, shininess: 90, specular: 0xffffff });
+  const quiltTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    g.fillStyle = '#44494d'; g.fillRect(0, 0, 64, 64); g.strokeStyle = '#7d8287'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(0, 32); g.lineTo(32, 0); g.lineTo(64, 32); g.lineTo(32, 64); g.closePath(); g.stroke();
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  })();
+  const quilt = (a, b) => { const t = quiltTex.clone(); t.needsUpdate = true; t.repeat.set(a / 0.12, b / 0.12); return M(0xffffff, { map: t }); };
+  const box = (w, h, d, mat, x, y, z, p = STAT) => add(p, new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+  // a seat cushion, tan with a quilted grey panel on top; and a backrest whose quilted face looks along fz (+1 aft, -1 forward)
+  const seat = (w, d, x, top, z) => { box(w, 0.09, d, tan, x, top - 0.045, z); box(w * 0.82, 0.012, d * 0.7, quilt(w * 0.82, d * 0.7), x, top + 0.002, z + d * 0.06); };
+  const backrest = (w, h, x, y, z, fz, tilt = 0) => {
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.x = tilt; STAT.add(g);
+    box(w, h, 0.08, tan, 0, 0, 0, g); box(w * 0.82, h * 0.7, 0.012, quilt(w * 0.82, h * 0.7), 0, 0, fz * 0.042, g);
+  };
+  // swept tube of varying radius with per-vertex colour
+  const sweep = (crv, NS, NR, rad, colorAt) => {
+    const F = crv.computeFrenetFrames(NS, false), pos = [], col = [], idx = [], P = new THREE.Vector3(), c = new THREE.Color();
+    for (let i = 0; i <= NS; i++) {
+      const t = i / NS; crv.getPointAt(t, P); const N = F.normals[i], B = F.binormals[i], r = rad(t);
+      for (let j = 0; j <= NR; j++) {
+        const a = j / NR * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+        const dx = ca * N.x + sa * B.x, dy = ca * N.y + sa * B.y, dz = ca * N.z + sa * B.z;
+        pos.push(P.x + r * dx, P.y + r * dy, P.z + r * dz); colorAt(c, P, dx, dy, dz); col.push(c.r, c.g, c.b);
+      }
+    }
+    for (let i = 0; i < NS; i++) for (let j = 0; j < NR; j++) { const a = i * (NR + 1) + j, b = a + NR + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  // the tubes: level along most of her length, sweeping up into the bow
+  const half = [[0.83, 0.22, 2.38], [0.85, 0.22, 1.2], [0.85, 0.24, 0.0], [0.82, 0.28, -0.85], [0.71, 0.35, -1.5], [0.52, 0.44, -1.93], [0.27, 0.53, -2.19]];
+  const path = half.concat([[0, 0.57, -2.28]], half.slice().reverse().map(p => [-p[0], p[1], p[2]])).map(p => new THREE.Vector3(...p));
+  const curve = new THREE.CatmullRomCurve3(path, false, 'centripetal');
+  const tubeR = (t) => lerp(0.24, 0.205, smooth(0.22, 0.5, Math.min(t, 1 - t)));
+  const tubeColor = (c, P, dx, dy, dz) => {
+    const out = Math.sign(P.x || 1) * dx;
+    if (dy < -0.62) return c.setHex(0xc2c7ca);                                                   // underside
+    if (dy < -0.2 && out > -0.25) return c.setHex(dy < -0.3 ? 0xa2a9ae : 0x737a80);             // the rubbing band and its dark top line
+    if (out > 0.2 && P.z > 1.5 - 0.6 * (dy + 0.2) && P.z < 2.28) return c.setHex(0xa9b0b5);      // the maker's panel aft
+    return c.setHex(0xdfe3e6);
+  };
+  OUTER.push(add(body, sweep(curve, 170, 22, tubeR, tubeColor), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), 0, 0, 0));
+  const TS = []; for (let i = 0; i <= 200; i++) TS.push(curve.getPointAt(0.5 * i / 200));
+  const tubeAt = (z) => {
+    if (z >= TS[0].z) return { x: TS[0].x, y: TS[0].y };
+    for (let i = 0; i < 200; i++) { const a = TS[i], b = TS[i + 1]; if (z <= a.z && z >= b.z) { const f = (a.z - z) / (a.z - b.z || 1); return { x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f) }; } }
+    return { x: 0, y: TS[200].y };
+  };
+  // dark end caps on the tubes astern, each with a step moulded in
+  for (const s of [-1, 1]) {
+    const cap = add(body, new THREE.CylinderGeometry(0.246, 0.246, 0.12, 22), M(0x3d4246), s * 0.83, 0.22, 2.44); cap.rotation.x = Math.PI / 2; OUTER.push(cap);
+    OUTER.push(box(0.22, 0.1, 0.012, black, s * 0.83, 0.2, 2.503, body));
+  }
+  // the GRP deep-V hull under the tubes, from the stem to the transom
   {
-    const pos = [], secs = [];
-    for (let i = 0; i <= 18; i++) {
-      const t = i / 18, z = -2.42 + t * 4.84, b = smooth(0, 0.42, t), w = 0.74 * Math.sqrt(b), ky = -0.36 + 0.24 * (1 - smooth(0, 0.4, t)) ** 2;
-      secs.push([[0, ky, z], [w, ky + 0.27 * w / 0.74, z], [0.8 * Math.sqrt(smooth(0, 0.3, t)) + 0.02, 0.16, z]]);
+    const pos = [], secs = [], Z0 = -2.16, Z1 = 2.05;
+    for (let i = 0; i <= 26; i++) {
+      const t = i / 26, z = Z0 + t * (Z1 - Z0), ky = -0.36 + 0.3 * (1 - smooth(0, 0.45, t)) ** 2, w = 0.7 * Math.sqrt(smooth(0, 0.4, t)), T = tubeAt(z);
+      secs.push([[0, ky, z], [w, ky + 0.25 * w / 0.7, z], [Math.max(w + 0.02, T.x - 0.04) * smooth(0, 0.08, t), T.y - 0.18, z]]);
     }
     const tri = (a, b2, c) => pos.push(...a, ...b2, ...c), mir = (p) => [-p[0], p[1], p[2]];
     for (let i = 0; i < secs.length - 1; i++) {
       const A = secs[i], Bs = secs[i + 1];
       for (const s of [1, -1]) {
         const f = (p) => s > 0 ? p : mir(p);
-        for (let k = 0; k < 2; k++) { const a = f(A[k]), b2 = f(A[k + 1]), c = f(Bs[k]), d = f(Bs[k + 1]); if (s > 0) { tri(a, c, b2); tri(b2, c, d); } else { tri(a, b2, c); tri(b2, d, c); } }
+        for (let k = 0; k < 2; k++) { const a = f(A[k]), b2 = f(A[k + 1]), c = f(Bs[k]), d = f(Bs[k + 1]); tri(a, c, b2); tri(b2, c, d); }
       }
     }
-    const tr = secs[secs.length - 1]; for (const s of [1, -1]) { const f = (p) => s > 0 ? p : mir(p); if (s > 0) { tri(tr[0], f(tr[2]), f(tr[1])); } else { tri(tr[0], f(tr[1]), f(tr[2])); } }
+    const tr = secs[secs.length - 1]; for (const s of [1, -1]) { const f = (p) => s > 0 ? p : mir(p); tri(tr[0], f(tr[1]), f(tr[2])); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
-    OUTER.push(add(body, g, new THREE.MeshLambertMaterial({ color: 0xe9e9e4, side: THREE.DoubleSide }), 0, 0, 0));
+    OUTER.push(add(body, g, M(0xb8bdc1, { side: THREE.DoubleSide }), 0, 0, 0));
   }
-  // grey Hypalon tubes with a black rubbing strake, coned at the stern
-  const tubePts = [[0.86, 0.2, 2.45], [0.88, 0.2, 1.0], [0.86, 0.21, -0.5], [0.75, 0.25, -1.5], [0.52, 0.31, -2.15], [0.22, 0.37, -2.5], [0, 0.39, -2.58]];
-  const path = tubePts.concat(tubePts.slice(0, -1).reverse().map(p => [-p[0], p[1], p[2]])).map(p => new THREE.Vector3(...p));
-  const curve = new THREE.CatmullRomCurve3(path);
-  OUTER.push(add(body, new THREE.TubeGeometry(curve, 90, 0.24, 12, false), M(0x596066), 0, 0, 0));
-  OUTER.push(add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p.x * 1.1, p.y - 0.13, p.z * 1.02))), 90, 0.06, 6, false), M(0x1b1d1f), 0, 0, 0));
-  for (const s of [-1, 1]) { const c = add(body, new THREE.ConeGeometry(0.24, 0.36, 12), M(0x596066), s * 0.86, 0.2, 2.62); c.rotation.x = Math.PI / 2; OUTER.push(c); }
-  // the deck runs out under the tubes all the way to the bow, rising a little forward as the foredeck does
+  // the deck runs out under the tubes from the transom moulding to the bow, rising forward as the foredeck does
   {
-    const pos = [], N = 48;
-    const at = (i) => { const q = curve.getPoint(0.5 * i / N); return [q.x, Math.max(0.2, q.y - 0.12), q.z]; };
-    for (let i = 0; i < N; i++) {
-      const a = at(i), b2 = at(i + 1), am = [-a[0], a[1], a[2]], bm = [-b2[0], b2[1], b2[2]];
-      pos.push(...am, ...a, ...b2, ...am, ...b2, ...bm);
-    }
+    const pos = [], zs = []; for (let z = 1.7; z > -2.24; z -= 0.08) zs.push(z); zs.push(-2.26);
+    const at = (z) => { const T = tubeAt(z); return [Math.max(0, T.x - 0.12), Math.max(0.16, T.y - 0.1), z]; };
+    for (let i = 0; i < zs.length - 1; i++) { const a = at(zs[i]), b2 = at(zs[i + 1]); pos.push(-a[0], a[1], a[2], ...a, ...b2, -a[0], a[1], a[2], ...b2, -b2[0], b2[1], b2[2]); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
-    add(body, g, new THREE.MeshLambertMaterial({ color: 0x7f8486, side: THREE.DoubleSide }), 0, 0, 0).castShadow = false;
+    add(STAT, g, deckM, 0, 0, 0).castShadow = false;
   }
-  // console with wheel, compass and throttle, jockey seat, lights
-  const white = M(0xefefea), dark = M(0x26292c);
-  add(body, new THREE.BoxGeometry(0.74, 0.92, 0.62), white, 0, 0.62, -0.2);
-  const mfd = add(body, new THREE.PlaneGeometry(0.26, 0.16), new THREE.MeshBasicMaterial({ color: 0x2a5f7a }), -0.14, 1.05, 0.12); mfd.rotation.x = -0.6;
-  add(body, new THREE.SphereGeometry(0.06, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0.16, 1.08, -0.05);
-  // the wheel stands off the back of the console on a short column, far enough out that its rim clears the console top
-  const col = add(body, new THREE.CylinderGeometry(0.03, 0.035, 0.12, 10), dark, 0.12, 0.97, 0.15); col.rotation.x = Math.PI / 2 - 0.75;
-  const wheelG = new THREE.Group(); wheelG.position.set(0.12, 0.98, 0.21); wheelG.rotation.x = -0.75; body.add(wheelG);
-  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.016, 10, 36), M(0x34383b)); wheelG.add(wheel);
-  add(wheelG, new THREE.CylinderGeometry(0.035, 0.035, 0.04, 12), dark, 0, 0, 0).rotation.x = Math.PI / 2;
-  for (let a = 0; a < 3; a++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.15, 0.012), dark); s2.rotation.z = a * Math.PI * 2 / 3; s2.position.set(-Math.sin(a * 2.094) * 0.085, Math.cos(a * 2.094) * 0.085, 0); wheelG.add(s2); }
-  RIB.wheel = wheelG;
-  const lev = new THREE.Group(); lev.position.set(0.39, 0.92, -0.05); body.add(lev);
-  add(lev, new THREE.BoxGeometry(0.06, 0.1, 0.12), dark, 0, 0, 0);
-  const arm = new THREE.Group(); lev.add(arm); add(arm, new THREE.BoxGeometry(0.025, 0.22, 0.025), M(0xb9bdbd), 0, 0.11, 0); add(arm, new THREE.BoxGeometry(0.1, 0.035, 0.035), dark, 0.03, 0.22, 0);
+  // grab handles along the tubes and a step pad either side amidships
+  for (const s of [-1, 1]) {
+    for (const z of [1.55, 0.8, 0.05, -0.7, -1.35]) {
+      const T = tubeAt(z), h = add(STAT, new THREE.TorusGeometry(0.055, 0.011, 6, 12, Math.PI), M(0xb5bcc1), s * (T.x + 0.12), T.y + 0.2, z); h.rotation.y = Math.PI / 2;
+    }
+    const T = tubeAt(0.35); box(0.16, 0.014, 0.95, anth, s * T.x, T.y + 0.24, 0.35);
+  }
+  // transom: a moulded box either side of the outboard well, with hatches, and the board the engine clamps to
+  for (const s of [-1, 1]) {
+    box(0.36, 0.46, 0.4, anth, s * 0.47, 0.39, 1.85); box(0.3, 0.012, 0.32, M(0x4c5257), s * 0.47, 0.625, 1.85);
+    const fill = add(STAT, new THREE.CylinderGeometry(0.045, 0.045, 0.02, 14), steel, s * 0.47, 0.635, 1.8);
+  }
+  box(0.58, 0.24, 0.35, anth, 0, 0.28, 1.87); box(0.58, 0.44, 0.06, anth, 0, 0.38, 2.02);
+  // rear bench with its backrest on stainless posts
+  box(1.2, 0.3, 0.42, anth, 0, 0.31, 1.38); seat(1.24, 0.44, 0, 0.56, 1.38);
+  for (const s of [-1, 1]) add(STAT, new THREE.CylinderGeometry(0.014, 0.014, 0.5, 8), steel, s * 0.5, 0.71, 1.63);
+  backrest(1.18, 0.2, 0, 0.88, 1.64, -1);
+  // the jockey moulding behind the helm: cup holders and a stainless grab rail on top, the helm seat's backrest on its front
+  box(0.72, 0.86, 0.3, anth, 0, 0.59, 0.95);
+  for (const s of [-1, 1]) add(STAT, new THREE.CylinderGeometry(0.04, 0.04, 0.02, 12), black, s * 0.24, 1.025, 0.95);
+  { const rail = new THREE.CatmullRomCurve3([[-0.26, 1.02, 1.08], [-0.24, 1.12, 1.09], [0.24, 1.12, 1.09], [0.26, 1.02, 1.08]].map(p => new THREE.Vector3(...p))); add(STAT, new THREE.TubeGeometry(rail, 16, 0.013, 6), steel, 0, 0, 0); }
+  for (const s of [-1, 1]) box(0.24, 0.3, 0.01, black, s * 0.16, 0.5, 1.105);
+  backrest(0.7, 0.3, 0, 0.84, 0.77, -1);
+  box(0.8, 0.34, 0.34, anth, 0, 0.33, 0.6); seat(0.42, 0.36, -0.215, 0.6, 0.6); seat(0.42, 0.36, 0.215, 0.6, 0.6);
+  // the centre console: an anthracite moulding with a sloping dash, extruded from its side profile with rounded edges
+  {
+    const sh = new THREE.Shape(), P = [[0.3, 0.16], [0.3, 0.74], [0.54, 1.16], [0.74, 1.18], [0.86, 1.02], [0.96, 0.6], [0.94, 0.16]];
+    P.forEach(([u, v], i) => i ? sh.lineTo(u, v) : sh.moveTo(u, v));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 0.6, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2, curveSegments: 4 });
+    g.rotateY(Math.PI / 2); g.translate(-0.3, 0, 0); g.deleteAttribute('uv');
+    add(STAT, g, anth, 0, 0, 0);
+  }
+  // the dash: it slopes up and forward from (z -0.30, y 0.74) to (-0.54, 1.16); its face looks aft and up along DN
+  const DN = [0.868, 0.496], dash = (f, off) => [-0.3 - 0.24 * f + DN[0] * (0.03 + off), 0.74 + 0.42 * f + DN[1] * (0.03 + off)];
+  for (const [gx, f] of [[-0.25, 0.3], [-0.14, 0.3]]) {   // two gauges low on the dash
+    const [z, y] = dash(f, 0.006), gg = add(STAT, new THREE.CylinderGeometry(0.038, 0.038, 0.012, 16), black, gx, y, z); gg.rotation.x = 1.052;
+    const fc = add(STAT, new THREE.CircleGeometry(0.03, 16), new THREE.MeshBasicMaterial({ color: 0xe8ecef }), gx, y + DN[1] * 0.0065, z + DN[0] * 0.0065); fc.rotation.x = -0.519;
+  }
+  { const [z, y] = dash(0.3, 0.004); const sw = add(STAT, new THREE.BoxGeometry(0.16, 0.06, 0.008), black, 0.24, y, z); sw.rotation.x = -0.519; }
+  add(STAT, new THREE.SphereGeometry(0.055, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), black, -0.2, 1.205, -0.66);
+  // the steering wheel on a short column out of the lower dash, clear of the console and below the chartplotter
+  {
+    const [z, y] = dash(0.12, 0), col = add(STAT, new THREE.CylinderGeometry(0.028, 0.034, 0.13, 10), black, 0.08, y + DN[1] * 0.065, z + DN[0] * 0.065); col.rotation.x = 1.052;
+    const wheelG = new THREE.Group(); wheelG.position.set(0.08, y + DN[1] * 0.13, z + DN[0] * 0.13); wheelG.rotation.x = -0.62; body.add(wheelG);
+    add(wheelG, new THREE.TorusGeometry(0.17, 0.017, 10, 40), M(0x2a2d30), 0, 0, 0);
+    add(wheelG, new THREE.CylinderGeometry(0.04, 0.04, 0.045, 14), steel, 0, 0, 0).rotation.x = Math.PI / 2;
+    for (let a = 0; a < 3; a++) { const sp2 = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.15, 0.01), steel); sp2.rotation.z = a * Math.PI * 2 / 3; sp2.position.set(-Math.sin(a * 2.094) * 0.09, Math.cos(a * 2.094) * 0.09, 0); wheelG.add(sp2); }
+    RIB.wheel = wheelG;
+  }
+  // a Garmin chartplotter set into the top of the dash, live: chart, data bar and sonar
+  {
+    const c = document.createElement('canvas'); c.width = 560; c.height = 346;
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+    const [z, y] = dash(0.66, 0.012), scr = add(body, new THREE.PlaneGeometry(0.34, 0.21), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), -0.03, y, z);
+    scr.rotation.x = -0.519; scr.castShadow = false;
+    const [zb, yb] = dash(0.66, 0), bz = add(STAT, new THREE.BoxGeometry(0.352, 0.222, 0.02), black, -0.03, yb, zb); bz.rotation.x = -0.519;
+    const mk = (w, h) => { const k = document.createElement('canvas'); k.width = w; k.height = h; return k; };
+    const cc = mk(340, 262), sc = mk(184, 262);
+    RIB.mfd = { c, g: c.getContext('2d'), tex, cc, cg: cc.getContext('2d'), sc, sg: sc.getContext('2d'), t: -1 };
+    RIB.mfd.sg.fillStyle = '#0a2a6b'; RIB.mfd.sg.fillRect(0, 0, 184, 262);
+  }
+  // the single lever on the starboard side of the console
+  const lev = new THREE.Group(); lev.position.set(0.36, 0.86, -0.42); body.add(lev);
+  add(lev, new THREE.BoxGeometry(0.06, 0.1, 0.14), black, 0, 0, 0);
+  const arm = new THREE.Group(); lev.add(arm); add(arm, new THREE.BoxGeometry(0.025, 0.22, 0.025), steel, 0, 0.11, 0); add(arm, new THREE.BoxGeometry(0.1, 0.035, 0.035), black, 0.03, 0.22, 0);
   RIB.lever = arm;
-  // a two-up jockey seat behind the console, straddled, with a grab rail at its back
-  add(body, new THREE.BoxGeometry(0.42, 0.5, 1.0), white, 0, 0.4, 0.98);
-  add(body, new THREE.BoxGeometry(0.46, 0.12, 1.04), dark, 0, 0.71, 0.98);
-  add(body, new THREE.BoxGeometry(0.5, 0.05, 0.05), M(0xb9bdbd), 0, 0.98, 1.5); for (const s of [-1, 1]) add(body, new THREE.BoxGeometry(0.04, 0.3, 0.04), M(0xb9bdbd), s * 0.23, 0.83, 1.5);
+  // a seat on the front of the console, its backrest against the console face
+  box(0.62, 0.3, 0.36, anth, 0, 0.31, -1.14); seat(0.66, 0.38, 0, 0.56, -1.14); backrest(0.6, 0.32, 0, 0.8, -0.98, -1, 0.234);
+  // bow: a seat across the foredeck, and the anchor locker in the eye of the bow with cleat and roller
+  box(0.7, 0.26, 0.46, anth, 0, 0.42, -1.78); seat(0.74, 0.48, 0, 0.64, -1.78); backrest(0.5, 0.24, 0, 0.8, -2.05, 1);
+  box(0.46, 0.4, 0.3, anth, 0, 0.5, -2.22); box(0.4, 0.02, 0.26, M(0x4c5257), 0, 0.71, -2.22);
+  box(0.06, 0.04, 0.26, steel, 0, 0.79, -2.36); box(0.12, 0.025, 0.03, steel, 0, 0.735, -2.18);
+  // stern light on a pole, and navigation lights at the bow
   const lite = (c) => new THREE.MeshBasicMaterial({ color: c });
-  add(body, new THREE.BoxGeometry(0.04, 1.1, 0.04), M(0xb9bdbd), 0.55, 0.75, 2.25); add(body, new THREE.SphereGeometry(0.05, 8, 6), lite(0xffffff), 0.55, 1.32, 2.25);
-  add(body, new THREE.BoxGeometry(0.06, 0.05, 0.08), lite(0x33ff66), 0.12, 0.47, -2.42); add(body, new THREE.BoxGeometry(0.06, 0.05, 0.08), lite(0xff3333), -0.12, 0.47, -2.42);
-  // helm and crew in lifejackets
-  const person = (x, z, y0, jacket) => {
-    const p = new THREE.Group(); p.position.set(x, 0.17, z); body.add(p);
-    for (const s of [-1, 1]) { const l = add(p, new THREE.BoxGeometry(0.15, y0, 0.2), M(0x23303f), s * 0.28, y0 / 2, 0); l.rotation.z = s * 0.12; }
-    add(p, new THREE.BoxGeometry(0.44, 0.6, 0.26), M(jacket), 0, y0 + 0.3, 0);
-    add(p, new THREE.SphereGeometry(0.12, 10, 8), M(0xd9b08c), 0, y0 + 0.75, 0);
-    add(p, new THREE.SphereGeometry(0.125, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), M(0x22262a), 0, y0 + 0.78, 0);
-    for (const s of [-1, 1]) { const a2 = add(p, new THREE.BoxGeometry(0.1, 0.5, 0.1), M(jacket), s * 0.22, y0 + 0.36, -0.18); a2.rotation.x = 0.9; }
+  add(STAT, new THREE.CylinderGeometry(0.014, 0.014, 0.85, 8), steel, 0.47, 1.06, 1.95); add(STAT, new THREE.SphereGeometry(0.035, 8, 6), lite(0xffffff), 0.47, 1.5, 1.95);
+  box(0.05, 0.035, 0.07, lite(0x33ff66), 0.14, 0.8, -2.3); box(0.05, 0.035, 0.07, lite(0xff3333), -0.14, 0.8, -2.3);
+  // the windscreen and its stainless frame: drawn from outside only, so it never gets in the helm's way
+  const SCREEN = new THREE.Group(); SCREEN.position.set(0, 1.19, -0.76); SCREEN.rotation.x = 0.26; body.add(SCREEN);
+  {
+    const g = new THREE.CylinderGeometry(0.7, 0.7, 0.46, 16, 1, true, Math.PI - 0.49, 0.98); g.translate(0, 0.23, 0.7);
+    add(SCREEN, g, new THREE.MeshPhongMaterial({ color: 0x27303a, transparent: true, opacity: 0.55, shininess: 100, specular: 0x8899aa, side: THREE.DoubleSide, depthWrite: false }), 0, 0, 0).castShadow = false;
+    const fr = []; fr.push(new THREE.Vector3(0.7 * Math.sin(Math.PI - 0.5), -0.04, 0.7 * Math.cos(Math.PI - 0.5) + 0.72));
+    for (let k = 0; k <= 12; k++) { const th = Math.PI - 0.5 + k / 12; fr.push(new THREE.Vector3(0.7 * Math.sin(th), 0.48, 0.7 * Math.cos(th) + 0.72)); }
+    fr.push(new THREE.Vector3(0.7 * Math.sin(Math.PI + 0.5), -0.04, 0.7 * Math.cos(Math.PI + 0.5) + 0.72));
+    add(SCREEN, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fr, false, 'centripetal', 0.2), 60, 0.013, 6), steel, 0, 0, 0);
+  }
+  // crew in lifejackets: the helm stands at the wheel; a passenger sits on the rear bench
+  const person = (x, z, seatY, jacket, parent) => {
+    const p = new THREE.Group(); p.position.set(x, 0.16, z); parent.add(p);
+    const trousers = M(0x23303f), hip = seatY ? seatY - 0.16 + 0.07 : 0.86;
+    for (const s of [-1, 1]) {
+      if (seatY) { box(0.15, 0.14, 0.42, trousers, s * 0.11, hip, -0.17, p); box(0.13, hip - 0.04, 0.13, trousers, s * 0.11, (hip - 0.04) / 2, -0.4, p); }
+      else { const l = box(0.15, hip, 0.18, trousers, s * 0.12, hip / 2, 0, p); l.rotation.z = s * 0.06; }
+    }
+    box(0.44, 0.58, 0.28, M(jacket), 0, hip + 0.33, 0, p);
+    add(p, new THREE.SphereGeometry(0.12, 12, 8), M(0xd9b08c), 0, hip + 0.8, 0);
+    add(p, new THREE.SphereGeometry(0.126, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), M(0x22262a), 0, hip + 0.83, 0);
+    for (const s of [-1, 1]) { const a2 = box(0.1, 0.5, 0.1, M(jacket), s * 0.22, hip + 0.37, -0.18, p); a2.rotation.x = seatY ? 0.4 : 0.95; }
     return p;
   };
-  RIB.helm = person(0.04, 0.62, 0.8, 0xc8392b);
-  person(0, 1.2, 0.74, 0xe2a81c);
+  RIB.helm = person(0.06, 0.25, 0, 0xc8392b, body);
+  person(-0.3, 1.36, 0.56, 0xe2a81c, STAT);
   // the outboard: trim and tilt on the transom bracket, steering on the swivel, prop on the gearcase
-  const ob = new THREE.Group(); ob.position.set(0, 0.3, 2.42); body.add(ob);
-  const trimG = new THREE.Group(); ob.add(trimG); const steerG = new THREE.Group(); steerG.position.set(0, 0, 0.18); trimG.add(steerG);
-  add(trimG, new THREE.BoxGeometry(0.3, 0.42, 0.14), dark, 0, -0.05, 0.06);
-  const cowl = M(0xeceeee), lower = M(0x1e2022), alu = M(0x2b2e31);
-  add(steerG, new THREE.BoxGeometry(0.46, 0.5, 0.7), cowl, 0, 0.62, 0.16); add(steerG, new THREE.BoxGeometry(0.47, 0.24, 0.72), lower, 0, 0.27, 0.16);
-  add(steerG, new THREE.BoxGeometry(0.4, 0.12, 0.6), cowl, 0, 0.91, 0.16);
-  add(steerG, new THREE.BoxGeometry(0.15, 0.82, 0.26), alu, 0, -0.26, 0.12);
-  add(steerG, new THREE.BoxGeometry(0.3, 0.02, 0.46), alu, 0, -0.5, 0.14);
-  const tor = add(steerG, new THREE.CylinderGeometry(0.075, 0.06, 0.46, 10), alu, 0, -0.68, 0.14); tor.rotation.x = Math.PI / 2;
-  add(steerG, new THREE.BoxGeometry(0.03, 0.18, 0.18), alu, 0, -0.82, 0.24);
-  const prop = new THREE.Group(); prop.position.set(0, -0.68, 0.4); steerG.add(prop);
-  for (let k = 0; k < 3; k++) { const bl = add(prop, new THREE.BoxGeometry(0.06, 0.17, 0.02), M(0x8d9398), 0, 0, 0); bl.geometry.translate(0, 0.085, 0); bl.rotation.z = k * Math.PI * 2 / 3; bl.rotation.y = 0.5; }
+  const ob = new THREE.Group(); ob.position.set(0, 0.45, 2.08); body.add(ob);
+  const trimG = new THREE.Group(); ob.add(trimG); const steerG = new THREE.Group(); steerG.position.set(0, 0, 0.16); trimG.add(steerG);
+  box(0.3, 0.36, 0.12, black, 0, -0.06, 0.05, trimG);
+  const cowlM = new THREE.MeshPhongMaterial({ color: 0x1b1d1f, shininess: 40, specular: 0x444a50 }), lowerM = M(0x232629), alu = M(0x2b2e31);
+  {
+    const sh = new THREE.Shape(), P = [[0.14, 0.36], [0.17, 0.7], [0.08, 0.88], [-0.3, 0.95], [-0.5, 0.86], [-0.54, 0.6], [-0.5, 0.36]];
+    P.forEach(([u, v], i) => i ? sh.lineTo(u, v) : sh.moveTo(u, v));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 0.36, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05, bevelSegments: 3, curveSegments: 4 });
+    g.rotateY(Math.PI / 2); g.translate(-0.18, 0, 0); g.deleteAttribute('uv');
+    add(steerG, g, cowlM, 0, 0, 0);
+  }
+  box(0.44, 0.14, 0.66, lowerM, 0, 0.27, 0.17, steerG);
+  box(0.18, 1.0, 0.3, lowerM, 0, -0.26, 0.1, steerG);
+  box(0.34, 0.022, 0.5, alu, 0, -0.75, 0.15, steerG);
+  box(0.11, 0.14, 0.26, alu, 0, -0.83, 0.1, steerG);
+  const tor = add(steerG, new THREE.CylinderGeometry(0.07, 0.052, 0.46, 12), alu, 0, -0.92, 0.15); tor.rotation.x = Math.PI / 2;
+  box(0.024, 0.16, 0.18, alu, 0, -1.04, 0.25, steerG);
+  const prop = new THREE.Group(); prop.position.set(0, -0.92, 0.4); steerG.add(prop);
+  for (let k = 0; k < 3; k++) { const bl = add(prop, new THREE.BoxGeometry(0.07, 0.17, 0.016), M(0x9aa1a6), 0, 0, 0); bl.geometry.translate(0, 0.085, 0); bl.rotation.z = k * Math.PI * 2 / 3; bl.rotation.y = 0.5; }
   RIB.trim = trimG; RIB.steer = steerG; RIB.prop = prop;
   ob.traverse(o => { if (o.isMesh) OUTER.push(o); });
   for (const o of OUTER) { o.material = o.material.clone(); o.material.clippingPlanes = [RIB_CLIP]; }
+  // the static parts merged by material, so the boat costs a dozen draw calls rather than a hundred
+  {
+    STAT.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(STAT.matrixWorld).invert(), byKey = new Map(), keep = [];
+    STAT.traverse(o => {
+      if (!o.isMesh) return;
+      const rel = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      if (o.material.map || o.material.transparent) { keep.push([o, rel]); return; }
+      const key = o.material.type + o.material.color.getHex() + o.material.side;
+      if (!byKey.has(key)) byKey.set(key, { mat: o.material, geos: [] });
+      byKey.get(key).geos.push(o.geometry.clone().applyMatrix4(rel));
+    });
+    while (STAT.children.length) STAT.remove(STAT.children[0]);
+    for (const { mat, geos } of byKey.values()) { const m = new THREE.Mesh(mergeGeos(geos), mat); m.castShadow = m.receiveShadow = true; STAT.add(m); }
+    for (const [o, rel] of keep) { rel.decompose(o.position, o.quaternion, o.scale); STAT.add(o); }
+  }
   RIB.root = root; RIB.body = body;
   root.traverse(o => { if (o.isMesh) o.layers.enable(2); });
+  SCREEN.traverse(o => { if (o.isMesh) o.layers.disable(2); });
   // the casualty, a berth outline, the turning marker and the slalom buoys
   const cas = new THREE.Group(); add(cas, new THREE.TorusGeometry(0.28, 0.1, 8, 14), M(0xf06a1c), 0, 0, 0).rotation.x = Math.PI / 2; add(cas, new THREE.SphereGeometry(0.13, 10, 8), M(0xd9b08c), 0, 0.12, 0);
   cas.visible = false; scene.add(cas); RIB.cas = cas;
@@ -4627,7 +4768,38 @@ function updateRibVisuals(dt) {
   RIB.slalom.forEach((b, i) => { b.visible = D.id === 'slalom'; if (b.visible) { const [x, y] = SLALOM[i]; b.position.set(x, S.tide + waveH(x, -y, t) * 0.8, -y); } });
   if (R.cas) { RIB.cas.position.set(R.cas.x, S.tide + waveH(R.cas.x, -R.cas.y, t) - 0.05, -R.cas.y); RIB.cas.rotation.z = Math.sin(t * 1.3) * 0.2; }
 }
+// the Garmin at the helm: a data bar, the chart in its own colours, and a scrolling sonar of the depth under the boat
+function ribMFD() {
+  const D = RIB.mfd; if (!D || GAME !== 'rib' || (D.t >= 0 && S.t - D.t < 0.25 && S.t >= D.t)) return; D.t = S.t;
+  const g = D.g, R = RB, sp = Math.sin(R.psi), cp = Math.cos(R.psi), vx = R.u * sp + R.v * cp, vy = R.u * cp - R.v * sp, sog = Math.hypot(vx, vy) / KN;
+  const depth = Math.max(0, S.tide - heightAt(R.x, R.y)), X0 = 16, Y0 = 12, FD = '"Barlow Condensed", "Arial Narrow", sans-serif', FM = '"IBM Plex Mono", monospace';
+  g.fillStyle = '#0c0d0e'; g.fillRect(0, 0, 560, 346);
+  g.fillStyle = '#8f969a'; g.font = `600 15px ${FD}`; g.textAlign = 'left'; g.fillText('GARMIN', 24, 340);
+  g.fillStyle = '#05080a'; g.fillRect(X0, Y0, 528, 50);
+  [['SOG', sog.toFixed(1), 'kn'], ['HDG', fmt3(R.psi / DEG), '°'], ['DEPTH', depth.toFixed(1), 'm'], ['RPM', String(Math.round(R.rpm / 50) * 50), '']].forEach(([lab, val, unit], i) => {
+    const x = X0 + 12 + i * 132;
+    g.fillStyle = '#8ea2ad'; g.font = `600 13px ${FD}`; g.fillText(lab, x, Y0 + 16);
+    g.fillStyle = '#ffffff'; g.font = `500 26px ${FM}`; g.fillText(val, x, Y0 + 44);
+    g.fillStyle = '#c9d3d8'; g.font = `600 14px ${FD}`; g.fillText(unit, x + g.measureText(val).width + 4, Y0 + 44);
+  });
+  drawChart(D.cg, 340, 262, { cx: R.x, cy: R.y, span: clamp(450 + sog * 45, 450, 2600), u: 0.72, pal: GARMIN_PAL });
+  g.drawImage(D.cc, X0, Y0 + 52);
+  // sonar: the old picture slides left and a new sounding comes in on the right
+  const sg = D.sg, SW = 184, SH = 262, range = depth < 7 ? 10 : depth < 15 ? 20 : depth < 32 ? 40 : 80, by = depth / range * SH;
+  sg.drawImage(D.sc, -3, 0);
+  sg.fillStyle = '#0a2a6b'; sg.fillRect(SW - 3, 0, 3, SH);
+  sg.fillStyle = 'rgba(120,170,255,.55)'; sg.fillRect(SW - 3, 0, 3, 3 + Math.random() * 4);
+  if (Math.random() < 0.08) { sg.fillStyle = '#5fd0ff'; sg.fillRect(SW - 3, Math.random() * by * 0.9, 3, 2); }
+  for (const [d0, d1, c] of [[0, 3, '#fff36a'], [3, 9, '#ffb21e'], [9, 24, '#e2461c'], [24, 60, '#7a1a12']]) { sg.fillStyle = c; sg.fillRect(SW - 3, by + d0, 3, d1 - d0); }
+  sg.fillStyle = '#3a0c08'; sg.fillRect(SW - 3, by + 60, 3, SH);
+  g.drawImage(D.sc, X0 + 344, Y0 + 52);
+  g.fillStyle = '#ffffff'; g.font = `500 22px ${FM}`; g.fillText(depth.toFixed(1) + 'm', X0 + 350, Y0 + 78);
+  g.font = `600 13px ${FD}`; g.textAlign = 'right'; g.fillText('0', X0 + 524, Y0 + 66); g.fillText(range + ' m', X0 + 524, Y0 + 310);
+  g.fillStyle = '#0c0d0e'; g.fillRect(X0 + 340, Y0 + 52, 4, 262);
+  D.tex.needsUpdate = true;
+}
 function updateRibUI() {
+  ribMFD();
   const R = RB, sp = Math.sin(R.psi), cp = Math.cos(R.psi);
   const vx = R.u * sp + R.v * cp, vy = R.u * cp - R.v * sp, sog = Math.hypot(vx, vy), cur = currentAt(R.x, R.y), stw = Math.hypot(vx - cur.x, vy - cur.y);
   setT($('nHdg'), fmt3(R.psi / DEG) + '°'); setT($('nSog'), (sog / KN).toFixed(1)); setT($('nCog'), sog > 0.15 ? fmt3(Math.atan2(vx, vy) / DEG) + '°' : '---');
@@ -4656,7 +4828,7 @@ function updateRibCamera() {
     camera.up.set(0, 1, 0); camera.lookAt(R.x, S.tide + 1.2, -R.y);
   } else if (cam.mode === 'helm') {
     RIB.root.updateMatrixWorld(true);
-    const cy = Math.cos(WH.pitch), eye = RIB.body.localToWorld(new V3(0.04, 1.72, 0.52)), tgt = RIB.body.localToWorld(new V3(0.04 - Math.sin(WH.yaw) * cy, 1.72 + Math.sin(WH.pitch), 0.52 - Math.cos(WH.yaw) * cy));
+    const cy = Math.cos(WH.pitch), eye = RIB.body.localToWorld(new V3(0.06, 1.74, 0.22)), tgt = RIB.body.localToWorld(new V3(0.06 - Math.sin(WH.yaw) * cy, 1.74 + Math.sin(WH.pitch), 0.22 - Math.cos(WH.yaw) * cy));
     camera.position.copy(eye); camera.up.set(0, 1, 0); camera.lookAt(tgt); return;
   } else {
     camera.position.set(R.x, S.tide + cam.topH, -R.y + 0.01); camera.up.set(0, 0, -1); camera.lookAt(R.x, S.tide, -R.y);
