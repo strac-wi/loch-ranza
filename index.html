@@ -5109,22 +5109,18 @@ function buildRib() {
     fr.push(new THREE.Vector3(0.7 * Math.sin(Math.PI + 0.5), -0.04, 0.7 * Math.cos(Math.PI + 0.5) + 0.72));
     add(SCREEN, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fr, false, 'centripetal', 0.2), 60, 0.013, 6), steel, 0, 0, 0);
   }
-  // crew in lifejackets: the helm stands at the wheel; a passenger sits on the rear bench
-  const person = (x, z, seatY, jacket, parent) => {
+  // the helm in a lifejacket, standing at the wheel
+  const person = (x, z, jacket, parent) => {
     const p = new THREE.Group(); p.position.set(x, 0.16, z); parent.add(p);
-    const trousers = M(0x23303f), hip = seatY ? seatY - 0.16 + 0.07 : 0.86;
-    for (const s of [-1, 1]) {
-      if (seatY) { box(0.15, 0.14, 0.42, trousers, s * 0.11, hip, -0.17, p); box(0.13, hip - 0.04, 0.13, trousers, s * 0.11, (hip - 0.04) / 2, -0.4, p); }
-      else { const l = box(0.15, hip, 0.18, trousers, s * 0.12, hip / 2, 0, p); l.rotation.z = s * 0.06; }
-    }
+    const trousers = M(0x23303f), hip = 0.86;
+    for (const s of [-1, 1]) { const l = box(0.15, hip, 0.18, trousers, s * 0.12, hip / 2, 0, p); l.rotation.z = s * 0.06; }
     box(0.44, 0.58, 0.28, M(jacket), 0, hip + 0.33, 0, p);
     add(p, new THREE.SphereGeometry(0.12, 12, 8), M(0xd9b08c), 0, hip + 0.8, 0);
     add(p, new THREE.SphereGeometry(0.126, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), M(0x22262a), 0, hip + 0.83, 0);
-    for (const s of [-1, 1]) { const a2 = box(0.1, 0.5, 0.1, M(jacket), s * 0.22, hip + 0.37, -0.18, p); a2.rotation.x = seatY ? 0.4 : 0.95; }
+    for (const s of [-1, 1]) { const a2 = box(0.1, 0.5, 0.1, M(jacket), s * 0.22, hip + 0.37, -0.18, p); a2.rotation.x = 0.95; }
     return p;
   };
-  RIB.helm = person(0.06, 0.25, 0, 0xc8392b, body);
-  person(-0.3, 1.36, 0.56, 0xe2a81c, STAT);
+  RIB.helm = person(0.06, 0.25, 0xc8392b, body);
   // the outboard: trim and tilt on the transom bracket, steering on the swivel, prop on the gearcase
   const ob = new THREE.Group(); ob.position.set(0, 0.45, 2.08); body.add(ob);
   const trimG = new THREE.Group(); ob.add(trimG); const steerG = new THREE.Group(); steerG.position.set(0, 0, 0.16); trimG.add(steerG);
