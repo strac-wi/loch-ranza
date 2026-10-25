@@ -179,7 +179,14 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
 .rbtns{display:flex;flex-wrap:wrap;gap:5px}
 .rbtns button{padding:4px 7px;font-size:12px}
 .rbtns button.warn{background:var(--red);color:#fff}
-@media (max-width:700px){#ribHud{top:92px;bottom:auto;width:auto;right:150px;padding:6px 8px} .rg{margin-bottom:5px;gap:8px} .rlev{height:36px} #rGear{font-size:22px;width:18px} .rcol{font-size:12px} .rbtns{gap:4px} .rbtns button{padding:5px 6px;font-size:11px} #rTrimUp,#rTrimDn{display:none}}
+.rfold{display:none}
+/* phones: the touch lever and trim buttons already show the lever and trim, so the panel shrinks to a gear and trim readout
+   over a row of small buttons, and a tap on the readout folds the buttons away */
+@media (max-width:700px){#ribHud{top:92px;bottom:auto;right:auto;width:auto;max-width:calc(100vw - 172px);padding:4px 6px;border-radius:6px;background:rgba(10,17,21,.6)}
+  .rg{margin:0 0 4px;gap:6px;cursor:pointer;-webkit-user-select:none;user-select:none} .rlev,.rtrim,#rTrimUp,#rTrimDn{display:none} #rGear{font-size:15px;width:auto;line-height:1}
+  .rcol{flex:0 1 auto;flex-direction:row;align-items:baseline;gap:6px;font-size:11px} .rvent:empty{display:none} .rfold{display:inline;font-size:11px;color:var(--dim)}
+  .rbtns{gap:3px} .rbtns button{padding:5px 6px;font-size:10px;letter-spacing:.04em}
+  body.ribfold .rbtns{display:none} body.ribfold .rg{margin:0}}
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -315,7 +322,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
     <div id="toasts" aria-live="polite"></div>
     <div id="ribHud" class="card">
       <div class="rg"><div class="rlev" title="Throttle and gear lever"><i id="rLev"></i></div><b id="rGear">–</b>
-        <div class="rcol"><span>Trim <b id="rTrim">0°</b></span><div class="rtrim"><i id="rTrimBar"></i></div><span id="rVent" class="rvent"></span></div></div>
+        <div class="rcol"><span>Trim <b id="rTrim">0°</b></span><div class="rtrim"><i id="rTrimBar"></i></div><span id="rVent" class="rvent"></span></div><span class="rfold" id="rFold" aria-hidden="true">▾</span></div>
       <div class="rbtns"><button id="rEng" title="Start or stop the engine (X)">Stopped</button><button id="rKill" title="Clip the kill cord on or off (K)">Kill cord: on</button><button id="rLines" title="Make fast or let go (L)">Let go lines</button>
         <button id="rTrimUp" title="Trim out, bow up (R)">Trim ▲</button><button id="rTrimDn" title="Trim in, bow down (F)">Trim ▼</button><button id="rMOB" class="warn" title="Man overboard (O)">MOB</button><button id="rDrill" title="Choose a drill (G)">Drill: Free practice</button></div>
     </div>
@@ -3572,7 +3579,7 @@ function zoomBy(f) {
     if (f < 1) { if (cam.dist > cmin) cam.dist = Math.max(cmin, cam.dist * f); else cam.fov = Math.max(24, cam.fov * f); }
     else if (cam.fov < 55) cam.fov = Math.min(55, cam.fov * f); else cam.dist = Math.min(900, cam.dist * f);
   } else if (cam.mode === 'top') cam.topH = clamp(cam.topH * f, 60, 4000);
-  else if (cam.mode === 'wheelhouse' || cam.mode === 'helm') WH.fov = clamp(WH.fov * f, 28, 75);
+  else if (cam.mode === 'wheelhouse' || cam.mode === 'helm') WH.fov = clamp(WH.fov * f, 28, 92);
 }
 // two fingers on the view pinch to zoom
 const ptrs = new Map(); let pinch = null;
@@ -4169,6 +4176,10 @@ $('bPA').onclick = () => paPlay(false);
 $('tPA').onclick = () => { if (GAME !== 'rib') paPlay(false); };
 $('rEng').onclick = () => ribEngine(); $('rKill').onclick = () => ribKill(); $('rLines').onclick = () => ribLines(); $('rMOB').onclick = () => ribMOB();
 $('rDrill').onclick = () => ribSetDrill(DRILLS[(DRILLS.indexOf(RB.drill.id) + 1) % DRILLS.length]);
+const PHONE = matchMedia('(max-width:700px)');
+function ribFold(on) { document.body.classList.toggle('ribfold', on); setT($('rFold'), on ? '▸' : '▾'); savePrefs({ ribFold: on }); }
+document.querySelector('#ribHud .rg').addEventListener('click', () => { if (PHONE.matches) ribFold(!document.body.classList.contains('ribfold')); });
+if (PREFS.ribFold) ribFold(true);
 for (const [id, d] of [['rTrimUp', 1], ['rTrimDn', -1]]) {
   $(id).addEventListener('pointerdown', () => { TOUCH.trim = d; });
   for (const evn of ['pointerup', 'pointercancel', 'pointerleave']) $(id).addEventListener(evn, () => { TOUCH.trim = 0; });
@@ -4679,6 +4690,7 @@ function ribMOB() {
 // ---------- drills ----------
 const DRILLS = GIGHA ? ['free', 'alongside', 'mob', 'slalom'] : ['free', 'mooring', 'mob', 'slalom'];   // no jetty in the Achnamara arm
 const DRILL_NAME = { free: 'Free practice', mooring: 'Pick up the mooring', alongside: 'Come alongside', mob: 'Man overboard', slalom: 'High-speed slalom' };
+const DRILL_SHORT = { free: 'free', mooring: 'mooring', alongside: 'alongside', mob: 'MOB', slalom: 'slalom' };
 function ribSetDrill(id) {
   TRK.pts = []; TRK.acc = 0;
   const R = RB; R.drill = { id, stage: 0, t0: S.t, pen: [] }; R.contactMax = 0; R.cas = null; RIB.cas.visible = false; R.slalomHit = false;
@@ -5149,8 +5161,10 @@ function updateRibUI() {
   $('rLev').style.height = (Math.abs(R.lever) * 50).toFixed(0) + '%'; $('rLev').style.bottom = R.lever >= 0 ? '50%' : (50 - Math.abs(R.lever) * 50).toFixed(0) + '%';
   setT($('rTrim'), (R.trim >= 0 ? '+' : '') + R.trim.toFixed(0) + '°'); $('rTrimBar').style.width = ((R.trim + 4) / 20 * 100).toFixed(0) + '%';
   setT($('rEng'), R.eng === 'run' ? 'Running' : R.eng === 'crank' ? 'Cranking' : 'Start eng'); setC($('rEng'), 'on', R.eng === 'run'); setC($('rEng'), 'warn', R.eng === 'off');
-  setT($('rKill'), R.kill ? 'Kill cord: on' : 'Kill cord: off'); setC($('rKill'), 'warn', !R.kill);
-  setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? 'Slip mooring' : 'Let go lines') : GIGHA ? 'Make fast' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
+  const ph = PHONE.matches;
+  setT($('rKill'), (ph ? 'Kill: ' : 'Kill cord: ') + (R.kill ? 'on' : 'off')); setC($('rKill'), 'warn', !R.kill);
+  setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? (ph ? 'Slip' : 'Slip mooring') : (ph ? 'Let go' : 'Let go lines')) : GIGHA ? 'Make fast' : ph ? 'Pick up' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
+  setT($('rDrill'), 'Drill: ' + (ph ? DRILL_SHORT : DRILL_NAME)[R.drill.id]);
   setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
   const [title, items] = ribChecklist(), html = items.map(([t2, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${t2}</li>`).join('');
   const ul = $('ckList'); if (ul.dataset.h !== html) { ul.dataset.h = html; ul.innerHTML = html; } setT($('ckTitle'), title);
