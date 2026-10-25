@@ -1220,7 +1220,20 @@ function groundTex(N = 512) {
   t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
   return t;
 }
-const TERRAIN_U = { uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay }, uGround: { value: HD ? groundTex() : null },
+// and in their place once they arrive, photographs of real ground from Poly Haven (CC0), published beside the HD page:
+// short turf, rough grazing, mossy rock slabs, beach sand and weedy stones for the band the tide covers. Each is used for
+// its detail only, divided by its own average colour, so the land keeps the colours of its cover map.
+const PHOTO = [['pasture', [0.313, 0.308, 0.11]], ['rough', [0.382, 0.312, 0.157]], ['rock', [0.431, 0.363, 0.205]], ['sand', [0.509, 0.449, 0.359]], ['wrack', [0.294, 0.268, 0.177]]];
+function loadGroundPhotos() {
+  if (!HD || location.protocol === 'file:') return;   // a page opened from disk may not put local images on the GPU
+  const dir = window.LR_HD ? 'tex/' : 'hd/tex/', L = new THREE.TextureLoader(); let n = 0;
+  PHOTO.forEach(([name], i) => L.load(dir + name + '.jpg', (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    TERRAIN_U['uGP' + i].value = t; if (++n === PHOTO.length) TERRAIN_U.uPhoto.value = 1;
+  }, undefined, () => { /* stay with the made textures */ }));
+}
+const TERRAIN_U = { uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay }, uGround: { value: HD ? groundTex() : null }, uPhoto: { value: 0 },
+  uGP0: { value: null }, uGP1: { value: null }, uGP2: { value: null }, uGP3: { value: null }, uGP4: { value: null }, uGPM: { value: PHOTO.map(([, m]) => new THREE.Vector3(...m)) },
   uDetAR: { value: new THREE.Vector4(...DETAIL_R.ard) }, uDetTR: { value: new THREE.Vector4(...DETAIL_R.tay) } };
 const TERRAIN_MAT = (() => {
   const m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 4, specular: 0x111111 });
@@ -1231,6 +1244,12 @@ const TERRAIN_MAT = (() => {
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       varying vec3 vWP; uniform float uTide; uniform sampler2D uDetA; uniform sampler2D uDetT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform sampler2D uGround;
+      uniform float uPhoto; uniform sampler2D uGP0; uniform sampler2D uGP1; uniform sampler2D uGP2; uniform sampler2D uGP3; uniform sampler2D uGP4; uniform vec3 uGPM[5];
+      vec3 gp(sampler2D t, vec3 m, vec2 a, vec2 b, vec2 c, float fine){
+        vec3 x = mix(texture2D(t, a).rgb * 0.6 + texture2D(t, b).rgb * 0.4, texture2D(t, c).rgb, fine);
+        const vec3 L = vec3(0.3, 0.55, 0.15);
+        return mix(vec3(dot(x, L) / dot(m, L)), x / m, 0.35);   // mostly light and shade, a little of the photo's own colour
+      }
       vec4 detailAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.05, e); }
       float th12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
       float tnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
@@ -1267,8 +1286,21 @@ const TERRAIN_MAT = (() => {
           float wR = smoothstep(0.38, 0.62, slope + (n1 - 0.5) * 0.2) * step(1.2, h);
           float wS = (1.0 - smoothstep(0.6, 2.8, h)) * (1.0 - green) * step(-0.6, h);
           float wG = green * (1.0 - wR), wH = (1.0 - green) * (1.0 - wR) * (1.0 - wS);
-          float d = (gt.r * wG + gt.g * wH + gt.b * wR + gt.a * wS) / max(wG + wH + wR + wS, 0.001);
-          diffuseColor.rgb *= mix(1.0, 0.3 + 1.4 * d, dn * (1.0 - 0.6 * dt.a));
+          float wsum = max(wG + wH + wR + wS, 0.001);
+          vec3 det;
+          if (uPhoto > 0.5) {
+            // the photographs: weed and stones where the tide reaches, sand above it
+            float wW = wS * (1.0 - smoothstep(0.3, 1.1, h)); wS -= wW;
+            vec2 a = p * 0.07, b = p * 0.016 + 0.37, cc = p * 0.31 + 0.71; float fine = (1.0 - smoothstep(10.0, 60.0, dist)) * 0.5;
+            vec3 acc = vec3(0.0);
+            if (wG > 0.01) acc += wG * gp(uGP0, uGPM[0], a, b, cc, fine);
+            if (wH > 0.01) acc += wH * gp(uGP1, uGPM[1], a, b, cc, fine);
+            if (wR > 0.01) acc += wR * gp(uGP2, uGPM[2], a, b, cc, fine);
+            if (wS > 0.01) acc += wS * gp(uGP3, uGPM[3], a, b, cc, fine);
+            if (wW > 0.01) acc += wW * gp(uGP4, uGPM[4], a, b, cc, fine);
+            det = 1.0 + (acc / wsum - 1.0) * 1.2;
+          } else det = vec3(0.3 + 1.4 * (gt.r * wG + gt.g * wH + gt.b * wR + gt.a * wS) / wsum);
+          diffuseColor.rgb *= mix(vec3(1.0), max(det, 0.0), dn * (1.0 - 0.6 * dt.a));
         }
         #endif
       }`);
@@ -5377,7 +5409,7 @@ function ribAudio(t, m) {
 }
 
 // ================= BOOT =================
-buildTerrain();
+buildTerrain(); loadGroundPhotos();
 if (GIGHA) TERMS.forEach(buildTerminal);
 // Gigha's South Pier, modelled after the aerial and shore photos
 function buildSouthPier() {
@@ -5593,6 +5625,7 @@ if (!GIGHA) {
   document.querySelector('.brand b').textContent = 'Loch Sween';
   setT($('ribWhere'), 'A 5 m RIB with a Suzuki 100 hp outboard, on a mooring off Achnamara. Boat-handling practice at high and low speed.');
 }
+if (HD) document.querySelector('#menu .fine').append(' HD ground textures: Poly Haven (CC0).');
 // the HD page and the standard one link to each other where both are published
 if (/github\.io$/.test(location.hostname) || location.protocol === 'file:') {
   const a = $('hdLink'); a.hidden = false;
@@ -5623,7 +5656,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
