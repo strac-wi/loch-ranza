@@ -4347,6 +4347,54 @@ function engineBuffer(ctx, seed, CYL = 6) {
   for (let i = 0; i < n; i++) d[i] *= 0.9 / pk;
   return buf;
 }
+// The ship's whistle: an air horn of the kind small ferries carry, pitched in the 250-700 Hz band the collision rules set
+// for a vessel under 75 m (the note itself is a guess). A rich tone with a little roughness, through a flared bell; the
+// air takes a moment to build, so the note swells and rises into pitch, and it sags as the valve shuts. Behind it a long
+// tail and a slap off the shore. Heard from the RIB it arrives late, at the speed of sound, and duller with distance.
+const WHISTLE_F = 290;
+function shipWhistle(ctx, master) {
+  const H = { on: false, f: WHISTLE_F, osc: [] };
+  const n = 14, re = new Float32Array(n + 1), im = new Float32Array(n + 1);
+  for (let k = 1; k <= n; k++) im[k] = (k === 1 ? 1 : 0.85 / Math.pow(k, 0.9)) * (k % 2 ? 1 : 0.75);   // odd partials a shade stronger
+  const wave = ctx.createPeriodicWave(re, im);
+  const sum = ctx.createGain(); sum.gain.value = 0.32;
+  // the main note, and a faint second just off it for a slow shimmer rather than a steady electronic tone
+  for (const [det, a] of [[1, 1], [1.0014, 0.22]]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.setPeriodicWave(wave); o.frequency.value = H.f * det; g.gain.value = a; o.connect(g); g.connect(sum); o.start(); H.osc.push([o, det]); }
+  // breath: air noise around the second partial, riding on the note
+  const nb = ctx.createBufferSource(); nb.buffer = AU.noiseBuf || (AU.noiseBuf = (() => { const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), x = b.getChannelData(0); for (let j = 0; j < x.length; j++) x[j] = Math.random() * 2 - 1; return b; })());
+  nb.loop = true; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = H.f * 2; nf.Q.value = 3; const ngn = ctx.createGain(); ngn.gain.value = 0.18;
+  nb.connect(nf); nf.connect(ngn); ngn.connect(sum); nb.start();
+  // the bell: a broad lift round 750 Hz, the top rolled off
+  const bell = ctx.createBiquadFilter(); bell.type = 'peaking'; bell.frequency.value = 750; bell.Q.value = 0.9; bell.gain.value = 6;
+  const top = ctx.createBiquadFilter(); top.type = 'lowpass'; top.frequency.value = 2600; top.Q.value = 0.5;
+  H.env = ctx.createGain(); H.env.gain.value = 0;
+  H.delay = ctx.createDelay(8); H.delay.delayTime.value = 0;
+  H.air = ctx.createBiquadFilter(); H.air.type = 'lowpass'; H.air.frequency.value = 2600;   // air takes the top off with distance
+  H.out = ctx.createGain(); H.out.gain.value = 0;
+  sum.connect(bell); bell.connect(top); top.connect(H.env); H.env.connect(H.delay); H.delay.connect(H.air); H.air.connect(H.out); H.out.connect(master);
+  // round the loch: a long tail with two slaps off the shore
+  const len = Math.floor(ctx.sampleRate * 3.2), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const x = ir.getChannelData(c);
+    for (let i = 0; i < len; i++) { const t = i / ctx.sampleRate; x[i] = (Math.random() * 2 - 1) * Math.exp(-t / 0.75) * 0.3 * Math.min(1, t / 0.03); }
+    for (const [t0, a] of [[0.42 + c * 0.03, 0.5], [1.15 + c * 0.05, 0.28]]) { const i0 = Math.floor(t0 * ctx.sampleRate); for (let i = 0; i < 2400; i++) x[i0 + i] += (Math.random() * 2 - 1) * a * Math.exp(-i / 500); }
+  }
+  const conv = ctx.createConvolver(); conv.buffer = ir; const wet = ctx.createGain(); wet.gain.value = 0.45;
+  H.air.connect(conv); conv.connect(wet); wet.connect(H.out);
+  return H;
+}
+function whistleSet(on, t, dist) {
+  const H = AU.whistle; if (!H || on === H.on) return; H.on = on;
+  if (on) {
+    // the sound leaves now and reaches you dist/343 s later; the delay is only moved while the whistle is quiet
+    if (H.env.gain.value < 0.02) H.delay.delayTime.setValueAtTime(clamp(dist / 343, 0, 7.5), t);
+    for (const [o, det] of H.osc) { o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(H.f * det * 0.86, t); o.frequency.exponentialRampToValueAtTime(H.f * det, t + 0.2); }
+    H.env.gain.cancelScheduledValues(t); H.env.gain.setValueAtTime(H.env.gain.value, t); H.env.gain.linearRampToValueAtTime(1.15, t + 0.12); H.env.gain.linearRampToValueAtTime(1, t + 0.3);
+  } else {
+    for (const [o, det] of H.osc) { o.frequency.cancelScheduledValues(t); o.frequency.setTargetAtTime(H.f * det * 0.93, t, 0.16); }
+    H.env.gain.cancelScheduledValues(t); H.env.gain.setTargetAtTime(0, t, 0.1);
+  }
+}
 function initAudio() {
   if (AU.ctx) return;
   try {
@@ -4379,9 +4427,7 @@ function initAudio() {
     const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 420; nf.Q.value = 0.5;
     const ng = ctx.createGain(); ng.gain.value = 0; ns.connect(nf); nf.connect(ng); ng.connect(master); ns.start(); AU.wash = ng;
     const ao = ctx.createOscillator(); ao.type = 'square'; ao.frequency.value = 880; const ag = ctx.createGain(); ag.gain.value = 0; ao.connect(ag); ag.connect(master); ao.start(); AU.alarm = ag;
-    const hf = ctx.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 900; const hg = ctx.createGain(); hg.gain.value = 0; hf.connect(hg); hg.connect(master);
-    for (const f of [148, 186]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(hf); o.start(); }
-    AU.horn = hg;
+    AU.whistle = shipWhistle(ctx, master);
   } catch (err) { AU.ctx = null; }
 }
 function toggleSound() { AU.on = !AU.on; setT($('bSound'), AU.on ? 'Sound on' : 'Sound off'); }
@@ -4528,7 +4574,13 @@ function updateAudio() {
   const wash = (Math.abs(S.units[0].fx) + Math.abs(S.units[0].fy) + Math.abs(S.units[1].fx) + Math.abs(S.units[1].fy)) / (4 * TMAX) + Math.hypot(S.u, S.v) * 0.04;
   AU.wash.gain.setTargetAtTime(m * clamp(wash, 0, 1) * 0.12, t, 0.2);
   AU.alarm.gain.setTargetAtTime(m * (S.alarmSound && (Math.floor(performance.now() / 260) % 2) ? 0.05 : 0), t, 0.01);
-  AU.horn.gain.setTargetAtTime(m * (GAME !== 'rib' ? (S.horn ? 0.2 : 0) : S.ferryHorn ? 0.3 * fade : 0), t, 0.04);
+  // the ship's whistle: aboard in the ferry game; from the RIB, as far off as she is
+  if (AU.whistle) {
+    const far = GAME === 'rib' ? Math.hypot(S.x - RB.x, S.y - RB.y) : 0;
+    whistleSet(GAME === 'rib' ? !!S.ferryHorn : !!S.horn, t, far);
+    AU.whistle.out.gain.setTargetAtTime(m * (GAME === 'rib' ? 0.42 / (1 + Math.max(0, far - 30) / 350) : 0.3), t, 0.1);
+    AU.whistle.air.frequency.setTargetAtTime(2600 / (1 + far / 700), t, 0.2);
+  }
 }
 
 // ================= CAMERA & RENDER =================
@@ -5780,7 +5832,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, GROUND, RIB, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, GROUND, RIB, AU, shipWhistle, whistleSet, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
