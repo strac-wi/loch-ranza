@@ -67,6 +67,7 @@ output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .tidectl output{font-size:13px;text-align:right}
 .tidectl input[type=range]{grid-column:1/-1;margin:2px 0 6px}
 .tidectl .row{grid-column:1/-1}
+.tidectl input:disabled,.tidectl button:disabled{opacity:.4}
 .chart{position:relative;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:4px}
 #map{display:block;width:230px;height:230px;border-radius:3px}
 #bMapZoom{position:absolute;right:8px;bottom:8px;font-size:11px;padding:3px 6px}
@@ -409,6 +410,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
             <legend>Tide</legend>
             <label><input type="radio" name="tide" value="springs" checked><span>Springs<small>The biggest rise and fall of the fortnight, and the strongest streams.</small></span></label>
             <label><input type="radio" name="tide" value="neaps"><span>Neaps<small>Little rise and fall. High water comes at a different time each game.</small></span></label>
+            <label><input type="radio" name="tide" value="live"><span>Live<small id="tideLiveNote">Today's tide at the game's clock, worked out from the Port Ellen tide gauge on Islay, 29 km away.</small></span></label>
           </fieldset>
           <fieldset>
             <legend>Light</legend>
@@ -487,6 +489,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <p>A yacht sails her way up and down, beating when the wind is ahead, and a fishing boat works her gear: a trawler towing in the Sound of Gigha, a creel boat hauling her strings in Loch Sween. Under sail or fishing they have right of way over the ferry and the RIB (Rule 18), so keep clear early and pass astern of them. They hold their course and speed, and act only at the last moment if you leave it too late, which costs points. Never cross close astern of the trawler: her warps run back a couple of hundred metres to the net. The creel boat counts as fishing only while she is hauling; running between strings she is an ordinary power-driven vessel and the crossing rules apply. By night they show their proper lights, and the chart shows them as targets with their heading. <b>Lights quiz</b> (on the start screen and under Settings) tests you on the lights and day shapes of these and other vessels.</p>
         <h3>The tide</h3>
         <p>The tide rises and falls with the clock: pick springs or neaps on the start screen. Under Settings you can move it to any point in the cycle, from six hours before high water to six after, change its size between neaps and springs, or hold it at one height to practise there. The rise and fall here is small, this coast being close to the point off Islay where the tide hardly rises at all; the ranges are estimates, not tide-table values.</p>
+        <p>Pick <b>Live</b> on the start screen for today's real tide at the game's clock (GMT or BST), worked out on your device from the harmonic constants of the Port Ellen tide gauge on Islay: TICON-3 (Hart-Davis, Dettmering and Seitz, 2022, CC BY 4.0), from the GESLA-3 record. It is Port Ellen's tide, the nearest gauge on this side of Kintyre: about the right size for the Sound of Gigha, but the times there will differ somewhat, and Loch Sween's will be larger. It has Port Ellen's double high waters. With Live on, the tide controls under Settings stand down. Not for navigation.</p>
         <h3>The chart</h3>
         <p>Tap or click the corner chart to open it full size. Drag to move it, pinch or scroll to zoom, or use + and −; zoomed in, it shows the roads and the boats on their moorings. Follow boat keeps you in the middle again, and Close or Escape puts it away. Harbour and Route on the corner chart switch between close in and the whole passage.</p>
         <h3>Loch Sween</h3>
@@ -2766,7 +2769,7 @@ function newGame(start, wxKey, simple = false) {
     rnd, t: 0, warp: 1, running: true, wx: WEATHER[wxKey], wxKey, simple, crewHold: 0, crewMsg: '',
     x: 0, y: 0, psi: (TERMS[0].brg + 180) * DEG, u: 0, v: 0, r: 0,
     heave: 0, pitchA: 0, rollA: 0, endHeave: [0, 0],
-    curDir: rnd() < 0.5 ? 15 : 195, tide0: (rnd() - 0.5) * 0.12, tide: 0, tideAmp: TIDE_AMP[OPTS.tide], tideHW: rnd() * TIDE_P, clock0: LIGHTS[OPTS.light].clock, wind: { x: 0, y: 0, spd: 0, from: 0 },
+    curDir: rnd() < 0.5 ? 15 : 195, tide0: (rnd() - 0.5) * 0.12, tide: 0, tideAmp: TIDE_AMP[OPTS.tide] || TIDE_AMP.springs, tideLive: OPTS.tide === 'live', tideDay: ukMidnightUTC(), tideHW: rnd() * TIDE_P, clock0: LIGHTS[OPTS.light].clock, wind: { x: 0, y: 0, spd: 0, from: 0 },
     units: [newUnit(UNIT_X), newUnit(-UNIT_X)],
     ends: [newEnd(), newEnd()],
     mode: 'combined', dir: 1, lev: { S: 0, W: 0, Y: 0 }, pad: [{ up: 0, right: 0 }, { up: 0, right: 0 }],
@@ -2820,8 +2823,8 @@ function updateEnv(dt) {
   const W = S.wx;
   // tide set from Settings: held, it keeps its place in the cycle; moved, it eases there at half an hour of tide a second
   // rather than jumping, which would wrench a ramp lying on the slip
-  if (S.tideHold) S.tideHW += dt;
-  if (S.tideGoal !== undefined) {
+  if (S.tideHold && !S.tideLive) S.tideHW += dt;
+  if (S.tideGoal !== undefined && !S.tideLive) {
     const d = ((((S.tideGoal - S.tideHW) / TIDE_P) % 1 + 1.5) % 1 - 0.5) * TIDE_P, m = 1800 * dt;
     if (Math.abs(d) <= m) { S.tideHW = S.tideGoal; S.tideGoal = undefined; } else S.tideHW += Math.sign(d) * m;
   }
@@ -3489,10 +3492,59 @@ const logEl = $('log');
 // Kintyre and too little at Tayvallich to dry out reliably. The ranges below are estimates within that, not tide-table values.
 const TIDE_AMP = GIGHA ? { springs: 0.45, neaps: 0.18 } : { springs: 0.6, neaps: 0.25 }, TIDE_P = 12.42 * 3600;
 const OPTS = { tide: 'springs', light: 'day' };
-const tideAt = (c) => S.tide0 + S.tideAmp * Math.cos((c - S.tideHW) / TIDE_P * Math.PI * 2);
+// Live: today's tide from a tide gauge's harmonic constants: TICON-3 (Hart-Davis, Dettmering and Seitz, 2022; CC BY 4.0), from the
+// GESLA-3 record at Port Ellen, Islay, 55.628 N 6.190 W, the nearest gauge on this side of Kintyre. Thirty constituents, with
+// nodal corrections and astronomical arguments as UTide computes them (checked against it to a thousandth of a millimetre over
+// 2026). It is Port Ellen's tide, not the Sound of Gigha's or Loch Sween's: about the right size for the Sound, but the times
+// there will differ somewhat, and Loch Sween's tide is likely larger.
+const TIDE_LIVE = { name: 'Port Ellen', km: GIGHA ? 29 : 58, tab: [{"n":"M2","d":[2.0,0.0,0.0,0.0,0.0,0.0],"semi":0.0,"sat":[[-1.0,-1.0,0.0,0.75,0.000214],[-1.0,0.0,0.0,0.75,0.000858],[0.0,-2.0,0.0,0.0,0.0005],[0.0,-1.0,0.0,0.5,0.0373],[1.0,-1.0,0.0,0.25,0.000214],[1.0,0.0,0.0,0.75,0.00193],[1.0,1.0,0.0,0.75,0.000429],[2.0,0.0,0.0,0.0,0.0006],[2.0,1.0,0.0,0.0,0.0002]],"A":0.15987,"g":89.29},{"n":"S2","d":[2.0,2.0,-2.0,0.0,0.0,0.0],"semi":0.0,"sat":[[0.0,-1.0,0.0,0.0,0.0022],[1.0,0.0,0.0,0.75,0.000214],[2.0,0.0,0.0,0.0,0.0001]],"A":0.14238,"g":154.39},{"n":"SA","d":[0.0,0.0,1.0,0.0,0.0,-1.0],"semi":0.0,"sat":[],"A":0.09264,"g":319.55},{"n":"K1","d":[1.0,1.0,0.0,0.0,0.0,0.0],"semi":-0.75,"sat":[[-2.0,-1.0,0.0,0.0,0.0002],[-1.0,-1.0,0.0,0.75,-0.000106],[-1.0,0.0,0.0,0.25,-0.000741],[-1.0,1.0,0.0,0.75,-0.000106],[0.0,-2.0,0.0,0.0,0.0001],[0.0,-1.0,0.0,0.5,0.0198],[0.0,1.0,0.0,0.0,0.1356],[0.0,2.0,0.0,0.5,0.0029],[1.0,0.0,0.0,0.25,-0.000212],[1.0,1.0,0.0,0.25,-0.000106]],"A":0.09205,"g":187.51},{"n":"O1","d":[1.0,-1.0,0.0,0.0,0.0,0.0],"semi":-0.25,"sat":[[-1.0,0.0,0.0,0.25,-0.000318],[0.0,-2.0,0.0,0.5,0.0058],[0.0,-1.0,0.0,0.0,0.1885],[1.0,-1.0,0.0,0.25,-0.000423],[1.0,0.0,0.0,0.75,-0.00307],[1.0,1.0,0.0,0.25,-0.000423],[2.0,0.0,0.0,0.5,0.0064],[2.0,1.0,0.0,0.5,0.001]],"A":0.08329,"g":40.2},{"n":"K2","d":[2.0,2.0,0.0,0.0,0.0,0.0],"semi":0.0,"sat":[[-1.0,0.0,0.0,0.75,0.005147],[-1.0,1.0,0.0,0.75,0.000858],[0.0,-1.0,0.0,0.5,0.0128],[0.0,1.0,0.0,0.0,0.298],[0.0,2.0,0.0,0.0,0.0324]],"A":0.04059,"g":150.09},{"n":"M3","d":[3.0,0.0,0.0,0.0,0.0,0.0],"semi":-0.5,"sat":[[0.0,-1.0,0.0,0.5,0.0564]],"A":0.03793,"g":104.58},{"n":"MU2","d":[2.0,-2.0,2.0,0.0,0.0,0.0],"semi":0.0,"sat":[[-1.0,-1.0,0.0,0.25,0.00386],[-1.0,0.0,0.0,0.25,0.022302],[0.0,-1.0,0.0,0.5,0.0375]],"A":0.03537,"g":110.18},{"n":"P1","d":[1.0,1.0,-2.0,0.0,0.0,0.0],"semi":-0.25,"sat":[[0.0,-2.0,0.0,0.0,0.0008],[0.0,-1.0,0.0,0.5,0.0112],[0.0,0.0,2.0,0.5,0.0004],[1.0,0.0,0.0,0.75,-0.000423],[2.0,0.0,0.0,0.5,0.0015],[2.0,1.0,0.0,0.5,0.0003]],"A":0.02997,"g":185.41},{"n":"Q1","d":[1.0,-2.0,0.0,1.0,0.0,0.0],"semi":-0.25,"sat":[[-2.0,-3.0,0.0,0.5,0.0007],[-2.0,-2.0,0.0,0.5,0.0039],[-1.0,-2.0,0.0,0.75,-0.001059],[-1.0,-1.0,0.0,0.75,-0.012173],[-1.0,0.0,0.0,0.75,-0.03091],[0.0,-2.0,0.0,0.5,0.0057],[-1.0,0.0,1.0,0.0,0.0008],[0.0,-1.0,0.0,0.0,0.1884],[1.0,0.0,0.0,0.75,-0.001905],[2.0,0.0,0.0,0.5,0.0028]],"A":0.02975,"g":336.7},{"n":"M6","sh":[[0,3.0]],"A":0.02631,"g":114.44},{"n":"N2","d":[2.0,-1.0,0.0,1.0,0.0,0.0],"semi":0.0,"sat":[[-2.0,-2.0,0.0,0.5,0.0039],[-1.0,0.0,1.0,0.0,0.0008],[0.0,-2.0,0.0,0.0,0.0005],[0.0,-1.0,0.0,0.5,0.0373]],"A":0.02391,"g":78.81},{"n":"SSA","d":[0.0,0.0,2.0,0.0,0.0,0.0],"semi":0.0,"sat":[],"A":0.02254,"g":156.14},{"n":"M4","sh":[[0,2.0]],"A":0.02095,"g":66.11},{"n":"MF","d":[0.0,2.0,0.0,0.0,0.0,0.0],"semi":0.0,"sat":[],"A":0.01934,"g":204.15},{"n":"L2","d":[2.0,1.0,0.0,-1.0,0.0,0.0],"semi":-0.5,"sat":[[0.0,-1.0,0.0,0.5,0.0366],[2.0,-1.0,0.0,0.0,0.0047],[2.0,0.0,0.0,0.5,0.2505],[2.0,1.0,0.0,0.5,0.1102],[2.0,2.0,0.0,0.5,0.0156]],"A":0.01718,"g":19.15},{"n":"MS4","sh":[[0,1.0],[1,1.0]],"A":0.01282,"g":69.88},{"n":"LDA2","d":[2.0,1.0,-2.0,1.0,0.0,0.0],"semi":-0.5,"sat":[[0.0,-1.0,0.0,0.5,0.0448]],"A":0.0121,"g":8.24},{"n":"MN4","sh":[[0,1.0],[11,1.0]],"A":0.01013,"g":45.21},{"n":"EPS2","d":[2.0,-3.0,2.0,1.0,0.0,0.0],"semi":0.0,"sat":[[-1.0,-1.0,0.0,0.25,0.016083],[-1.0,0.0,0.0,0.25,0.086206],[0.0,-1.0,0.0,0.5,0.0373]],"A":0.00911,"g":96.98},{"n":"S1","d":[1.0,1.0,-1.0,0.0,0.0,1.0],"semi":-0.75,"sat":[[0.0,0.0,-2.0,0.0,0.3534],[0.0,1.0,0.0,0.5,0.0264]],"A":0.00825,"g":109.27},{"n":"2Q1","d":[1.0,-3.0,0.0,2.0,0.0,0.0],"semi":-0.25,"sat":[[-2.0,-2.0,0.0,0.5,0.0063],[-1.0,-1.0,0.0,0.75,-0.025511],[-1.0,0.0,0.0,0.75,-0.064254],[0.0,-2.0,0.0,0.5,0.0063],[0.0,-1.0,0.0,0.0,0.1885]],"A":0.00683,"g":281.77},{"n":"T2","d":[2.0,2.0,-3.0,0.0,0.0,1.0],"semi":0.0,"sat":[],"A":0.00642,"g":130.76},{"n":"NU2","d":[2.0,-1.0,2.0,-1.0,0.0,0.0],"semi":0.0,"sat":[[0.0,-1.0,0.0,0.5,0.0373],[1.0,0.0,0.0,0.75,0.009007],[2.0,0.0,0.0,0.0,0.0042],[2.0,1.0,0.0,0.5,0.0036]],"A":0.00559,"g":340.69},{"n":"MKS2","sh":[[0,1.0],[5,1.0],[1,-1.0]],"A":0.00383,"g":153.42},{"n":"MM","d":[0.0,1.0,0.0,-1.0,0.0,0.0],"semi":0.0,"sat":[],"A":0.00342,"g":228.88},{"n":"S4","sh":[[1,2.0]],"A":0.00304,"g":98.35},{"n":"MSF","d":[0.0,2.0,-2.0,0.0,0.0,0.0],"semi":0.0,"sat":[],"A":0.00299,"g":65.58},{"n":"N4","sh":[[11,2.0]],"A":0.00291,"g":12.57},{"n":"2N2","d":[2.0,-2.0,0.0,2.0,0.0,0.0],"semi":0.0,"sat":[[-2.0,-2.0,0.0,0.5,0.0061],[-1.0,-1.0,0.0,0.25,0.02509],[-1.0,0.0,0.0,0.25,0.145392],[0.0,-1.0,0.0,0.5,0.0374]],"A":0.00251,"g":87.22}] };
+const TIDE_ASTRO = [[270.434164, 13.1763965268, -0.0000850, 0.000000039], [279.696678, 0.9856473354, 0.00002267, 0], [334.329556, 0.1114040803, -0.0007739, -0.00000026], [-259.183275, 0.0529539222, -0.0001557, -0.000000050], [281.220844, 0.0000470684, 0.0000339, 0.000000070]];
+function tidePredict(tab, ms) {   // metres about mean sea level at a UTC time in ms
+  const jd = ms / 86400000 + 719163, d = jd - 693595.5, D = d / 10000;   // days in UTide's time base (proleptic Gregorian ordinal)
+  const a = TIDE_ASTRO.map(c => ((c[0] + c[1] * d + c[2] * D * D + c[3] * D * D * D) / 360) % 1);
+  const astro = [(jd % 1) + a[1] - a[0], a[0], a[1], a[2], a[3], a[4]];   // lunar time, moon, sun, lunar perigee, minus the node, perihelion (cycles)
+  const F = [], U = [], V = [];
+  let h = 0;
+  tab.forEach((e, i) => {
+    if (e.sh) { let f = 1, u = 0, v = 0; for (const [j, c] of e.sh) { f *= Math.pow(F[j], Math.abs(c)); u += U[j] * c; v += V[j] * c; } F[i] = f; U[i] = u; V[i] = v; }   // shallow-water: from its parts
+    else {
+      let re = 1, im = 0;
+      for (const q of e.sat) { const uu = (q[0] * astro[3] + q[1] * astro[4] + q[2] * astro[5] + q[3]) % 1; re += q[4] * Math.cos(2 * Math.PI * uu); im += q[4] * Math.sin(2 * Math.PI * uu); }
+      F[i] = Math.hypot(re, im); U[i] = Math.atan2(im, re) / (2 * Math.PI);
+      let v = e.semi; for (let k = 0; k < 6; k++) v += e.d[k] * astro[k]; V[i] = v % 1;
+    }
+    if (e.A) h += F[i] * e.A * Math.cos(2 * Math.PI * (V[i] + U[i]) - e.g * Math.PI / 180);
+  });
+  return h;
+}
+// midnight today in Britain, as a UTC time: the game's clock is local time, GMT or BST
+function ukMidnightUTC(now = new Date()) {
+  const part = (o, d) => new Intl.DateTimeFormat('en-GB', Object.assign({ timeZone: 'Europe/London' }, o)).formatToParts(d);
+  const p = part({ year: 'numeric', month: 'numeric', day: 'numeric' }, now), get = (t) => +p.find(x => x.type === t).value;
+  const y = get('year'), m = get('month'), dd = get('day'), noon = Date.UTC(y, m - 1, dd, 12);
+  const hLon = +part({ hour: 'numeric', hourCycle: 'h23' }, new Date(noon)).find(x => x.type === 'hour').value;
+  return Date.UTC(y, m - 1, dd) - (hLon - 12) * 3600000;
+}
+const tideAt = (c) => S.tideLive ? tidePredict(TIDE_LIVE.tab, S.tideDay + c * 1000) : S.tide0 + S.tideAmp * Math.cos((c - S.tideHW) / TIDE_P * Math.PI * 2);
+// live: the next high or low water, passing over the small wobbles of a tide like Port Ellen's (it has double high waters)
+function tideLiveNext(c) {
+  const T = S.tideNext; if (T && T.c > c && T.from <= c && c - T.from < 600) return T;
+  const pts = []; let p0 = tideAt(c), p1 = tideAt(c + 300);
+  for (let k = 2; k <= 200; k++) { const p2 = tideAt(c + k * 300); if ((p1 - p0) * (p2 - p1) < 0) pts.push([c + (k - 1) * 300, p1, p1 > p0]); p0 = p1; p1 = p2; }
+  for (let i = 0; i + 1 < pts.length;) if (Math.abs(pts[i + 1][1] - pts[i][1]) < 0.06) pts.splice(i, 2); else i++;
+  const n = pts[0] || [c + 6 * 3600, p1, true];
+  return (S.tideNext = { from: c, c: n[0], h: n[1], hw: n[2] });
+}
 const hhmm = (c) => { c = ((c % 86400) + 86400) % 86400; return String(Math.floor(c / 3600)).padStart(2, '0') + ':' + String(Math.floor(c / 60) % 60).padStart(2, '0'); };
 function tideUI() {
-  const c = S.clock0 + S.t, rising = Math.sin((c - S.tideHW) / TIDE_P * Math.PI * 2) < 0;
+  const c = S.clock0 + S.t;
+  if (S.tideLive) {
+    const n = tideLiveNext(c), rising = tideAt(c + 300) > S.tide;
+    setT($('nTide'), (S.tide >= 0 ? '+' : '') + S.tide.toFixed(1) + (rising ? ' ↑' : ' ↓'));
+    setT($('nTideL'), n.hw ? 'Next HW' : 'Next LW'); setT($('nTideT'), hhmm(n.c));
+    return;
+  }
+  const rising = Math.sin((c - S.tideHW) / TIDE_P * Math.PI * 2) < 0;
   let hw = S.tideHW; while (hw <= c) hw += TIDE_P; while (hw - TIDE_P > c) hw -= TIDE_P;
   const lw = hw - TIDE_P / 2 > c ? hw - TIDE_P / 2 : hw + TIDE_P / 2, nextHW = hw < lw;
   setT($('nTide'), (S.tide >= 0 ? '+' : '') + S.tide.toFixed(1) + (rising ? ' ↑' : ' ↓'));
@@ -4216,6 +4268,13 @@ $('bMore').onclick = () => { toolsMore($('toolsMore').hidden); tideSync(); };
 // the tide, from Settings: where in the cycle (it runs on from there unless held) and how big, neaps to springs
 function tideSync() {
   if (!S) return;
+  for (const id of ['tdPhase', 'tdAmp', 'tdHold']) $(id).disabled = !!S.tideLive;
+  if (S.tideLive) {
+    const c = S.clock0 + S.t, n = tideLiveNext(c);
+    setT($('tdNow'), `live · ${S.tide >= 0 ? '+' : ''}${S.tide.toFixed(2)} m ${tideAt(c + 300) > S.tide ? '↑' : '↓'} · ${n.hw ? 'HW' : 'LW'} ${hhmm(n.c)}`);
+    setT($('tdRange'), `${TIDE_LIVE.name} gauge, ${TIDE_LIVE.km} km`);
+    return;
+  }
   const ph = ((((S.clock0 + S.t - S.tideHW) / TIDE_P) % 1 + 1.5) % 1 - 0.5) * TIDE_P / 3600, A = TIDE_AMP, f = (S.tideAmp - A.neaps) / (A.springs - A.neaps);
   if (document.activeElement !== $('tdPhase') && S.tideGoal === undefined) $('tdPhase').value = ph.toFixed(1);
   if (document.activeElement !== $('tdAmp')) $('tdAmp').value = f.toFixed(2);
@@ -6422,7 +6481,9 @@ if (!GIGHA) {
   document.querySelectorAll('.ferryOpt').forEach(f => { f.style.display = 'none'; });
   setT($('menuEyebrow'), 'Loch Sween · Knapdale'); setT($('menuTitle'), MENU_TXT.rib[0]); setT($('menuBlurb'), MENU_TXT.rib[1]);
   setT($('ribWhere'), 'A 5 m RIB with a Suzuki 100 hp outboard, on a mooring off Achnamara. Boat-handling practice at high and low speed.');
+  setT($('tideLiveNote'), "Today's tide at the game's clock, from the Port Ellen tide gauge on Islay, 58 km away: there is no gauge in Loch Sween, and its own tide will be larger and at other times.");
 }
+document.querySelector('#menu .fine').append(' Live tide: TICON-3 tidal constants for the Port Ellen gauge (Hart-Davis, Dettmering and Seitz, 2022; CC BY 4.0).');
 if (HD) { document.querySelector('#menu .fine').append(' HD ground textures: Poly Haven (CC0).'); texSetLabel(); }
 // the HD page and the standard one link to each other where both are published
 if (/github\.io$/.test(location.hostname) || location.protocol === 'file:') {
