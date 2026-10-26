@@ -190,6 +190,10 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
+.texslots{display:grid;gap:8px;margin:10px 0 12px}
+.texslot{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;font-size:15px}
+.texslot canvas{width:56px;height:56px;border-radius:4px;background:#1b2a31}
+.texslot small{display:block;color:var(--dim);font-size:13px}
 .hdlink{align-self:center;margin-left:auto;color:var(--cyan);font-size:14px;text-decoration:underline;text-underline-offset:3px}
 #report{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:4;max-width:min(420px,calc(100% - 32px))}
 #report table{width:100%;border-collapse:collapse;font-size:15px;margin:6px 0 12px}
@@ -380,11 +384,20 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
             <label><input type="radio" name="wx" value="fresh"><span>Fresh westerly<small>26 kn gusting, a lumpy sea on the beam.</small></span></label>
           </fieldset>
         </div>
-        <div class="row"><button id="bGo" class="go">Start</button><button id="bHelp2">How she handles</button><a id="hdLink" class="hdlink" hidden></a></div>
+        <div class="row"><button id="bGo" class="go">Start</button><button id="bHelp2">How she handles</button><button id="bTex" hidden>Ground textures</button><a id="hdLink" class="hdlink" hidden></a></div>
         <p class="fine" style="margin-top:12px">Loch Sween: shore, roads, woods and tidal flats traced from OpenStreetMap (© OpenStreetMap contributors, ODbL), GSHHG beyond; land heights from Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA). Press V in game for the first-person wheelhouse. Coastline in the Sound traced from OpenStreetMap (© OpenStreetMap contributors, ODbL); beyond it, the GSHHG shoreline (Wessel &amp; Smith, LGPL). An unofficial fan simulator, not affiliated with or endorsed by Caledonian MacBrayne. The coastline is stylised and the handling figures are estimates, so treat it as a game rather than a training aid.</p>
       </div>
     </div>
 
+    <div id="texDlg" class="overlay" hidden>
+      <div class="card">
+        <p class="eyebrow">HD ground</p>
+        <h2>Your own ground textures</h2>
+        <p class="fine">For each kind of ground, pick a photo taken looking straight down from about head height, a metre or two across. It is cropped square, made to tile without seams and used for its light and shade: the land keeps its colours from the map. Your pictures stay on this device.</p>
+        <div id="texSlots" class="texslots"></div>
+        <div class="row"><button id="texDone" class="go">Done</button><button id="texReset">Back to Poly Haven's</button></div>
+      </div>
+    </div>
     <div id="help" class="overlay help" hidden>
       <div class="card">
         <p class="eyebrow">Wheelhouse notes</p>
@@ -1178,6 +1191,18 @@ function buildBayTint(R, N) {
   const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
 }
 const DETAIL = { ard: buildGroundDetail(DETAIL_R.ard, GIGHA ? 1024 : 1536, GIGHA ? 2048 : 1536), tay: buildGroundDetail(DETAIL_R.tay, GIGHA ? 1536 : 640, GIGHA ? 1152 : 560), bayA: buildBayTint(DETAIL_R.ard, 384), bayT: buildBayTint(DETAIL_R.tay, 256) };
+// Random values for the value noise in the ground, water and wake shaders, read from a texture rather than hashed in the
+// shader. A hash gives the same grid point to the four cells around it only if every cell does the arithmetic identically;
+// a graphics driver that rearranges it (Edge on Windows does) breaks the noise into blocks with seams. A texel is a texel.
+const NOISE_TEX = (() => {
+  const N = 256, rnd = mulberry(4242), d = new Uint8Array(N * N * 4);
+  for (let i = 0; i < d.length; i++) d[i] = Math.floor(rnd() * 256);
+  const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true;
+  return t;
+})();
+// value noise with smoothed corners: the hardware's bilinear filter does the blend between the four texels
+const NOISE_GLSL = `uniform sampler2D uNoise;
+      float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f); return texture2D(uNoise, (i + f + 0.5) / 256.0).r; }`;
 // HD ground texture, made here rather than downloaded: four tileable greyscale detail maps in one RGBA image, each about
 // mid-grey on average so it adds texture without shifting the colours: R pasture (fine speckle over tussocks), G heather
 // and bracken (clumps with dark gaps), B rock (cracked slabs, mottled), A sand (grain and ripples)
@@ -1230,10 +1255,70 @@ function loadGroundPhotos() {
   const dir = window.LR_HD ? 'tex/' : 'hd/tex/', L = new THREE.TextureLoader(); let n = 0;
   PHOTO.forEach(([name], i) => L.load(dir + name + '.jpg', (t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    TERRAIN_U['uGP' + i].value = t; if (++n === PHOTO.length) TERRAIN_U.uPhoto.value = 1;
+    GROUND.ph[i] = t; if (!GROUND.own[i]) TERRAIN_U['uGP' + i].value = t;
+    if (++n === PHOTO.length) groundReady();
   }, undefined, () => { /* stay with the made textures */ }));
 }
-const TERRAIN_U = { uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay }, uGround: { value: HD ? groundTex() : null }, uPhoto: { value: 0 },
+// ---- your own ground textures (HD): a photo per kind of ground, kept in this browser's storage (IndexedDB, beside the
+// PA recording). Each is cropped square, made seamless by cross-fading it with a copy shifted half a tile, and its
+// average colour measured so the shader can use it for detail only.
+const GROUND = { ph: [], own: [], mean: PHOTO.map(([, m]) => m.slice()) };
+const GROUND_LABEL = ['Pasture', 'Rough grazing and heather', 'Rock', 'Beach sand', 'Weed and stones at the tide line'];
+function groundReady() { if (PHOTO.every((_, i) => TERRAIN_U['uGP' + i].value)) TERRAIN_U.uPhoto.value = 1; }
+function groundApply(i, canvas) {
+  const t = new THREE.CanvasTexture(canvas); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const s = document.createElement('canvas'); s.width = s.height = 16; s.getContext('2d').drawImage(canvas, 0, 0, 16, 16);
+  const d = s.getContext('2d').getImageData(0, 0, 16, 16).data, m = [0, 0, 0];
+  for (let k = 0; k < d.length; k += 4) for (let c = 0; c < 3; c++) m[c] += d[k + c] / 255 / 256;
+  GROUND.own[i] = t; TERRAIN_U['uGP' + i].value = t; TERRAIN_U.uGPM.value[i].set(Math.max(0.02, m[0]), Math.max(0.02, m[1]), Math.max(0.02, m[2]));
+  groundReady(); texSlotDraw(i);
+}
+function groundSeamless(img) {
+  const N = 512, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+  const side = Math.min(img.width, img.height); g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, N, N);
+  const a = g.getImageData(0, 0, N, N), o = new ImageData(N, N), A = a.data, O = o.data, H = N / 2;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // weight of the shifted copy: none in the middle, all of it at the edges, where the shifted copy runs on unbroken
+    const ex = Math.abs(x + 0.5 - H) / H, ey = Math.abs(y + 0.5 - H) / H, w = smooth(0.55, 1, Math.max(ex, ey));
+    const k = (y * N + x) * 4, k2 = (((y + H) % N) * N + (x + H) % N) * 4;
+    for (let c2 = 0; c2 < 3; c2++) O[k + c2] = A[k + c2] * (1 - w) + A[k2 + c2] * w;
+    O[k + 3] = 255;
+  }
+  g.putImageData(o, 0, 0); return c;
+}
+function texSlotDraw(i) {
+  const cv = document.querySelector(`#texSlots canvas[data-i="${i}"]`); if (!cv) return;
+  const g = cv.getContext('2d'), t = GROUND.own[i] || GROUND.ph[i], im = t && t.image;
+  g.clearRect(0, 0, cv.width, cv.height); if (im) try { g.drawImage(im, 0, 0, cv.width, cv.height); } catch (e) { /* not drawable yet */ }
+  const tag = document.querySelector(`#texSlots small[data-i="${i}"]`); if (tag) tag.textContent = GROUND.own[i] ? 'Your picture' : GROUND.ph[i] ? "Poly Haven's" : 'Made in the game';
+}
+function texSetLabel() { setT($('bTex'), GROUND.own.some(Boolean) ? 'Ground textures: yours' : 'Ground textures'); }
+if (HD) {
+  $('bTex').hidden = false;
+  $('texSlots').innerHTML = PHOTO.map(([name], i) => `<div class="texslot"><canvas width="56" height="56" data-i="${i}"></canvas><span>${GROUND_LABEL[i]}<small data-i="${i}"></small></span><span><input type="file" accept="image/*" data-i="${i}" hidden><button type="button" data-pick="${i}">Choose…</button></span></div>`).join('');
+  document.querySelectorAll('#texSlots button[data-pick]').forEach(b => b.onclick = () => document.querySelector(`#texSlots input[data-i="${b.dataset.pick}"]`).click());
+  document.querySelectorAll('#texSlots input[type=file]').forEach(inp => inp.onchange = async () => {
+    const f = inp.files && inp.files[0], i = +inp.dataset.i; if (!f) return;
+    try {
+      const img = await createImageBitmap(f), c = groundSeamless(img);
+      groundApply(i, c); texSetLabel();
+      c.toBlob(b => { if (b) paStore('readwrite', st => st.put(b, 'ground:' + PHOTO[i][0])); }, 'image/jpeg', 0.88);
+    } catch (e) { toast('Could not read that picture', 'warn'); }
+    inp.value = '';
+  });
+  $('bTex').onclick = () => { PHOTO.forEach((_, i) => texSlotDraw(i)); $('texDlg').hidden = false; };
+  $('texDone').onclick = () => { $('texDlg').hidden = true; };
+  $('texReset').onclick = () => {
+    PHOTO.forEach(([name, m], i) => { GROUND.own[i] = null; TERRAIN_U['uGP' + i].value = GROUND.ph[i] || null; TERRAIN_U.uGPM.value[i].set(...m); texSlotDraw(i); paStore('readwrite', st => st.delete('ground:' + name)); });
+    if (!PHOTO.every((_, i) => TERRAIN_U['uGP' + i].value)) TERRAIN_U.uPhoto.value = 0;
+    texSetLabel();
+  };
+  // your saved ones, back from storage
+  PHOTO.forEach(([name], i) => paStore('readonly', st => { const q = st.get('ground:' + name); q.onsuccess = async () => {
+    if (!q.result) return; try { const img = await createImageBitmap(q.result), c = document.createElement('canvas'); c.width = c.height = 512; c.getContext('2d').drawImage(img, 0, 0, 512, 512); groundApply(i, c); texSetLabel(); } catch (e) { /* unreadable: ignore */ }
+  }; }));
+}
+const TERRAIN_U = { uNoise: { value: NOISE_TEX }, uTide: { value: 0 }, uDetA: { value: DETAIL.ard }, uDetT: { value: DETAIL.tay }, uGround: { value: HD ? groundTex() : null }, uPhoto: { value: 0 },
   uGP0: { value: null }, uGP1: { value: null }, uGP2: { value: null }, uGP3: { value: null }, uGP4: { value: null }, uGPM: { value: PHOTO.map(([, m]) => new THREE.Vector3(...m)) },
   uDetAR: { value: new THREE.Vector4(...DETAIL_R.ard) }, uDetTR: { value: new THREE.Vector4(...DETAIL_R.tay) } };
 const TERRAIN_MAT = (() => {
@@ -1252,14 +1337,14 @@ const TERRAIN_MAT = (() => {
         return mix(vec3(dot(x, L) / dot(m, L)), x / m, 0.35);   // mostly light and shade, a little of the photo's own colour
       }
       vec4 detailAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.05, e); }
-      float th12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-      float tnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
-        return mix(mix(th12(i), th12(i + vec2(1.0, 0.0)), f.x), mix(th12(i + vec2(0.0, 1.0)), th12(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+      ` + NOISE_GLSL + `
+      float tnoise(vec2 p){ return vnoise(p); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       {
         float dist = length(vWP - cameraPosition);
         vec2 p = vWP.xz;
-        float n1 = tnoise(p * 0.045), n2 = tnoise(p * 0.19 + 7.3), n3 = tnoise(p * 0.83 + 3.1);
+        // the finer two turned off the north-south grid, so value noise's square cells do not line up into a lattice
+        float n1 = tnoise(p * 0.045), n2 = tnoise(mat2(0.8, -0.6, 0.6, 0.8) * p * 0.19 + 7.3), n3 = tnoise(mat2(0.6, 0.8, -0.8, 0.6) * p * 0.83 + 3.1);
         float near = 1.0 - smoothstep(60.0, 320.0, dist), mid = 1.0 - smoothstep(400.0, 2600.0, dist);
         vec3 fn = normalize(cross(dFdx(vWP), dFdy(vWP)));
         float slope = 1.0 - abs(fn.y), h = vWP.y - uTide, base = dot(diffuseColor.rgb, vec3(0.333));
@@ -1457,7 +1542,7 @@ function waterMaterial(amp) {
       uDeep: { value: new THREE.Color(0x122f38) }, uShallow: { value: new THREE.Color(0x2c615f) }, uSkyTop: { value: SKY_TOP },
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
-      uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, ...WATER_U,
+      uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, ...WATER_U, uNoise: { value: NOISE_TEX },
       uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 }, uSpec: { value: WATER_SPEC },
       uRefl: REFL_U.tex, uReflMat: REFL_U.mat, uReflOn: REFL_U.on, uWaterY: REFL_U.y, uFoamPh: WATER_FOAM,
     },
@@ -1486,9 +1571,8 @@ function waterMaterial(amp) {
         return g;
       }
       // random fine chop for the glitter: value-noise slopes at two scales, drifting with the wind
-      float wh12(vec2 p){ p = mod(p, 256.0); vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-      float wn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
-        return mix(mix(wh12(i), wh12(i + vec2(1.0, 0.0)), f.x), mix(wh12(i + vec2(0.0, 1.0)), wh12(i + vec2(1.0, 1.0)), f.x), f.y); }
+      ` + NOISE_GLSL + `
+      float wn(vec2 p){ return vnoise(p); }   // repeats every 256 cells, as the offsets from uOrg assume
       vec2 chop(vec2 l, float fp){
         vec2 g = vec2(0.0); const float e = 0.2;
         vec2 q = l * 0.55 + uChopQ; float a = wn(q);
@@ -1588,20 +1672,19 @@ const waterFar = (() => {
 scene.add(waterNear, waterFar);
 // HD reflections: each frame the scene is drawn once more from a camera mirrored in the water plane, at reduced size, into a
 // texture the water samples. An oblique near plane cuts off anything below the surface (Lengyel's method, as three.js's
-// Reflector does). Phones draw it smaller and every other frame.
+// Reflector does). Phones draw it smaller; every frame, since a reflection a frame late jumps about at speed.
 const REFL = !HD ? null : (() => {
   const rt = new THREE.WebGLRenderTarget(16, 16, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, generateMipmaps: false });
   REFL_U.tex.value = rt.texture;
   return { rt, cam: new THREE.PerspectiveCamera(), rot: new THREE.Matrix4(), cp: new THREE.Vector3(), pp: new THREE.Vector3(), look: new THREE.Vector3(), view: new THREE.Vector3(), tgt: new THREE.Vector3(),
-    n: new THREE.Vector3(0, 1, 0), org: new THREE.Matrix4(), plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), size: new THREE.Vector2(), frame: 0 };
+    n: new THREE.Vector3(0, 1, 0), org: new THREE.Matrix4(), plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), size: new THREE.Vector2() };
 })();
 function hdReflect() {
   if (!REFL) return;
   if (!sun.castShadow) { REFL_U.on.value = 0; return; }   // Detail: low turns them off
   const R = REFL, phone = Math.min(innerWidth, innerHeight) < 700;
-  if (phone && (R.frame++ & 1) && REFL_U.on.value) return;   // phones: every other frame
   renderer.getDrawingBufferSize(R.size);
-  const k = phone ? 0.35 : 0.5, w = Math.max(16, Math.round(R.size.x * k)), h = Math.max(16, Math.round(R.size.y * k));
+  const k = phone ? 0.28 : 0.5, w = Math.max(16, Math.round(R.size.x * k)), h = Math.max(16, Math.round(R.size.y * k));
   if (R.rt.width !== w || R.rt.height !== h) R.rt.setSize(w, h);
   camera.updateMatrixWorld(); R.cp.setFromMatrixPosition(camera.matrixWorld);
   const y0 = S.tide; R.pp.set(R.cp.x, y0, R.cp.z);
@@ -2263,12 +2346,12 @@ function makeWake() {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aw', new THREE.BufferAttribute(aw, 3));
   const idx = new Uint16Array((WAKE_N - 1) * 6); g.setIndex(new THREE.BufferAttribute(idx, 1));
   const mat = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog]),
+    uniforms: Object.assign(THREE.UniformsUtils.merge([THREE.UniformsLib.fog]), { uNoise: { value: NOISE_TEX } }),
     vertexShader: 'attribute vec3 aw; varying vec3 vAw;\n#include <fog_pars_vertex>\nvoid main(){ vAw = aw; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;\n#include <fog_vertex>\n}',
     fragmentShader: `varying vec3 vAw;
       #include <fog_pars_fragment>
-      float wh(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-      float wnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1.0, 0.0)), f.x), mix(wh(i + vec2(0.0, 1.0)), wh(i + vec2(1.0, 1.0)), f.x), f.y); }
+      ` + NOISE_GLSL + `
+      float wnz(vec2 p){ return vnoise(p); }
       void main(){
         // x: across the wake (-1..1), y: metres along the track, z: strength now. Fresh wash is nearly solid white,
         // brightest in the two lines rolling off the chines; as it weakens it breaks up into lace and patches.
@@ -4683,7 +4766,7 @@ const RIB_PTS = [[2.45, 0, 0.15], [1.8, 0.75, 0.2], [1.8, -0.75, 0.2], [0.6, 1.0
 const RB = { x: 0, y: 0, psi: 0, u: 0, v: 0, r: 0, rpm: 0, lever: 0, wheel: 0, trim: 0, eng: 'off', crank: 0, kill: true, vent: 0, T: 0, gear: 0, plane: 0,
   fast: false, pose: null, detent: 0, heave: 0, pitch: 0, roll: 0, prop: 0, contactT: -99, groundT: -99, gearWarned: 0, foamAcc: 0, sprayAcc: 0,
   drill: { id: 'free', stage: 0 }, cas: null,
-  hz: 0, hw: 0, th: 0, q: 0, eta: [null, null], airT: [0, 0], air: 0, gz: 1, gPeak: 1, slamT: -99, slamN: 0, slamV: 0, flyT: 0, warnT: -99 };
+  hz: 0, hw: 0, th: 0, q: 0, eta: [null, null], airT: [0, 0], air: 0, gz: 1, gPeak: 1, slamT: -99, slamN: 0, slamV: 0, flyT: 0, warnT: -99, hzv: 0, thv: 0 };
 const RIB = {};
 // Wind chop for the RIB's motion, on top of the swell in the wave field. Fetch-limited (JONSWAP) height and period from the
 // forecast wind: a fresh breeze over the Sound's few miles of water gives about 0.7 m at 3 s, the sheltered loch about half.
@@ -5249,7 +5332,7 @@ function ribNewGame(wx) {
   S.ai = GIGHA; AP.readyAt = null; AP.going = false; AP.hornT = -99; S.ferryHorn = false;
   if (!GIGHA) { SHIP.root.visible = false; S.curDir = S.curDir < 100 ? 30 : 210; }   // no ferry here; what stream there is runs along the loch
   const b = ribStart();
-  S.chop = null; Object.assign(RB, { hz: 0, hw: 0, th: 0, q: 0, eta: [null, null], airT: [0, 0], air: 0, gz: 1, gPeak: 1, flyT: 0, slamV: 0 });
+  S.chop = null; Object.assign(RB, { hz: 0, hw: 0, th: 0, q: 0, hzv: 0, thv: 0, eta: [null, null], airT: [0, 0], air: 0, gz: 1, gPeak: 1, flyT: 0, slamV: 0 });
   Object.assign(RB, { x: b.x, y: b.y, psi: b.psi, u: 0, v: 0, r: 0, rpm: 0, lever: 0, wheel: 0, trim: 0, eng: 'off', kill: true, vent: 0, fast: true, fastAt: GIGHA ? 'pontoon' : 'mooring', pose: { x: b.x, y: b.y, psi: b.psi }, gear: 0, contactMax: 0, cas: null });
   RIB_BOXES = ribBoxes();
   RIB.root.visible = true; RIB.ghost.visible = false; RIB.marker.visible = false;
@@ -5300,8 +5383,12 @@ function updateRibVisuals(dt) {
   if (p > 0.8 && R.trim > 9) { pitch += DEG * (R.trim - 9) * 0.5 * Math.sin(t * 11); if (!R.porp || t - R.porp > 15) { R.porp = t; msg('Porpoising: trim in a little'); } }
   const lat = R.u * R.r, roll = Math.atan((hs - hpp) / 1.8) * (1 - 0.5 * p) - clamp(lat / 9.81 * (0.38 * p - 0.1 * (1 - p)), -0.32, 0.32);
   R.pitch += (pitch - R.pitch) * a; R.roll += (roll - R.roll) * a;
-  RIB.root.position.set(R.x, S.tide + R.hz + 0.08 * p - 0.06, -R.y); RIB.root.rotation.y = -R.psi;
-  RIB.body.rotation.set(R.pitch + clamp(R.th, -0.5, 0.5), 0, R.roll);
+  // what you see of the seaway: her buzz over the wind chop, met six or seven times a second at speed, is felt through the
+  // feet rather than seen, so the picture follows heave and pitch through a light filter (about 1.5 Hz). The swell, slams
+  // and landings still come through; the physics underneath is unchanged.
+  const fa = Math.min(1, dt * 9); R.hzv += (R.hz - R.hzv) * fa; R.thv += (R.th - R.thv) * fa;
+  RIB.root.position.set(R.x, S.tide + R.hzv + 0.08 * p - 0.06, -R.y); RIB.root.rotation.y = -R.psi;
+  RIB.body.rotation.set(R.pitch + clamp(R.thv, -0.5, 0.5), 0, R.roll);
   RIB.steer.rotation.y = R.wheel * 32 * DEG;   // wheel to starboard swings the prop to starboard, pushing the stern to port
   RIB.trim.rotation.x = -R.trim * DEG; RIB.prop.rotation.z = R.prop;
   RIB.wheel.rotation.z = -R.wheel * 2.6; RIB.lever.rotation.x = -R.lever * 0.8;
@@ -5683,7 +5770,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, GROUND, RIB, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
