@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Loch Ranza Ferry HD</title>
+<title>Marine Traffic Sim HD</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -50,7 +50,7 @@ output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .hud button,.hud canvas{pointer-events:auto}
 #hudL{left:0;padding-left:max(16px,env(safe-area-inset-left,0px));max-width:calc(100% - 32px)}
 #hudR{right:0;padding-right:max(16px,env(safe-area-inset-right,0px));align-items:flex-end}
-.brand{display:flex;align-items:baseline;gap:10px;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.brand{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .brand b{font-size:22px;font-weight:700;letter-spacing:.18em}
 .brand span{font-size:13px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase;font-weight:600}
 .navgrid{display:grid;grid-template-columns:repeat(6,auto);background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:4px;width:max-content;max-width:100%}
@@ -60,6 +60,8 @@ output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .tools{display:flex;flex-wrap:wrap;gap:6px}
 .tools button{background:var(--glass)}
 .tools button.on{background:var(--amber);color:var(--amber-ink)}
+.tmore{pointer-events:auto;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:100%;box-sizing:border-box;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:6px}
+.tmore[hidden]{display:none}
 .chart{position:relative;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:4px}
 #map{display:block;width:230px;height:230px;border-radius:3px}
 #bMapZoom{position:absolute;right:8px;bottom:8px;font-size:11px;padding:3px 6px}
@@ -147,6 +149,7 @@ output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 /* ---------- overlays ---------- */
 .overlay{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(6,12,15,.72);padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow-y:auto}
 .card{background:var(--panel);border:1px solid var(--line-hi);border-radius:8px;padding:22px 24px;max-width:640px;width:100%;box-sizing:border-box;margin:auto}
+.sitename{margin:0 0 6px;font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:var(--dim);font-weight:600}
 .eyebrow{margin:0;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);font-weight:600}
 .card h1{margin:4px 0 8px;font-size:52px;line-height:.95;font-weight:700;letter-spacing:.04em;text-transform:uppercase;text-wrap:balance}
 .card h2{margin:0 0 8px;font-size:28px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
@@ -280,7 +283,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
     <canvas id="gl" aria-label="3D view of the Sound of Gigha"></canvas>
 
     <div class="hud" id="hudL">
-      <div class="brand"><b>Loch Ranza</b><span id="routeTag">Tayinloan → Gigha</span></div>
+      <div class="brand"><b>Marine Traffic Sim</b><span id="routeTag">Tayinloan → Gigha</span></div>
       <div class="navgrid">
         <div class="nv"><span>Hdg</span><b id="nHdg">---</b></div>
         <div class="nv"><span>SOG kn</span><b id="nSog">0.0</b></div>
@@ -300,15 +303,22 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <button id="bCam" title="Cycle camera (V)">View: chase</button>
         <button id="bSound" title="Mute (M)">Sound on</button>
         <button id="bPA" title="Play the passenger announcement (P)">Announcement</button>
-        <button id="bPALoad" title="Announcement source: the recording published with the game, the built-in spoken one, or your own file (kept on this device)">PA: built-in</button>
-        <input type="file" id="paFile" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.mov,.mp4" hidden>
-        <button id="bHelp">Help</button>
-        <button id="bQuiz" title="What am I looking at? A quiz on vessels' lights and shapes">Lights quiz</button>
         <button id="bConsole">Show console</button>
-        <button id="bSimple" title="Switch between full procedure and simple controls">Controls: full</button>
-        <button id="bGfx" title="Shadows, clouds and wildlife">Detail: high</button>
-        <button id="bTouch" title="On-screen joystick and steering">Touch controls: off</button>
-        <button id="bNew" title="Back to the start screen to pick the ferry or the RIB">New game</button>
+        <button id="bMore" aria-expanded="false" aria-controls="toolsMore">Settings ▾</button>
+      </div>
+      <div id="toolsMore" class="tmore" hidden>
+        <div class="tools">
+          <button id="bSimple" title="Switch between full procedure and simple controls">Controls: full</button>
+          <button id="bGfx" title="Shadows, clouds and wildlife">Detail: high</button>
+          <button id="bTouch" title="On-screen joystick and steering">Touch controls: off</button>
+          <button id="bPALoad" title="Announcement source: the recording published with the game, the built-in spoken one, or your own file (kept on this device)">PA: built-in</button>
+          <input type="file" id="paFile" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.mov,.mp4" hidden>
+        </div>
+        <div class="tools">
+          <button id="bHelp">Help</button>
+          <button id="bQuiz" title="What am I looking at? A quiz on vessels' lights and shapes">Lights quiz</button>
+          <button id="bNew" title="Back to the start screen to pick the ferry or the RIB">New game</button>
+        </div>
       </div>
     </div>
 
@@ -358,6 +368,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
 
     <div id="menu" class="overlay">
       <div class="card">
+        <p class="sitename">Marine Traffic Sim</p>
         <p class="eyebrow" id="menuEyebrow">Sound of Gigha · Kintyre</p>
         <h1 id="menuTitle">MV Loch Ranza</h1>
         <p id="menuBlurb">Thirty metres, two Voith Schneider units and no rudder. Either end can lead. Work her across from Tayinloan to Ardminish on Gigha, land her on the slip, put the ramp down and work the cars.</p>
@@ -449,19 +460,19 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
           <kbd>H</kbd><span>Horn (hold)</span>
           <kbd>C</kbd><span>Change direction: the other end leads, and in the wheelhouse you walk to its station</span>
           <kbd>V · T · M</kbd><span>Camera · time compression · mute</span>
-          <kbd>P</kbd><span>Passenger announcement (also plays by itself after leaving each slip). The PA button picks the source: a recording published with the game (if there is one), a built-in spoken one, or your own file, which stays on your device</span>
+          <kbd>P</kbd><span>Passenger announcement (also plays by itself after leaving each slip). The PA button, under Settings, picks the source: a recording published with the game (if there is one), a built-in spoken one, or your own file, which stays on your device</span>
           <kbd>Touch</kbd><span>Left pad: drag up for ahead, down for astern, sideways to crab; speed stays where you leave it and sideways recentres. Right bar: drag to steer, it recentres when you let go. Both work at once. Pinch the view with two fingers to zoom; View changes camera.</span>
           <kbd>Mouse</kbd><span>Drag to orbit the camera, scroll to zoom (in chase view it closes in on the ship, then narrows the lens), double-click to reset</span>
         </div>
         <p class="fine">Map data © OpenStreetMap contributors (ODbL). Outer coastline: GSHHG (Wessel &amp; Smith, LGPL). Depths are modelled, not charted.</p>
         <h3>Simple controls</h3>
-        <p>Pick Simple on the start screen, or switch with the Controls button at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
+        <p>Pick Simple on the start screen, or switch with Controls, under Settings, at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
         <h3>The RIB: Gala Viking V500 with a Suzuki 100</h3>
         <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen, which remembers your last choices.</p>
         <p>In a sea she pitches and slams: driving hard into a short chop costs speed and can launch her, so trim in and ease off, or take the waves at an angle. In the Sound of Gigha the ferry keeps crossing while you practise; she will not alter course for you, and if you are close under her bow she slows and gives five short blasts. At dusk and night she shows a white masthead light, red and green sidelights and a stern light; read which way she is heading from them. After a drill, Show track on the report opens the chart with your track coloured by speed and plays it back.</p>
         <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
         <h3>Other traffic</h3>
-        <p>A yacht sails her way up and down, beating when the wind is ahead, and a fishing boat works her gear: a trawler towing in the Sound of Gigha, a creel boat hauling her strings in Loch Sween. Under sail or fishing they have right of way over the ferry and the RIB (Rule 18), so keep clear early and pass astern of them. They hold their course and speed, and act only at the last moment if you leave it too late, which costs points. Never cross close astern of the trawler: her warps run back a couple of hundred metres to the net. The creel boat counts as fishing only while she is hauling; running between strings she is an ordinary power-driven vessel and the crossing rules apply. By night they show their proper lights, and the chart shows them as targets with their heading. <b>Lights quiz</b> (on the start screen and in the tools) tests you on the lights and day shapes of these and other vessels.</p>
+        <p>A yacht sails her way up and down, beating when the wind is ahead, and a fishing boat works her gear: a trawler towing in the Sound of Gigha, a creel boat hauling her strings in Loch Sween. Under sail or fishing they have right of way over the ferry and the RIB (Rule 18), so keep clear early and pass astern of them. They hold their course and speed, and act only at the last moment if you leave it too late, which costs points. Never cross close astern of the trawler: her warps run back a couple of hundred metres to the net. The creel boat counts as fishing only while she is hauling; running between strings she is an ordinary power-driven vessel and the crossing rules apply. By night they show their proper lights, and the chart shows them as targets with their heading. <b>Lights quiz</b> (on the start screen and under Settings) tests you on the lights and day shapes of these and other vessels.</p>
         <h3>The chart</h3>
         <p>Tap or click the corner chart to open it full size. Drag to move it, pinch or scroll to zoom, or use + and −; zoomed in, it shows the roads and the boats on their moorings. Follow boat keeps you in the middle again, and Close or Escape puts it away. Harbour and Route on the corner chart switch between close in and the whole passage.</p>
         <h3>Loch Sween</h3>
@@ -3967,6 +3978,7 @@ const CONTROL_KEYS = new Set(['KeyR', 'KeyF', 'KeyX', 'KeyK', 'KeyL', 'KeyO', 'K
 window.addEventListener('keydown', (ev) => {
   if (QZ.open) { quizKey(ev); return; }
   if (ev.code === 'Escape' && MAPX.open) { mapXOpen(false); return; }
+  if (ev.code === 'Escape' && !$('toolsMore').hidden) { toolsMore(false); return; }
   if (!S || !$('menu').hidden) return;
   if (CONTROL_KEYS.has(ev.code)) { ev.preventDefault(); if (document.activeElement && document.activeElement.type === 'range') document.activeElement.blur(); }
   keys.add(ev.code);
@@ -4178,6 +4190,10 @@ MAPX.c.addEventListener('pointermove', (ev) => {
 for (const evn of ['pointerup', 'pointercancel', 'lostpointercapture']) MAPX.c.addEventListener(evn, (ev) => { MAPX.ptrs.delete(ev.pointerId); if (!MAPX.ptrs.size) MAPX.c.classList.remove('drag'); });
 $('bConsole').onclick = () => setConsole(!$('console').hidden);
 $('bConClose').onclick = () => setConsole(true);
+// Settings: the options and the occasional things, kept out of the bar
+function toolsMore(open) { $('toolsMore').hidden = !open; $('bMore').setAttribute('aria-expanded', String(open)); setT($('bMore'), open ? 'Settings ▴' : 'Settings ▾'); }
+$('bMore').onclick = () => toolsMore($('toolsMore').hidden);
+for (const id of ['bHelp', 'bQuiz']) $(id).addEventListener('click', () => toolsMore(false));
 $('bHelp').onclick = () => { $('help').hidden = false; };
 $('bHelp2').onclick = () => { $('help').hidden = false; };
 $('helpClose').onclick = () => { $('help').hidden = true; };
@@ -5131,7 +5147,7 @@ function perfGovern(raw) {
   if (PERF.level === 1) { renderer.setPixelRatio(Math.max(1, dpr * 0.75)); resize(); PERF.reflK = 0.75; }
   else if (PERF.level === 2) { renderer.setPixelRatio(1); resize(); PERF.reflK = 0.55; }
   else { if (HD) PERF.noRefl = true; else { sun.castShadow = false; } }
-  if (PERF.level === 1) toast('Detail lowered a little to keep it smooth. The Detail button puts it back.');
+  if (PERF.level === 1) toast('Detail lowered a little to keep it smooth. Detail, under Settings, puts it back.');
 }
 function setGfx(high) {
   PERF.manual = true; PERF.noRefl = false; PERF.reflK = 1;
@@ -5977,7 +5993,7 @@ function ribNewGame(wx) {
   cam.az = 0.5; cam.el = 0.28; cam.dist = 16; cam.fov = 55; setCam('chase');
   document.querySelectorAll('#hudL .nv span').forEach(sp => { if (sp.textContent === 'UKC m') sp.textContent = 'Depth m'; if (sp.textContent === 'To slip') sp.textContent = 'RPM'; });
   const mi = $('mDist').previousElementSibling; if (mi) mi.textContent = 'rpm';
-  setT($('routeTag'), 'Viking V500 · Suzuki 100'); setT($('tStop'), 'Neutral'); setT($('tDir'), 'Trim ▲'); setT($('tPA'), 'Trim ▼');
+  setT($('routeTag'), `${GIGHA ? 'Sound of Gigha' : 'Loch Sween'} · Viking V500`); setT($('tStop'), 'Neutral'); setT($('tDir'), 'Trim ▲'); setT($('tPA'), 'Trim ▼');
   log(GIGHA ? 'Alongside the Boathouse pontoon. Kill cord on, start the engine (X), let go the lines (L).' : 'On a mooring off Achnamara. Kill cord on, start the engine (X), slip the mooring (L).');
 }
 function ribHandleKeys(dt) {
@@ -6373,7 +6389,6 @@ if (!GIGHA) {
   $('optFerry').hidden = true; document.querySelector('input[name=game][value=rib]').checked = true;
   document.querySelectorAll('.ferryOpt').forEach(f => { f.style.display = 'none'; });
   setT($('menuEyebrow'), 'Loch Sween · Knapdale'); setT($('menuTitle'), MENU_TXT.rib[0]); setT($('menuBlurb'), MENU_TXT.rib[1]);
-  document.querySelector('.brand b').textContent = 'Loch Sween';
   setT($('ribWhere'), 'A 5 m RIB with a Suzuki 100 hp outboard, on a mooring off Achnamara. Boat-handling practice at high and low speed.');
 }
 if (HD) { document.querySelector('#menu .fine').append(' HD ground textures: Poly Haven (CC0).'); texSetLabel(); }
