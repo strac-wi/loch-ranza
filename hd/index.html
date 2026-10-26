@@ -1414,9 +1414,32 @@ const SHADE_WAVES = WAVES.map(w => ({ dx: w.dx, dz: w.dz, l: w.l, a: w.a * 0.35 
   [[15, 0.08, 38], [19, 0.11, -27], [23, 0.13, 55], [31, 0.15, -48], [37, 0.12, 14], [49, 0.16, -8], [12, 0.06, 71], [27, 0.1, -66]].map(([l, a, deg]) => {
     const b = Math.atan2(0.6, 0.8) + deg * Math.PI / 180; return { dx: Math.cos(b), dz: Math.sin(b), l, a };
   })).map((w, i) => Object.assign(w, { k: 2 * Math.PI / w.l, w: Math.sqrt(9.81 * 2 * Math.PI / w.l), ph: (i * 2.39996) % 6.283 }));
-const WAVE_GRAD_GLSL = 'vec2 waveGrad(vec2 p, float t, float fp){ vec2 g = vec2(0.0);\n' +
-  SHADE_WAVES.map(w => `g += ${(w.a * w.k).toFixed(4)}*cos(${w.k.toFixed(5)}*dot(p, vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})) - ${w.w.toFixed(4)}*t + ${w.ph.toFixed(3)})*vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})*(1.0 - smoothstep(0.6, 1.6, ${w.k.toFixed(5)}*fp));`).join('\n') +
+const WAVE_GRAD_GLSL = `uniform float uWPh[${SHADE_WAVES.length}];\nvec2 waveGrad(vec2 l, float fp){ vec2 g = vec2(0.0);\n` +
+  SHADE_WAVES.map((w, i) => `g += ${(w.a * w.k).toFixed(4)}*cos(${w.k.toFixed(5)}*dot(l, vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})) + uWPh[${i}])*vec2(${w.dx.toFixed(3)}, ${w.dz.toFixed(3)})*(1.0 - smoothstep(0.6, 1.6, ${w.k.toFixed(5)}*fp));`).join('\n') +
   '\nreturn g; }\n';
+// The water is shaded in coordinates relative to a point near the camera (uOrg, the near mesh's centre), never the map's:
+// kilometres out, a graphics chip working at reduced precision cannot place a pixel to the metre, its sines of large
+// angles go wrong, and the sea breaks into flat blocks. Everything that depends on where the point is, or on the time,
+// becomes a phase worked out here once a frame in double precision.
+const WATER_FOAM = { value: 0 }, TAU = Math.PI * 2, wrapA = (a, m = TAU) => ((a % m) + m) % m;
+const WATER_U = { uOrg: { value: new THREE.Vector2() }, uWPh: { value: new Float32Array(SHADE_WAVES.length) }, uRipA: { value: new THREE.Vector2() },
+  uRipC: { value: new THREE.Vector3() }, uPaw: { value: new THREE.Vector4() }, uChopQ: { value: new THREE.Vector2() }, uChopR: { value: new THREE.Vector2() },
+  uCamL: { value: new THREE.Vector3() }, uDomL: { value: new THREE.Vector4() }, uBayAR: { value: new THREE.Vector4() }, uBayTR: { value: new THREE.Vector4() } };
+function waterOrigin(ox, oz, t) {
+  const U = WATER_U; U.uOrg.value.set(ox, oz);
+  SHADE_WAVES.forEach((w, i) => { U.uWPh.value[i] = wrapA(w.k * (w.dx * ox + w.dz * oz) - w.w * t + w.ph); });
+  U.uRipA.value.set(wrapA(0.071 * oz + 0.3 * t), wrapA(0.063 * ox - 0.27 * t));
+  U.uRipC.value.set(wrapA(0.83 * (0.8 * ox + 0.6 * oz) + 2.4 * t), wrapA(1.37 * (-0.53 * ox + 0.85 * oz) + 3.1 * t), wrapA(2.21 * (0.96 * ox - 0.28 * oz) + 4.1 * t));
+  // cat's paws (three), and the surf and foam flicker
+  U.uPaw.value.set(wrapA(0.011 * ox + 0.05 * t), wrapA(0.013 * oz - 0.04 * t), wrapA(0.0071 * (ox + oz)), wrapA(1.3 * t + 0.03 * ox - 0.02 * oz));
+  U.uChopQ.value.set(wrapA(0.55 * ox + 0.33 * t, 256), wrapA(0.55 * oz + 0.21 * t, 256));   // the chop's noise repeats every 256 cells
+  U.uChopR.value.set(wrapA(1.6 * ox - 0.47 * t, 256), wrapA(1.6 * oz + 0.39 * t, 256));
+  U.uCamL.value.set(camera.position.x - ox, camera.position.y, camera.position.z - oz);
+  U.uDomL.value.set(DOM.x0 - ox, DOM.y0 + oz, DOM.x1 - DOM.x0, DOM.y1 - DOM.y0);
+  const A = DETAIL_R.ard, T = DETAIL_R.tay;
+  U.uBayAR.value.set(A[0] - ox, A[1] + oz, A[2], A[3]); U.uBayTR.value.set(T[0] - ox, T[1] + oz, T[2], T[3]);
+  WATER_FOAM.value = wrapA(2.3 * ox + 1.7 * oz + t);
+}
 function waveH(x, z, t) {
   let h = 0;
   for (const w of WAVES) h += w.a * Math.sin(w.k * (w.dx * x + w.dz * z) - w.w * t);
@@ -1434,42 +1457,43 @@ function waterMaterial(amp) {
       uDeep: { value: new THREE.Color(0x122f38) }, uShallow: { value: new THREE.Color(0x2c615f) }, uSkyTop: { value: SKY_TOP },
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
-      uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uDetAR: TERRAIN_U.uDetAR, uDetTR: TERRAIN_U.uDetTR,
+      uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, ...WATER_U,
       uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 }, uSpec: { value: WATER_SPEC },
-      uRefl: REFL_U.tex, uReflMat: REFL_U.mat, uReflOn: REFL_U.on, uWaterY: REFL_U.y,
+      uRefl: REFL_U.tex, uReflMat: REFL_U.mat, uReflOn: REFL_U.on, uWaterY: REFL_U.y, uFoamPh: WATER_FOAM,
     },
-    vertexShader: WAVE_GLSL + `varying vec3 vW; varying float vH;
+    vertexShader: WAVE_GLSL + `uniform vec2 uOrg; varying vec3 vL; varying float vH;
       void main(){ vec4 wp = modelMatrix*vec4(position,1.0);
         float d = distance(wp.xz, cameraPosition.xz);
         float wh = waveH(wp.xz)*(1.0 - smoothstep(350.0, 760.0, d));
         wp.y += wh; vH = wh / max(uAmp, 0.01);
-        vW = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`,
+        vL = vec3(wp.x - uOrg.x, wp.y, wp.z - uOrg.y); gl_Position = projectionMatrix*viewMatrix*wp; }`,
     fragmentShader: `uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSkyTop; uniform vec3 uFog; uniform vec3 uSun;
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
-      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uDetAR; uniform vec4 uDetTR; uniform vec4 uHullDim; uniform float uKelLen; uniform float uKel; uniform vec3 uSpec;
-      uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn; uniform float uWaterY;
+      uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uBayAR; uniform vec4 uBayTR; uniform vec4 uHullDim;
+      uniform vec2 uRipA; uniform vec3 uRipC; uniform vec4 uPaw; uniform vec2 uChopQ; uniform vec2 uChopR; uniform vec3 uCamL; uniform vec4 uDomL; uniform float uKelLen; uniform float uKel; uniform vec3 uSpec;
+      uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn; uniform float uWaterY; uniform float uFoamPh;
       vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
-      varying vec3 vW; varying float vH;
+      varying vec3 vL; varying float vH;
       ` + WAVE_GRAD_GLSL + `
       // cat's-paw ripples: a few short wind waves summed analytically for the normal only, each faded
       // before it gets finer than the pixel so they never alias into stripes
-      vec2 ripple(vec2 p, float t, float fp){
+      vec2 ripple(vec2 l, float fp){
         vec2 g = vec2(0.0);
-        vec2 q = p + vec2(sin(p.y*0.071 + t*0.3), cos(p.x*0.063 - t*0.27))*6.0;
-        g += vec2(0.80, 0.60)*cos(dot(vec2(0.80, 0.60), q)*0.83 + t*2.4)*(1.0 - smoothstep(0.4, 1.2, 0.83*fp));
-        g += vec2(-0.53, 0.85)*cos(dot(vec2(-0.53, 0.85), q)*1.37 + t*3.1)*0.7*(1.0 - smoothstep(0.4, 1.2, 1.37*fp));
-        g += vec2(0.96, -0.28)*cos(dot(vec2(0.96, -0.28), q)*2.21 + t*4.1)*0.5*(1.0 - smoothstep(0.4, 1.2, 2.21*fp));
+        vec2 q = l + vec2(sin(l.y*0.071 + uRipA.x), cos(l.x*0.063 + uRipA.y))*6.0;
+        g += vec2(0.80, 0.60)*cos(dot(vec2(0.80, 0.60), q)*0.83 + uRipC.x)*(1.0 - smoothstep(0.4, 1.2, 0.83*fp));
+        g += vec2(-0.53, 0.85)*cos(dot(vec2(-0.53, 0.85), q)*1.37 + uRipC.y)*0.7*(1.0 - smoothstep(0.4, 1.2, 1.37*fp));
+        g += vec2(0.96, -0.28)*cos(dot(vec2(0.96, -0.28), q)*2.21 + uRipC.z)*0.5*(1.0 - smoothstep(0.4, 1.2, 2.21*fp));
         return g;
       }
       // random fine chop for the glitter: value-noise slopes at two scales, drifting with the wind
-      float wh12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+      float wh12(vec2 p){ p = mod(p, 256.0); vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
       float wn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(wh12(i), wh12(i + vec2(1.0, 0.0)), f.x), mix(wh12(i + vec2(0.0, 1.0)), wh12(i + vec2(1.0, 1.0)), f.x), f.y); }
-      vec2 chop(vec2 p, float t, float fp){
+      vec2 chop(vec2 l, float fp){
         vec2 g = vec2(0.0); const float e = 0.2;
-        vec2 q = p * 0.55 + vec2(t * 0.33, t * 0.21); float a = wn(q);
+        vec2 q = l * 0.55 + uChopQ; float a = wn(q);
         g += vec2(wn(q + vec2(e, 0.0)) - a, wn(q + vec2(0.0, e)) - a) / e * 0.55 * (1.0 - smoothstep(0.5, 1.3, 0.55 * 3.0 * fp));
-        vec2 r = p * 1.6 + vec2(-t * 0.47, t * 0.39); float b = wn(r);
+        vec2 r = l * 1.6 + uChopR; float b = wn(r);
         g += vec2(wn(r + vec2(e, 0.0)) - b, wn(r + vec2(0.0, e)) - b) / e * 0.35 * (1.0 - smoothstep(0.5, 1.3, 1.6 * 3.0 * fp));
         return g;
       }
@@ -1485,15 +1509,16 @@ function waterMaterial(amp) {
         return amp * arm * sin(ph) * (1.0 - smoothstep(0.6, 1.6, kd * fp));
       }
       void main(){
-        float dist = distance(cameraPosition, vW);
+        vec2 l = vL.xz;   // metres east and south of uOrg
+        float dist = distance(uCamL, vL);
         // world size of this pixel on the water, the longer way (grazing views stretch it)
-        vec2 fw2 = fwidth(vW.xz); float fp = max(fw2.x, fw2.y);
-        vec2 sg = waveGrad(vW.xz, uTime, fp) * uAmp * (1.0 - smoothstep(350.0, 760.0, distance(vW.xz, cameraPosition.xz)));
-        float paws = 0.45 + 0.55*smoothstep(-0.6, 0.9, sin(vW.x*0.011 + uTime*0.05)*cos(vW.z*0.013 - uTime*0.04) + sin((vW.x + vW.z)*0.0071));
-        vec2 rg = ripple(vW.xz, uTime, fp) * uRip * paws * 0.25;
-        vec2 cg = chop(vW.xz, uTime, fp) * (0.04 + uRip * 1.3) * (0.6 + 0.4 * paws);
-        // ship-relative coordinates for the waterline and wake
-        vec2 rel = vW.xz - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
+        vec2 fw2 = fwidth(l); float fp = max(fw2.x, fw2.y);
+        vec2 sg = waveGrad(l, fp) * uAmp * (1.0 - smoothstep(350.0, 760.0, distance(l, uCamL.xz)));
+        float paws = 0.45 + 0.55*smoothstep(-0.6, 0.9, sin(l.x*0.011 + uPaw.x)*cos(l.y*0.013 + uPaw.y) + sin((l.x + l.y)*0.0071 + uPaw.z));
+        vec2 rg = ripple(l, fp) * uRip * paws * 0.25;
+        vec2 cg = chop(l, fp) * (0.04 + uRip * 1.3) * (0.6 + 0.4 * paws);
+        // ship-relative coordinates for the waterline and wake (uShip.xy is relative to uOrg too)
+        vec2 rel = l - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
         vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - uHullDim.xy;
         float hd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uHullDim.z, hs = (uHullDim.x + uHullDim.z) / 5.0;
         float spd = length(uVel);
@@ -1501,24 +1526,24 @@ function waterMaterial(amp) {
         vec2 kg = vec2(0.0); float kh = 0.0;
         if (spd > 0.6 && length(rel) < 720.0) {
           const float e = 0.6;
-          kh = kelvin(vW.xz, bow, vd, spd, fp);
-          kg = vec2(kelvin(vW.xz + vec2(e, 0.0), bow, vd, spd, fp) - kh, kelvin(vW.xz + vec2(0.0, e), bow, vd, spd, fp) - kh) / e;
+          kh = kelvin(l, bow, vd, spd, fp);
+          kg = vec2(kelvin(l + vec2(e, 0.0), bow, vd, spd, fp) - kh, kelvin(l + vec2(0.0, e), bow, vd, spd, fp) - kh) / e;
         }
         vec3 n = normalize(vec3(-sg.x - rg.x - cg.x - kg.x, 1.0, -sg.y - rg.y - cg.y - kg.y));
-        vec2 uv = vec2((vW.x - uDom.x)/uDom.z, (-vW.z - uDom.y)/uDom.w);
+        vec2 uv = vec2((l.x - uDomL.x)/uDomL.z, (-l.y - uDomL.y)/uDomL.w);
         float depth = texture2D(uDepth, uv).r*40.0;
         vec3 alb = mix(uShallow, uDeep, smoothstep(0.5, 14.0, depth));
         // around the two terminals the sandy and weedy bottom shows through the shallows
-        vec4 bay = bayAt(uBayA, uDetAR, vec2(vW.x, -vW.z)) + bayAt(uBayT, uDetTR, vec2(vW.x, -vW.z));
+        vec4 bay = bayAt(uBayA, uBayAR, vec2(l.x, -l.y)) + bayAt(uBayT, uBayTR, vec2(l.x, -l.y));
         alb = mix(alb, bay.rgb / max(bay.a, 0.001), bay.a * 0.8);
         vec3 col = alb*(0.55 + 0.45*clamp(dot(n, uSun), 0.0, 1.0));
-        vec3 V = normalize(cameraPosition - vW);
+        vec3 V = normalize(uCamL - vL);
         vec3 R = reflect(-V, n);
         vec3 sky = mix(uFog, uSkyTop, smoothstep(0.0, 0.5, R.y));
         float fres = 0.04 + 0.96*pow(1.0 - max(dot(n, V), 0.0), 5.0), fmax = 0.72;
         if (uReflOn > 0.5) {
           // HD: the mirror image of the scene, rippled by the surface normal; the sky gradient fills in at the frame edges
-          vec4 rp = uReflMat * vec4(vW.x, uWaterY, vW.z, 1.0);
+          vec4 rp = uReflMat * vec4(l.x, uWaterY, l.y, 1.0);
           vec2 ruv = clamp(rp.xy / rp.w + vec2(n.x, n.z) * 0.07, 0.001, 0.999);
           float sm = 0.004 + 0.02 * clamp(uAmp, 0.0, 1.0);   // ripples stretch a reflection up and down
           vec3 rc = texture2D(uRefl, ruv).rgb * 0.4 + texture2D(uRefl, clamp(ruv + vec2(0.0, sm), 0.001, 0.999)).rgb * 0.3 + texture2D(uRefl, clamp(ruv - vec2(0.0, sm), 0.001, 0.999)).rgb * 0.3;
@@ -1529,7 +1554,7 @@ function waterMaterial(amp) {
         vec3 H = normalize(V + uSun);
         col += uSpec*pow(max(dot(n, H), 0.0), 140.0);
         float crest = smoothstep(0.6, 1.0, vH)*smoothstep(0.22, 0.6, uAmp);
-        float surf = (1.0 - smoothstep(0.15, 1.5, depth))*(0.55 + 0.45*sin(uTime*1.3 - depth*5.0 + vW.x*0.03 - vW.z*0.02));
+        float surf = (1.0 - smoothstep(0.15, 1.5, depth))*(0.55 + 0.45*sin(uPaw.w - depth*5.0 + l.x*0.03 - l.y*0.02));
         col = mix(col, vec3(0.93, 0.96, 0.96), clamp(crest*0.65 + surf*0.7, 0.0, 0.85));
         // the hull darkens the water hard against it, with churned water at the waterline (the wake astern is its own mesh)
         col *= mix(0.62, 1.0, smoothstep(0.0, 3.0 * hs, hd));
@@ -1537,10 +1562,10 @@ function waterMaterial(amp) {
         float wake = 0.0;
         if (spd > 0.15) {
           // white water breaking on the Kelvin crests close to the bow
-          float bb = -dot(vW.xz - bow, vd);
+          float bb = -dot(l - bow, vd);
           wake += smoothstep(0.3, 0.8, kh / 0.5) * exp(-max(bb, 0.0) / 60.0) * clamp((spd - 2.0) / 2.5, 0.0, 1.0);
         }
-        float foam = clamp(churn + wake*0.7, 0.0, 0.8) * mix(0.7 + 0.3*sin(vW.x*2.3 + vW.z*1.7 + uTime), 0.85, smoothstep(0.4, 1.0, 2.9*fp));
+        float foam = clamp(churn + wake*0.7, 0.0, 0.8) * mix(0.7 + 0.3*sin(l.x*2.3 + l.y*1.7 + uFoamPh), 0.85, smoothstep(0.4, 1.0, 2.9*fp));
         col = mix(col, vec3(0.9, 0.94, 0.94), foam * step(0.0, hd));
         col = mix(col, uFog, smoothstep(uFogNear, uFogFar, dist));
         gl_FragColor = vec4(col, 1.0);
@@ -1568,7 +1593,7 @@ const REFL = !HD ? null : (() => {
   const rt = new THREE.WebGLRenderTarget(16, 16, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, generateMipmaps: false });
   REFL_U.tex.value = rt.texture;
   return { rt, cam: new THREE.PerspectiveCamera(), rot: new THREE.Matrix4(), cp: new THREE.Vector3(), pp: new THREE.Vector3(), look: new THREE.Vector3(), view: new THREE.Vector3(), tgt: new THREE.Vector3(),
-    n: new THREE.Vector3(0, 1, 0), plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), size: new THREE.Vector2(), frame: 0 };
+    n: new THREE.Vector3(0, 1, 0), org: new THREE.Matrix4(), plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), size: new THREE.Vector2(), frame: 0 };
 })();
 function hdReflect() {
   if (!REFL) return;
@@ -1588,7 +1613,8 @@ function hdReflect() {
   R.tgt.subVectors(R.pp, R.look).reflect(R.n).negate().add(R.pp);
   const vc = R.cam; vc.position.copy(R.view); vc.up.set(0, 1, 0).applyMatrix4(R.rot).reflect(R.n); vc.lookAt(R.tgt);
   vc.near = camera.near; vc.far = camera.far; vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix); vc.matrixWorldInverse.copy(vc.matrixWorld).invert();
-  REFL_U.mat.value.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
+  REFL_U.mat.value.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse)
+    .multiply(R.org.makeTranslation(WATER_U.uOrg.value.x, 0, WATER_U.uOrg.value.y));   // the water shades in coordinates relative to uOrg
   REFL_U.y.value = y0;
   // oblique near plane on the water
   R.plane.setFromNormalAndCoplanarPoint(R.n, R.pp).applyMatrix4(vc.matrixWorldInverse);
@@ -4565,12 +4591,12 @@ function frame(now) {
   }
   updateCamera();
   const sx = Math.round(camera.position.x / WATER_CELL) * WATER_CELL, sz = Math.round(camera.position.z / WATER_CELL) * WATER_CELL;
-  waterNear.position.set(sx, S.tide, sz); waterFar.position.set(sx, S.tide, sz);
+  waterNear.position.set(sx, S.tide, sz); waterFar.position.set(sx, S.tide, sz); waterOrigin(sx, sz, S.t);
   waterNearMat.uniforms.uTime.value = S.t; waterNearMat.uniforms.uAmp.value = S.wx.wave; waterFarMat.uniforms.uTime.value = S.t; TERRAIN_U.uTide.value = S.tide;
   {
     // the wake, waterline darkening and foam belong to whichever vessel you are driving
     const V = GAME === 'rib' ? RB : S, sp = Math.sin(V.psi), cp = Math.cos(V.psi), U = waterNearMat.uniforms;
-    U.uShip.value.set(V.x, -V.y, sp, cp); U.uVel.value.set(V.u * sp + V.v * cp, -(V.u * cp - V.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
+    U.uShip.value.set(V.x - sx, -V.y - sz, sp, cp); U.uVel.value.set(V.u * sp + V.v * cp, -(V.u * cp - V.v * sp)); U.uRip.value = 0.035 + 0.008 * S.wind.spd;
     if (GAME === 'rib') { const spd = Math.hypot(RB.u, RB.v); U.uHullDim.value.set(0.2, 1.6, 0.9, 2.5); foam.pts.material.size = 0.45; U.uKel.value = 0.6 * (1 - 0.6 * smooth(8, 16, spd)); }
     else { U.uHullDim.value.set(3.2, 13.3, 1.8, 14); foam.pts.material.size = 1.3; U.uKel.value = 1; }
     U.uKelLen.value = WAKE.kelLen;
@@ -5657,7 +5683,7 @@ $('bGo').onclick = () => {
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
