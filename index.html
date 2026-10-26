@@ -62,6 +62,11 @@ output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .tools button.on{background:var(--amber);color:var(--amber-ink)}
 .tmore{pointer-events:auto;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:100%;box-sizing:border-box;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:6px}
 .tmore[hidden]{display:none}
+.tidectl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:baseline;padding:2px 2px 0;min-width:240px}
+.tidectl span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.tidectl output{font-size:13px;text-align:right}
+.tidectl input[type=range]{grid-column:1/-1;margin:2px 0 6px}
+.tidectl .row{grid-column:1/-1}
 .chart{position:relative;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:4px}
 #map{display:block;width:230px;height:230px;border-radius:3px}
 #bMapZoom{position:absolute;right:8px;bottom:8px;font-size:11px;padding:3px 6px}
@@ -314,6 +319,13 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
           <button id="bPALoad" title="Announcement source: the recording published with the game, the built-in spoken one, or your own file (kept on this device)">PA: built-in</button>
           <input type="file" id="paFile" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.mov,.mp4" hidden>
         </div>
+        <div class="tidectl">
+          <span>Tide</span><output id="tdNow">-</output>
+          <input type="range" id="tdPhase" min="-6.2" max="6.2" step="0.1" value="0" aria-label="Where in the tide: hours before or after high water">
+          <span>Range</span><output id="tdRange">-</output>
+          <input type="range" id="tdAmp" min="0" max="1" step="0.01" value="1" aria-label="Size of the tide, neaps to springs">
+          <div class="row"><button id="tdHold" title="Stop the tide rising or falling, to practise at one height">Hold the tide: off</button></div>
+        </div>
         <div class="tools">
           <button id="bHelp">Help</button>
           <button id="bQuiz" title="What am I looking at? A quiz on vessels' lights and shapes">Lights quiz</button>
@@ -473,6 +485,8 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
         <h3>Other traffic</h3>
         <p>A yacht sails her way up and down, beating when the wind is ahead, and a fishing boat works her gear: a trawler towing in the Sound of Gigha, a creel boat hauling her strings in Loch Sween. Under sail or fishing they have right of way over the ferry and the RIB (Rule 18), so keep clear early and pass astern of them. They hold their course and speed, and act only at the last moment if you leave it too late, which costs points. Never cross close astern of the trawler: her warps run back a couple of hundred metres to the net. The creel boat counts as fishing only while she is hauling; running between strings she is an ordinary power-driven vessel and the crossing rules apply. By night they show their proper lights, and the chart shows them as targets with their heading. <b>Lights quiz</b> (on the start screen and under Settings) tests you on the lights and day shapes of these and other vessels.</p>
+        <h3>The tide</h3>
+        <p>The tide rises and falls with the clock: pick springs or neaps on the start screen. Under Settings you can move it to any point in the cycle, from six hours before high water to six after, change its size between neaps and springs, or hold it at one height to practise there. The rise and fall here is small, this coast being close to the point off Islay where the tide hardly rises at all; the ranges are estimates, not tide-table values.</p>
         <h3>The chart</h3>
         <p>Tap or click the corner chart to open it full size. Drag to move it, pinch or scroll to zoom, or use + and −; zoomed in, it shows the roads and the boats on their moorings. Follow boat keeps you in the middle again, and Close or Escape puts it away. Harbour and Route on the corner chart switch between close in and the whole passage.</p>
         <h3>Loch Sween</h3>
@@ -2804,6 +2818,13 @@ function newGame(start, wxKey, simple = false) {
 // ================= ENVIRONMENT =================
 function updateEnv(dt) {
   const W = S.wx;
+  // tide set from Settings: held, it keeps its place in the cycle; moved, it eases there at half an hour of tide a second
+  // rather than jumping, which would wrench a ramp lying on the slip
+  if (S.tideHold) S.tideHW += dt;
+  if (S.tideGoal !== undefined) {
+    const d = ((((S.tideGoal - S.tideHW) / TIDE_P) % 1 + 1.5) % 1 - 0.5) * TIDE_P, m = 1800 * dt;
+    if (Math.abs(d) <= m) { S.tideHW = S.tideGoal; S.tideGoal = undefined; } else S.tideHW += Math.sign(d) * m;
+  }
   S.tide = tideAt(S.clock0 + S.t);
   const g = 1 + W.gust * (fbm(S.t * 0.06, 3.3) - 0.5) * 2.4;
   const from = W.from + (fbm(S.t * 0.01, 9.1) - 0.5) * 24;
@@ -4191,7 +4212,19 @@ $('bConsole').onclick = () => setConsole(!$('console').hidden);
 $('bConClose').onclick = () => setConsole(true);
 // Settings: the options and the occasional things, kept out of the bar
 function toolsMore(open) { $('toolsMore').hidden = !open; $('bMore').setAttribute('aria-expanded', String(open)); setT($('bMore'), open ? 'Settings ▴' : 'Settings ▾'); }
-$('bMore').onclick = () => toolsMore($('toolsMore').hidden);
+$('bMore').onclick = () => { toolsMore($('toolsMore').hidden); tideSync(); };
+// the tide, from Settings: where in the cycle (it runs on from there unless held) and how big, neaps to springs
+function tideSync() {
+  if (!S) return;
+  const ph = ((((S.clock0 + S.t - S.tideHW) / TIDE_P) % 1 + 1.5) % 1 - 0.5) * TIDE_P / 3600, A = TIDE_AMP, f = (S.tideAmp - A.neaps) / (A.springs - A.neaps);
+  if (document.activeElement !== $('tdPhase') && S.tideGoal === undefined) $('tdPhase').value = ph.toFixed(1);
+  if (document.activeElement !== $('tdAmp')) $('tdAmp').value = f.toFixed(2);
+  setT($('tdNow'), `HW ${ph >= 0 ? '+' : '−'}${Math.abs(ph).toFixed(1)} h · ${S.tide >= 0 ? '+' : ''}${S.tide.toFixed(2)} m ${S.tideHold ? '(held)' : ph < 0 ? '↑' : '↓'}`);
+  setT($('tdRange'), f > 0.97 ? 'springs' : f < 0.03 ? 'neaps' : `${(S.tideAmp * 2).toFixed(1)} m rise and fall`);
+}
+$('tdPhase').oninput = () => { if (S) S.tideGoal = S.clock0 + S.t - (+$('tdPhase').value) * 3600; };   // the high water that puts her there
+$('tdAmp').oninput = () => { if (S) { const A = TIDE_AMP; S.tideAmp = A.neaps + (+$('tdAmp').value) * (A.springs - A.neaps); tideSync(); } };
+$('tdHold').onclick = () => { if (!S) return; S.tideHold = !S.tideHold; setT($('tdHold'), S.tideHold ? 'Hold the tide: on' : 'Hold the tide: off'); setC($('tdHold'), 'on', S.tideHold); tideSync(); };
 for (const id of ['bHelp', 'bQuiz']) $(id).addEventListener('click', () => toolsMore(false));
 $('bHelp').onclick = () => { $('help').hidden = false; };
 $('bHelp2').onclick = () => { $('help').hidden = false; };
@@ -5314,7 +5347,7 @@ function frame(now) {
   renderView();
   drawPad(0); drawPad(1);
   uiAcc += rdt; mapAcc += rdt;
-  if (uiAcc > 0.1) { uiAcc = 0; if (GAME === 'rib') updateRibUI(); else updateUI(); updateAudio(); }
+  if (uiAcc > 0.1) { uiAcc = 0; if (GAME === 'rib') updateRibUI(); else updateUI(); updateAudio(); if (!$('toolsMore').hidden) tideSync(); }
   if (mapAcc > 0.2) { mapAcc = 0; drawMap(); }
   if (MAPX.open && MAPX.rep) {
     const P = MAPX.rep; P.t = Math.min(P.end, P.t + rdt * P.k); if (P.t >= P.end) P.hold = (P.hold || 0) + rdt;
