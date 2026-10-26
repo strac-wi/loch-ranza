@@ -1,6 +1,6 @@
-# Loch Ranza
+# Marine Traffic Sim
 
-An unofficial browser sim: pilot the double-ended ro-ro ferry MV Loch Ranza across the Sound of Gigha between Tayinloan and Gigha, with Voith Schneider propulsion and two-section folding ramps.
+An unofficial browser sim of the waters off Knapdale and Kintyre: pilot the double-ended ro-ro ferry MV Loch Ranza across the Sound of Gigha between Tayinloan and Gigha, with Voith Schneider propulsion and two-section folding ramps. A yacht and a fishing boat share the water and keep to the Collision Regulations, and a lights quiz tests you on what vessels show by night and by day.
 
 Or pick the RIB on the start screen: a Gala Viking V500 with a Suzuki 100 hp outboard, starting alongside the Boathouse pontoon at Ardminish, with drills for coming alongside, man overboard and a high-speed slalom. Its handling figures are estimates tuned to published specs, so it is a game, not a training aid.
 
