@@ -190,6 +190,8 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
+.texmode{display:grid;gap:6px;margin:8px 0 10px;font-size:15px}
+.texmode input{accent-color:var(--amber);margin-right:6px}
 .texslots{display:grid;gap:8px;margin:10px 0 12px}
 .texslot{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;font-size:15px}
 .texslot canvas{width:56px;height:56px;border-radius:4px;background:#1b2a31}
@@ -392,8 +394,10 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
     <div id="texDlg" class="overlay" hidden>
       <div class="card">
         <p class="eyebrow">HD ground</p>
-        <h2>Your own ground textures</h2>
-        <p class="fine">For each kind of ground, pick a photo taken looking straight down from about head height, a metre or two across. It is cropped square, made to tile without seams and used for its light and shade: the land keeps its colours from the map. Your pictures stay on this device.</p>
+        <h2>Ground textures</h2>
+        <div class="texmode"><label><input type="radio" name="gtex" value="photo" checked> Photographs: Poly Haven's, or your own below</label>
+          <label><input type="radio" name="gtex" value="made"> Made in the game: the patterns drawn before there were photos, nothing to download</label></div>
+        <p class="fine">For your own, pick a photo taken looking straight down from about head height, a metre or two across. It is cropped square, made to tile without seams and used for its light and shade: the land keeps its colours from the map. Your pictures stay on this device.</p>
         <div id="texSlots" class="texslots"></div>
         <div class="row"><button id="texDone" class="go">Done</button><button id="texReset">Back to Poly Haven's</button></div>
       </div>
@@ -1251,7 +1255,8 @@ function groundTex(N = 512) {
 // its detail only, divided by its own average colour, so the land keeps the colours of its cover map.
 const PHOTO = [['pasture', [0.313, 0.308, 0.11]], ['rough', [0.382, 0.312, 0.157]], ['rock', [0.431, 0.363, 0.205]], ['sand', [0.509, 0.449, 0.359]], ['wrack', [0.294, 0.268, 0.177]]];
 function loadGroundPhotos() {
-  if (!HD || location.protocol === 'file:') return;   // a page opened from disk may not put local images on the GPU
+  if (!HD || location.protocol === 'file:' || PREFS.ground === 'made' || GROUND.asked) return;   // a page opened from disk may not put local images on the GPU
+  GROUND.asked = true;
   const dir = window.LR_HD ? 'tex/' : 'hd/tex/', L = new THREE.TextureLoader(); let n = 0;
   PHOTO.forEach(([name], i) => L.load(dir + name + '.jpg', (t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -1264,7 +1269,8 @@ function loadGroundPhotos() {
 // average colour measured so the shader can use it for detail only.
 const GROUND = { ph: [], own: [], mean: PHOTO.map(([, m]) => m.slice()) };
 const GROUND_LABEL = ['Pasture', 'Rough grazing and heather', 'Rock', 'Beach sand', 'Weed and stones at the tide line'];
-function groundReady() { if (PHOTO.every((_, i) => TERRAIN_U['uGP' + i].value)) TERRAIN_U.uPhoto.value = 1; }
+// photographs only once all five are in, and only if the player has not chosen the made patterns
+function groundReady() { TERRAIN_U.uPhoto.value = PREFS.ground !== 'made' && PHOTO.every((_, i) => TERRAIN_U['uGP' + i].value) ? 1 : 0; }
 function groundApply(i, canvas) {
   const t = new THREE.CanvasTexture(canvas); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const s = document.createElement('canvas'); s.width = s.height = 16; s.getContext('2d').drawImage(canvas, 0, 0, 16, 16);
@@ -1292,7 +1298,8 @@ function texSlotDraw(i) {
   g.clearRect(0, 0, cv.width, cv.height); if (im) try { g.drawImage(im, 0, 0, cv.width, cv.height); } catch (e) { /* not drawable yet */ }
   const tag = document.querySelector(`#texSlots small[data-i="${i}"]`); if (tag) tag.textContent = GROUND.own[i] ? 'Your picture' : GROUND.ph[i] ? "Poly Haven's" : 'Made in the game';
 }
-function texSetLabel() { setT($('bTex'), GROUND.own.some(Boolean) ? 'Ground textures: yours' : 'Ground textures'); }
+function texSetLabel() { setT($('bTex'), PREFS.ground === 'made' ? 'Ground textures: made' : GROUND.own.some(Boolean) ? 'Ground textures: yours' : 'Ground textures: photos'); }
+function texSlotsShow() { const made = PREFS.ground === 'made'; $('texSlots').style.opacity = made ? 0.4 : 1; $('texSlots').style.pointerEvents = made ? 'none' : ''; }
 if (HD) {
   $('bTex').hidden = false;
   $('texSlots').innerHTML = PHOTO.map(([name], i) => `<div class="texslot"><canvas width="56" height="56" data-i="${i}"></canvas><span>${GROUND_LABEL[i]}<small data-i="${i}"></small></span><span><input type="file" accept="image/*" data-i="${i}" hidden><button type="button" data-pick="${i}">Choose…</button></span></div>`).join('');
@@ -1310,9 +1317,13 @@ if (HD) {
   $('texDone').onclick = () => { $('texDlg').hidden = true; };
   $('texReset').onclick = () => {
     PHOTO.forEach(([name, m], i) => { GROUND.own[i] = null; TERRAIN_U['uGP' + i].value = GROUND.ph[i] || null; TERRAIN_U.uGPM.value[i].set(...m); texSlotDraw(i); paStore('readwrite', st => st.delete('ground:' + name)); });
-    if (!PHOTO.every((_, i) => TERRAIN_U['uGP' + i].value)) TERRAIN_U.uPhoto.value = 0;
-    texSetLabel();
+    groundReady(); texSetLabel();
   };
+  document.querySelectorAll('input[name=gtex]').forEach(r => {
+    r.checked = r.value === (PREFS.ground || 'photo');
+    r.onchange = () => { savePrefs({ ground: r.value }); if (r.value !== 'made') loadGroundPhotos(); groundReady(); texSetLabel(); texSlotsShow(); };
+  });
+  texSlotsShow();
   // your saved ones, back from storage
   PHOTO.forEach(([name], i) => paStore('readonly', st => { const q = st.get('ground:' + name); q.onsuccess = async () => {
     if (!q.result) return; try { const img = await createImageBitmap(q.result), c = document.createElement('canvas'); c.width = c.height = 512; c.getContext('2d').drawImage(img, 0, 0, 512, 512); groundApply(i, c); texSetLabel(); } catch (e) { /* unreadable: ignore */ }
@@ -5739,7 +5750,7 @@ if (!GIGHA) {
   document.querySelector('.brand b').textContent = 'Loch Sween';
   setT($('ribWhere'), 'A 5 m RIB with a Suzuki 100 hp outboard, on a mooring off Achnamara. Boat-handling practice at high and low speed.');
 }
-if (HD) document.querySelector('#menu .fine').append(' HD ground textures: Poly Haven (CC0).');
+if (HD) { document.querySelector('#menu .fine').append(' HD ground textures: Poly Haven (CC0).'); texSetLabel(); }
 // the HD page and the standard one link to each other where both are published
 if (/github\.io$/.test(location.hostname) || location.protocol === 'file:') {
   const a = $('hdLink'); a.hidden = false;
