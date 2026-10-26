@@ -1692,10 +1692,10 @@ const REFL = !HD ? null : (() => {
 })();
 function hdReflect() {
   if (!REFL) return;
-  if (!sun.castShadow) { REFL_U.on.value = 0; return; }   // Detail: low turns them off
+  if (!sun.castShadow || PERF.noRefl) { REFL_U.on.value = 0; return; }   // Detail: low, or the frame-rate governor, turns them off
   const R = REFL, phone = Math.min(innerWidth, innerHeight) < 700;
   renderer.getDrawingBufferSize(R.size);
-  const k = phone ? 0.28 : 0.5, w = Math.max(16, Math.round(R.size.x * k)), h = Math.max(16, Math.round(R.size.y * k));
+  const k = (phone ? 0.28 : 0.5) * PERF.reflK, w = Math.max(16, Math.round(R.size.x * k)), h = Math.max(16, Math.round(R.size.y * k));
   if (R.rt.width !== w || R.rt.height !== h) R.rt.setSize(w, h);
   camera.updateMatrixWorld(); R.cp.setFromMatrixPosition(camera.matrixWorld);
   const y0 = S.tide; R.pp.set(R.cp.x, y0, R.cp.z);
@@ -3375,6 +3375,17 @@ function updateUI(force) {
   }
   updateChecklist();
 }
+// with the on-screen controls, hints name the buttons and sticks rather than keys
+const TOUCH_WORDS = [
+  [' (X)', ' (Start eng)'], ['Lines let go (L)', 'Lines let go (Let go)'], ['Mooring slipped (L)', 'Mooring slipped (Slip)'], ['Slip the mooring (L)', 'Slip the mooring (Slip)'],
+  ['Stop with the buoy at the bow, then L', 'Stop with the buoy at the bow, then Pick up'], ['Stop, then make fast (L)', 'Stop, then Make fast'],
+  ['W/S lever: ahead, neutral, astern', 'Lever: up for ahead, down for astern, the notch for neutral'],
+  ['R/F trim: in to plane, out once she is up', 'Trim ▼ to get her on the plane, Trim ▲ once she is up'],
+  ['O: man overboard drill at any time', 'MOB: man overboard drill at any time'], ['Pull away: W for ahead, A/D to turn', 'Pull away: stick up for ahead, steer to turn'],
+  ['X to start, L to let go, W for ahead.', 'Start eng, Let go, then the lever up for ahead.'], ['X to start, L to slip, W for ahead.', 'Start eng, Slip, then the lever up for ahead.'],
+  ['W ahead, A/D turn, Q/E sideways.', 'Stick up for ahead, steer to turn, stick sideways to crab.'],
+];
+const tw = (t) => { if (!TOUCH.on) return t; for (const [a, b] of TOUCH_WORDS) t = t.split(a).join(b); return t; };
 function simpleChecklist() {
   const sog = Math.hypot(S.u, S.v) / KN;
   if (S.leg.state === 'alongside') {
@@ -3442,10 +3453,10 @@ function updateChecklist() {
       items.push(['Float the ramp; traffic then moves', false]);
     }
   }
-  const html = items.map(([t, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${t}</li>`).join('');
+  const html = items.map(([t, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${tw(t)}</li>`).join('');
   WH.ck = { title, items };
   const nxt = items.find(it => !it[1]);
-  setT($('mNext'), S.simple && S.crewMsg ? 'Crew: ' + S.crewMsg : nxt ? 'Next: ' + nxt[0] : title);
+  setT($('mNext'), S.simple && S.crewMsg ? 'Crew: ' + S.crewMsg : nxt ? 'Next: ' + tw(nxt[0]) : title);
   const ul = $('ckList'); if (ul.dataset.h !== html) { ul.dataset.h = html; ul.innerHTML = html; }
   setT($('ckTitle'), title);
 }
@@ -4640,7 +4651,25 @@ function resize() {
   camera.aspect = Math.max(1, r.width) / Math.max(1, r.height); camera.updateProjectionMatrix();
 }
 const resizeObs = new ResizeObserver(resize);
+// If the frame rate stays below about 26 a second for a few seconds, detail comes down a step at a time: a lower
+// pixel ratio, then lower still, then (HD) the reflections or (standard) the shadows. It never goes back up by itself,
+// and once you press Detail it leaves the choice to you. Off under automated testing unless a test asks for it.
+const PERF = { ema: 1 / 60, slowT: 0, level: 0, manual: false, reflK: 1, noRefl: false };
+function perfGovern(raw) {
+  if (!S || !S.running || PERF.manual || PERF.level >= 3 || document.hidden || (navigator.webdriver && !window.LR_GOVERN)) return;
+  if (!(raw > 0) || raw > 0.5) return;   // a stall (tab switch, alert) says nothing about the rendering
+  PERF.ema += (raw - PERF.ema) * 0.05;
+  if (PERF.ema > 1 / 26) PERF.slowT += raw; else PERF.slowT = Math.max(0, PERF.slowT - raw * 0.5);
+  if (PERF.slowT < 4) return;
+  PERF.slowT = 0; PERF.level++;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (PERF.level === 1) { renderer.setPixelRatio(Math.max(1, dpr * 0.75)); resize(); PERF.reflK = 0.75; }
+  else if (PERF.level === 2) { renderer.setPixelRatio(1); resize(); PERF.reflK = 0.55; }
+  else { if (HD) PERF.noRefl = true; else { sun.castShadow = false; } }
+  if (PERF.level === 1) toast('Detail lowered a little to keep it smooth. The Detail button puts it back.');
+}
 function setGfx(high) {
+  PERF.manual = true; PERF.noRefl = false; PERF.reflK = 1;
   sun.castShadow = high; clouds.visible = high; LIFE.group.visible = high;
   renderer.setPixelRatio(high ? Math.min(window.devicePixelRatio || 1, 2) : 1); resize();
   setT($('bGfx'), high ? 'Detail: high' : 'Detail: low'); setC($('bGfx'), 'on', !high);
@@ -4741,7 +4770,8 @@ function updateVisuals(dt) {
 let last = performance.now(), uiAcc = 0, mapAcc = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const rdt = clamp((now - last) / 1000, 0, 0.05); last = now;   // the first frame's timestamp can predate the end of loading
+  const raw = (now - last) / 1000, rdt = clamp(raw, 0, 0.05); last = now;   // the first frame's timestamp can predate the end of loading
+  perfGovern(raw);
   if (!S) { renderer.render(scene, camera); return; }
   if (S.running && GAME === 'rib') {
     ribHandleKeys(rdt);
@@ -5579,9 +5609,9 @@ function updateRibUI() {
   setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? (ph ? 'Slip' : 'Slip mooring') : (ph ? 'Let go' : 'Let go lines')) : GIGHA ? 'Make fast' : ph ? 'Pick up' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
   setT($('rDrill'), 'Drill: ' + (ph ? DRILL_SHORT : DRILL_NAME)[R.drill.id]);
   setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
-  const [title, items] = ribChecklist(), html = items.map(([t2, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${t2}</li>`).join('');
+  const [title, items] = ribChecklist(), html = items.map(([t2, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${tw(t2)}</li>`).join('');
   const ul = $('ckList'); if (ul.dataset.h !== html) { ul.dataset.h = html; ul.innerHTML = html; } setT($('ckTitle'), title);
-  const nxt = items.find(it => !it[1]); setT($('mNext'), nxt ? nxt[0] : title);
+  const nxt = items.find(it => !it[1]); setT($('mNext'), nxt ? tw(nxt[0]) : title);
   $('alarmbar').hidden = true;
 }
 function updateRibCamera() {
@@ -5869,7 +5899,7 @@ $('bGo').onclick = () => {
     ribNewGame(wx);
     $('menu').hidden = true; S.running = true; setTouch(TOUCH.on); setConsole(true);
     initAudio(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
-    toast(GIGHA ? 'Alongside the Boathouse pontoon. X to start, L to let go, W for ahead.' : 'On the mooring off Achnamara. X to start, L to slip, W for ahead.', 'good');
+    toast(tw(GIGHA ? 'Alongside the Boathouse pontoon. X to start, L to let go, W for ahead.' : 'On the mooring off Achnamara. X to start, L to slip, W for ahead.'), 'good');
     return;
   }
   const simple = document.querySelector('input[name=ctl]:checked').value === 'simple';
@@ -5878,11 +5908,11 @@ $('bGo').onclick = () => {
   $('menu').hidden = true; S.running = true;
   setTouch(TOUCH.on); setConsole(true);
   initAudio(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
-  toast(simple ? (start === 'cold' ? 'Traffic is boarding. The crew will say when you are clear to sail.' : 'Underway for Gigha. W ahead, A/D turn, Q/E sideways.')
+  toast(simple ? (start === 'cold' ? 'Traffic is boarding. The crew will say when you are clear to sail.' : tw('Underway for Gigha. W ahead, A/D turn, Q/E sideways.'))
     : start === 'cold' ? 'Traffic is boarding. Start the engines while you wait.' : 'Underway for Gigha. Ramps pinned, conning from No.1.', 'good');
 };
 window.lochRanza = {
-  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, GROUND, RIB, AU, shipWhistle, whistleSet, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
+  get S() { return S; }, get RB() { return RB; }, get GAME() { return GAME; }, HD, REFL_U, TERRAIN_U, GROUND, RIB, AU, PERF, perfGovern, TOUCH, shipWhistle, whistleSet, WATER_MATS: [waterNearMat, waterFarMat], AP, NAV, setLight, PREFS, TRK, MAPX, trkShow, trkReplay, mapXOpen, ribDrillDone, ribSetDrill, ferryRun, updateEnv, TERM, SITE, GEO, shoreDist, ribStart, ribBow, WAKE, updateWake, updateRibVisuals, heightAt, landingAngle, TERMS, cam, SHIP, engineBuffer, SPIER, ribPontoon, SLALOM, ribUpdate, ribLines, ribCircles, ribBerth,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, meshes: (() => { let n = 0; scene.traverse(o => { if (o.isMesh) n++; }); return n; })() }),
   // screen position of a wheelhouse control (for automated checks)
   pickAt(x, y) { const c = pickCtrl({ clientX: x, clientY: y }); return c ? c.label : null; },
