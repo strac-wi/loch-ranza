@@ -196,7 +196,8 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
   .rg{margin:0 0 4px;gap:6px;cursor:pointer;-webkit-user-select:none;user-select:none} .rlev,.rtrim,#rTrimUp,#rTrimDn{display:none} #rGear{font-size:15px;width:auto;line-height:1}
   .rcol{flex:0 1 auto;flex-direction:row;align-items:baseline;gap:6px;font-size:11px} .rvent:empty{display:none} .rfold{display:inline;font-size:11px;color:var(--dim)}
   .rbtns{gap:3px} .rbtns button{padding:5px 6px;font-size:10px;letter-spacing:.04em}
-  body.ribfold .rbtns{display:none} body.ribfold .rg{margin:0}}
+  .rfold{font-size:12px!important;padding:2px 6px;border:1px solid var(--line-hi);border-radius:4px;color:var(--text)!important;white-space:nowrap}
+  body.ribfold .rbtns button:not(.need){display:none} body.ribfold .rg{margin:0 0 4px}}
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -267,7 +268,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
   #hudR{top:44px}
   .check{display:none}
   #alarmbar{top:50px}
-  #toasts{bottom:auto;top:96px}
+  #toasts{bottom:auto;top:96px;z-index:4}   /* over the RIB's panel while they show */
   #fpHint{display:none!important}
 }
 @media (max-width:380px){ .tjoy{width:126px;height:126px} .tsteer{width:164px} #mNext{right:132px} }
@@ -371,7 +372,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
     <div id="toasts" aria-live="polite"></div>
     <div id="ribHud" class="card">
       <div class="rg"><div class="rlev" title="Throttle and gear lever"><i id="rLev"></i></div><b id="rGear">–</b>
-        <div class="rcol"><span>Trim <b id="rTrim">0°</b></span><div class="rtrim"><i id="rTrimBar"></i></div><span id="rVent" class="rvent"></span></div><span class="rfold" id="rFold" aria-hidden="true">▾</span></div>
+        <div class="rcol"><span>Trim <b id="rTrim">0°</b></span><div class="rtrim"><i id="rTrimBar"></i></div><span id="rVent" class="rvent"></span></div><span class="rfold" id="rFold">Controls ▾</span></div>
       <div class="rbtns"><button id="rEng" title="Start or stop the engine (X)">Stopped</button><button id="rKill" title="Clip the kill cord on or off (K)">Kill cord: on</button><button id="rLines" title="Make fast or let go (L)">Let go lines</button>
         <button id="rTrimUp" title="Trim out, bow up (R)">Trim ▲</button><button id="rTrimDn" title="Trim in, bow down (F)">Trim ▼</button><button id="rMOB" class="warn" title="Man overboard (O)">MOB</button><button id="rFish" class="go" hidden title="Fish health cases, alongside the feed barge">Fish health</button><button id="rDrill" title="Choose a drill (G)">Drill: Free practice</button></div>
     </div>
@@ -6167,9 +6168,10 @@ $('tPA').onclick = () => { if (GAME !== 'rib') paPlay(false); };
 $('rEng').onclick = () => ribEngine(); $('rKill').onclick = () => ribKill(); $('rLines').onclick = () => ribLines(); $('rMOB').onclick = () => ribMOB();
 $('rDrill').onclick = () => ribSetDrill(DRILLS[(DRILLS.indexOf(RB.drill.id) + 1) % DRILLS.length]);
 const PHONE = matchMedia('(max-width:700px)');
-function ribFold(on) { document.body.classList.toggle('ribfold', on); setT($('rFold'), on ? '▸' : '▾'); savePrefs({ ribFold: on }); }
+// on a phone the panel folds to its header and whatever button the next step needs; it opens again with each new game
+function ribFold(on) { document.body.classList.toggle('ribfold', on); setT($('rFold'), on ? 'Controls ▸' : 'Controls ▾'); }
 document.querySelector('#ribHud .rg').addEventListener('click', () => { if (PHONE.matches) ribFold(!document.body.classList.contains('ribfold')); });
-if (PREFS.ribFold) ribFold(true);
+ribFold(false);
 for (const [id, d] of [['rTrimUp', 1], ['rTrimDn', -1]]) {
   $(id).addEventListener('pointerdown', () => { TOUCH.trim = d; });
   for (const evn of ['pointerup', 'pointercancel', 'pointerleave']) $(id).addEventListener(evn, () => { TOUCH.trim = 0; });
@@ -7087,6 +7089,7 @@ function buildRib() {
 }
 // ---------- per-frame ----------
 function ribNewGame(wx) {
+  ribFold(false);
   newGame('cold', wx, true);
   GAME = 'rib'; document.body.classList.add('rib');
   // the ferry lies on the Gigha slip with her ramp down, as scenery
@@ -7235,6 +7238,7 @@ function updateRibUI() {
   const nearBarge = Math.hypot(R.x - FARM.barge.x, R.y - FARM.barge.y) < 45;
   setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? (ph ? 'Slip' : 'Slip mooring') : (ph ? 'Let go' : 'Let go lines')) : GIGHA || nearBarge ? 'Make fast' : ph ? 'Pick up' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
   $('rFish').hidden = !(R.fast && R.fastAt === 'barge');
+  setC($('rEng'), 'need', R.eng === 'off'); setC($('rKill'), 'need', !R.kill); setC($('rFish'), 'need', R.fast && R.fastAt === 'barge');
   setT($('rDrill'), 'Drill: ' + (ph ? DRILL_SHORT : DRILL_NAME)[R.drill.id]);
   setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
   const [title, items] = ribChecklist(), html = items.map(([t2, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${tw(t2)}</li>`).join('');
