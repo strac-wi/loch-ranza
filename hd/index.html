@@ -198,6 +198,10 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
   .rbtns{gap:3px} .rbtns button{padding:5px 6px;font-size:10px;letter-spacing:.04em}
   .rfold{font-size:12px!important;padding:2px 6px;border:1px solid var(--line-hi);border-radius:4px;color:var(--text)!important;white-space:nowrap}
   body.ribfold .rbtns button:not(.need){display:none} body.ribfold .rg{margin:0 0 4px}}
+#fishCall{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;width:min(360px,calc(100% - 32px));padding:14px 16px;text-align:center}
+#fishCall .lrow{justify-content:center}
+body:not(.rib) #fishCall{display:none!important}
+#fishCall p:not(.eyebrow){margin:6px auto 12px}
 #layup{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);z-index:4;width:min(420px,calc(100% - 32px));padding:12px 14px}
 #layup p{margin:0 0 10px;font-size:15px}
 .lrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -376,6 +380,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
       <div class="rbtns"><button id="rEng" title="Start or stop the engine (X)">Stopped</button><button id="rKill" title="Clip the kill cord on or off (K)">Kill cord: on</button><button id="rLines" title="Make fast or let go (L)">Let go lines</button>
         <button id="rTrimUp" title="Trim out, bow up (R)">Trim ▲</button><button id="rTrimDn" title="Trim in, bow down (F)">Trim ▼</button><button id="rMOB" class="warn" title="Man overboard (O)">MOB</button><button id="rFish" class="go" hidden title="Fish health cases, alongside the feed barge">Fish health</button><button id="rDrill" title="Choose a drill (G)">Drill: Free practice</button></div>
     </div>
+    <div id="fishCall" class="card" hidden><p class="eyebrow">Alongside the feed barge</p><p>The fish health team have five cases for you to diagnose.</p><div class="lrow"><button id="fishGo" class="go">Fish health cases</button><button id="fishNo">Not now</button></div></div>
     <div id="layup" class="card" hidden><p id="layupText"></p><div class="lrow"><button id="layupYes" class="go">Lay up at South Pier</button><button id="layupNo">Carry on</button></div></div>
 
     <div id="report" class="card" hidden>
@@ -5450,7 +5455,7 @@ function fqStart() {
 }
 function fqOpen(on) {
   if (on === FQ.open) return;
-  FQ.open = on; $('fishq').hidden = !on; keys.clear();
+  FQ.open = on; $('fishq').hidden = !on; keys.clear(); fishCallUI();
   if (on) { FQ.was = !!(S && S.running); if (S) S.running = false; fqStart(); }
   else if (S && FQ.was) S.running = true;
 }
@@ -5464,6 +5469,10 @@ function fqKey(ev) {
 $('fqNext').onclick = fqNext;
 $('fqClose').onclick = () => fqOpen(false);
 $('rFish').onclick = () => fqOpen(true);
+// the call in the middle of the screen while she lies at the barge, until taken up or put off
+const fishCallUI = () => { $('fishCall').hidden = !(GAME === 'rib' && RB.fast && RB.fastAt === 'barge') || RB.fishNo || FQ.open; };
+$('fishGo').onclick = () => fqOpen(true);
+$('fishNo').onclick = () => { RB.fishNo = true; fishCallUI(); };
 window.addEventListener('resize', () => { if (FQ.open && FQ.q && !FQ.q.end) fqDraw(); });
 
 // ---------- pointer: orbit / look, and operating wheelhouse controls ----------
@@ -6714,7 +6723,7 @@ function ribKill() {
 }
 function ribLines() {
   const R = RB;
-  if (R.fast) { R.fast = false; log(R.fastAt === 'mooring' ? 'Mooring slipped' : 'Lines let go'); if (R.drill.id === 'alongside' && R.drill.stage === 0) { R.drill.stage = 1; R.drill.t0 = S.t; } return; }
+  if (R.fast) { R.fast = false; log(R.fastAt === 'mooring' ? 'Mooring slipped' : 'Lines let go'); if (R.drill.id === 'alongside' && R.drill.stage === 0) { R.drill.stage = 1; R.drill.t0 = S.t; } fishCallUI(); return; }
   const sog = Math.hypot(R.u, R.v) / KN;
   // the salmon farm's feed barge, in either water: lie along either long side
   {
@@ -6723,9 +6732,7 @@ function ribLines() {
       const s = dx * B.ux + dy * B.uy, t = dx * B.uy - dy * B.ux;
       const hd = ((R.psi - B.psi) % Math.PI + Math.PI) % Math.PI, par = Math.min(hd, Math.PI - hd) / DEG, gap = Math.abs(t) - B.W / 2 - 1.08;
       if (Math.abs(s) < B.L / 2 - 1 && gap < 0.7 && par < 20 && sog < 0.7) {
-        R.fast = true; R.fastAt = 'barge'; R.pose = { x: R.x, y: R.y, psi: R.psi }; log('Lines made fast alongside the feed barge', 'good');
-        toast('Alongside the feed barge: the fish health team have five cases for you');
-        setTimeout(() => { if (RB.fast && RB.fastAt === 'barge') fqOpen(true); }, 1200);
+        R.fast = true; R.fastAt = 'barge'; R.fishNo = false; R.pose = { x: R.x, y: R.y, psi: R.psi }; log('Lines made fast alongside the feed barge', 'good'); fishCallUI();
       } else msg(gap >= 0.7 ? 'Get her alongside the barge first: closer than a step' : par >= 20 ? 'Lie her parallel to the barge' : sog >= 0.7 ? 'Stop her alongside first' : 'Come alongside one of the barge\'s long sides');
       return;
     }
@@ -7239,6 +7246,7 @@ function updateRibUI() {
   const nearBarge = Math.hypot(R.x - FARM.barge.x, R.y - FARM.barge.y) < 45;
   setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? (ph ? 'Slip' : 'Slip mooring') : (ph ? 'Let go' : 'Let go lines')) : GIGHA || nearBarge ? 'Make fast' : ph ? 'Pick up' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
   $('rFish').hidden = !(R.fast && R.fastAt === 'barge');
+  fishCallUI();
   setC($('rEng'), 'need', R.eng === 'off'); setC($('rKill'), 'need', !R.kill); setC($('rFish'), 'need', R.fast && R.fastAt === 'barge');
   setT($('rDrill'), 'Drill: ' + (ph ? DRILL_SHORT : DRILL_NAME)[R.drill.id]);
   setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
