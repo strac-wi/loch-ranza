@@ -1062,7 +1062,7 @@ const TWIN = (() => {
   const rings = {}; for (const k of ['sand', 'flat', 'dune', 'rock', 'kelp']) rings[k] = sweenRings(TWD.tw[k]).map(r => r.map(v => v / 2));
   const trace = (ctx, rs, T) => { if (ctx.beginPath) ctx.beginPath(); for (const r of rs) { for (let k = 0; k < r.length; k += 2) k ? ctx.lineTo(...T(r[k], r[k + 1])) : ctx.moveTo(...T(r[k], r[k + 1])); ctx.closePath(); } };
   const fill = (k) => () => { trace(g, rings[k], (x, y) => [X(x), Y(y)]); g.fill(); };
-  const L = { R, RS, N, rings, trace, paths: TWD.tw.paths, sand: layer(fill('sand'), 1), flat: layer(fill('flat'), 1), dune: layer(fill('dune'), 2), rock: layer(fill('rock'), 1), kelp: layer(fill('kelp'), 1),
+  const L = { R, RS, N, rings, trace, paths: TWD.tw.paths, sand: layer(fill('sand'), 1), flat: layer(fill('flat'), 1), dune: layer(fill('dune'), 2), rock: layer(fill('rock'), 1), kelp: layer(fill('kelp'), 1), beach: layer(() => { fill('sand')(); fill('dune')(); fill('flat')(); }, 5),
     path: layer(() => { g.lineCap = g.lineJoin = 'round'; for (const p of TWD.tw.paths) { g.lineWidth = p.w / 2; g.beginPath(); p.pts.forEach(([x, y], i) => i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.stroke(); } }, 0) };
   // how much of a layer covers a spot, between the cell middles
   L.at = (a, x, y) => {
@@ -1083,13 +1083,19 @@ function twinRelief(x, y, sd) {
   const eg = polyIn(EILEAN_GARBH, u, v), cr = fbm(u * 0.024 + 3, v * 0.024 - 8), kn = fbm(u * 0.075 - 2, v * 0.075 + 6);
   const R = T.R, edge = smooth(0, 60, Math.min(x - R[0], R[0] + R[2] - x, y - R[1], R[1] + R[3] - y));   // the crags fade out at the patch's edge
   let d = ((cr - 0.5) * (eg ? 11 : 4) + Math.max(0, kn - 0.55) * (eg ? 18 : 7)) * smooth(5, 30, sd) * (1 - du) * edge;
-  if (du > 0) d += du * (1.2 + 1.8 * fbm(u * 0.07 + 5, v * 0.07 - 3));
+  if (du > 0) d += du * smooth(0, 22, sd) * (0.6 + 0.9 * fbm(u * 0.07 + 5, v * 0.07 - 3));   // low hummocks, rising from the dune foot over 20 m
   if (ro > 0) d += ro * (0.3 + 1.6 * fbm(u * 0.21 - 7, v * 0.21 + 2)) * smooth(0, 4, sd);
   return d - pa * 0.25;
 }
 // the Twin Beaches in the Gigha water: Loch Sween's land heights, relief and seabed for them, read through the change of
 // frame and faded into the Gigha water's own shapes, the land over the height grid's last 120 m and the seabed over the
 // depth grid's last eight cells. Past 15 m the depth grid stops, and the open water beyond keeps its own depth.
+// the beaches' upper shore, which the depths read from the water's colour cannot see: sand at one in twenty from a metre
+// above mean sea level at the dune foot, down until it meets the bed the grid has (never lowering it)
+function twinBeach(x, y, sd, b) {
+  const T = TWIN, w = T.at(T.beach, x, y) * (1 - T.at(T.rock, x, y));
+  return w > 0 ? lerp(b, Math.max(b, 1.0 + sd / 20), w) : b;
+}
 function twinGigha(x, y, sd, h) {
   const u = TWF.u(x, y), v = TWF.v(x, y), F = TWD.tdom;
   if (sd > 0) {
@@ -1099,14 +1105,14 @@ function twinGigha(x, y, sd, h) {
     return lerp(h, 1.0 + Math.max(0, g - 1) * smooth(0, 14, sd) + (fbm(x * 0.006, y * 0.006) - 0.5) * 3 * Math.min(1, sd / 150) + twinRelief(x, y, sd), w);
   }
   const G = TWSEA, fx = (u - G.x0) / G.step, fy = (v - G.y0) / G.step, i = Math.floor(fx), j = Math.floor(fy);
-  if (i < 0 || j < 0 || i >= G.nx - 1 || j >= G.ny - 1) return h;
+  if (i < 0 || j < 0 || i >= G.nx - 1 || j >= G.ny - 1) return twinBeach(x, y, sd, h);
   const tx = fx - i, ty = fy - j, k = j * G.nx + i, H = G.H, E = G.E;
   let b = 0, wt = 0, w = 0;
   const add = (q, a) => { if (H[q] === H[q]) { b += H[q] * a; wt += a; w += smooth(0, 8, E[q]) * a; } };
   add(k, (1 - tx) * (1 - ty)); add(k + 1, tx * (1 - ty)); add(k + G.nx, (1 - tx) * ty); add(k + G.nx + 1, tx * ty);
-  if (wt <= 0 || w <= 0) return h;
+  if (wt <= 0 || w <= 0) return twinBeach(x, y, sd, h);
   b /= wt;
-  return lerp(h, b < -14.5 ? Math.min(b, h) : b, w);
+  return twinBeach(x, y, sd, lerp(h, b < -14.5 ? Math.min(b, h) : b, w));
 }
 // the seabed at a spot: the model's height b, overlaid by each grid where it reaches, fading in over its last three cells
 function sweenSeabed(x, y, b) {
@@ -1129,6 +1135,7 @@ function heightAt(x, y, mesh = false) {
       const h = Math.max(-15, -(0.6 + Math.min(-sd, 60) * 0.08 + Math.max(0, -sd - 60) * 0.04));   // the charted depths stop at 15 m too
       let b = fl > 0 ? lerp(h, -0.18 + (fbm(x * 0.03, y * 0.03) - 0.5) * 0.4, smooth(0.2, 0.7, fl)) : h;
       b = sweenSeabed(x, y, b);
+      if (TWIN.in(x, y)) b = twinBeach(x, y, sd, b);
       return mesh ? b : Math.max(b, sweenRock(x, y));   // the rock has its own mesh
     }
     // the elevation data reaches the water's edge too high in places (trees, and a 30 m grid across a narrow shore), so ease it in
@@ -1544,6 +1551,11 @@ function buildTwinDetail(R, N) {
   g.save(); g.clip(sea, 'evenodd'); g.globalAlpha = 0.95; g.fillStyle = P.weed; g.fill(rock);
   g.globalAlpha = 1; g.fillStyle = P.wet; g.fill(sand); g.fillStyle = P.flat; g.fill(flat); g.restore();
   g.save(); g.clip(land); g.globalAlpha = 1; g.fillStyle = P.sand; g.fill(sand); g.restore();
+  // the upper beach stays dry at most high waters (it rises at one in twenty to a metre at the dune foot): dry sand
+  // down to about mean high water, its edge softened
+  { const band = (GIGHA ? 12 : 8) * sc;
+    g.save(); g.clip(sand); g.strokeStyle = P.sand; g.lineJoin = 'round';
+    g.globalAlpha = 0.45; g.lineWidth = 2 * band + 6 * sc; g.stroke(land); g.globalAlpha = 0.9; g.lineWidth = 2 * band; g.stroke(land); g.restore(); }
   // the paths: a worn edge, then the sand of the track
   g.lineCap = g.lineJoin = 'round';
   for (const pth of T.paths) {
@@ -1586,6 +1598,7 @@ function buildTwinWater(R, N) {
     // past 6 m down it hands over to the depth map of the whole water, which has these depths too, so the texture's
     // ten metres do not end in a step where it stops
     const k = (j * N + i) * 4; b /= wt;
+    if (T.at(T.beach, x, y) > 0) b = twinBeach(x, y, shoreDist(x, y), b);
     data[k] = Math.round(clamp((b + 10) / 11, 0, 1) * 255); data[k + 1] = Math.round(T.at(T.kelp, x, y) * 255); data[k + 3] = Math.round(clamp(e, 0, 1) * smooth(-10, -6, b) * 255);
   }
   const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
