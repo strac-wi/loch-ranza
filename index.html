@@ -208,6 +208,10 @@ body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #b
 .texslot small{display:block;color:var(--dim);font-size:13px}
 .hdlink{align-self:center;margin-left:auto;color:var(--cyan);font-size:14px;text-decoration:underline;text-underline-offset:3px}
 #quiz{z-index:7}
+#fishq{z-index:7}
+#fishq .card{max-height:100%;overflow:auto}
+#fqC{aspect-ratio:16/9}
+.fqtext{font-size:16px!important}
 .quiz canvas{width:100%;aspect-ratio:2.2/1;border-radius:6px;display:block;margin:8px 0;background:#05090f}
 .qzopts{display:grid;gap:7px;margin:8px 0}
 .qzopts button{text-align:left;text-transform:none;letter-spacing:.01em;font-size:16px;font-weight:500;padding:9px 12px;line-height:1.25}
@@ -369,7 +373,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
       <div class="rg"><div class="rlev" title="Throttle and gear lever"><i id="rLev"></i></div><b id="rGear">–</b>
         <div class="rcol"><span>Trim <b id="rTrim">0°</b></span><div class="rtrim"><i id="rTrimBar"></i></div><span id="rVent" class="rvent"></span></div><span class="rfold" id="rFold" aria-hidden="true">▾</span></div>
       <div class="rbtns"><button id="rEng" title="Start or stop the engine (X)">Stopped</button><button id="rKill" title="Clip the kill cord on or off (K)">Kill cord: on</button><button id="rLines" title="Make fast or let go (L)">Let go lines</button>
-        <button id="rTrimUp" title="Trim out, bow up (R)">Trim ▲</button><button id="rTrimDn" title="Trim in, bow down (F)">Trim ▼</button><button id="rMOB" class="warn" title="Man overboard (O)">MOB</button><button id="rDrill" title="Choose a drill (G)">Drill: Free practice</button></div>
+        <button id="rTrimUp" title="Trim out, bow up (R)">Trim ▲</button><button id="rTrimDn" title="Trim in, bow down (F)">Trim ▼</button><button id="rMOB" class="warn" title="Man overboard (O)">MOB</button><button id="rFish" class="go" hidden title="Fish health cases, alongside the feed barge">Fish health</button><button id="rDrill" title="Choose a drill (G)">Drill: Free practice</button></div>
     </div>
     <div id="layup" class="card" hidden><p id="layupText"></p><div class="lrow"><button id="layupYes" class="go">Lay up at South Pier</button><button id="layupNo">Carry on</button></div></div>
 
@@ -453,6 +457,17 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <div class="row"><button id="qzNext" class="go" hidden>Next</button><button id="qzClose">Close</button><span id="qzScore" class="score"></span></div>
       </div>
     </div>
+    <div id="fishq" class="overlay" hidden>
+      <div class="card quiz">
+        <p class="eyebrow" id="fqEye">Fish health</p>
+        <h2 id="fqTitle">What is wrong with these fish?</h2>
+        <canvas id="fqC" aria-label="An illustration of the fish or their gills"></canvas>
+        <p id="fqText" class="fqtext"></p>
+        <div id="fqOpts" class="qzopts"></div>
+        <div id="fqWhy" class="qzwhy" hidden></div>
+        <div class="row"><button id="fqNext" class="go" hidden>Next case</button><button id="fqClose">Close</button><span id="fqScore" class="score"></span></div>
+      </div>
+    </div>
     <div id="help" class="overlay help" hidden>
       <div class="card">
         <p class="eyebrow">Wheelhouse notes</p>
@@ -483,7 +498,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <h3>Simple controls</h3>
         <p>Pick Simple on the start screen, or switch with Controls, under Settings, at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
         <h3>The RIB: Gala Viking V500 with a Suzuki 100</h3>
-        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen, which remembers your last choices.</p>
+        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen, which remembers your last choices. Off the north-east of Gigha is a salmon farm: come alongside one of the feed barge's long sides, stopped and parallel, and make fast (L) for five fish health cases to diagnose.</p>
         <p>In a sea she pitches and slams: driving hard into a short chop costs speed and can launch her, so trim in and ease off, or take the waves at an angle. In the Sound of Gigha the ferry keeps crossing while you practise; she will not alter course for you, and if you are close under her bow she slows and gives five short blasts. At dusk and night she shows a white masthead light, red and green sidelights and a stern light; read which way she is heading from them. After a drill, Show track on the report opens the chart with your track coloured by speed and plays it back.</p>
         <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
         <h3>Other traffic</h3>
@@ -757,6 +772,29 @@ const TWF = (() => {
 // Castle Sween, and the points of interest the chart marks at every zoom
 const CASTLE = GIGHA ? null : { x: SW.castle[0], y: SW.castle[1], brg: SW.castle[2] };
 const POIS = GIGHA ? [(([x, y]) => ({ name: 'Twin Beaches', x, y, icon: 'beach' }))(TWF.from(...TWD.at))] : [{ name: 'Castle Sween', x: CASTLE.x, y: CASTLE.y, icon: 'castle' }, { name: 'Twin Beaches', x: SW.named['Twin Beaches'][0], y: SW.named['Twin Beaches'][1], icon: 'beach' }];
+// The salmon farm off the north-east of Gigha (Bakkafrost Scotland's East Tarbert Bay site), from the user's satellite
+// screenshots: twelve pens about 36 m across (120 m round) in two columns 60 m apart, rows 63 m apart, in a mooring grid
+// with a buoy at each corner of its cells, and the feed barge at the south end with the farm's workboat across its end.
+// Fitted in Loch Sween's metres and turned into the Gigha water's frame. Pens are in rows from the north, west then east.
+// The barge's size is a guess from the blurred screenshot and the user's photograph.
+const FARM = (() => {
+  const S2 = [[-8847.2, -34266.7], [-8787.4, -34269.2], [-8851.4, -34330.8], [-8791.4, -34332.7], [-8854.0, -34394.2], [-8795.2, -34396.6],
+    [-8858.5, -34457.2], [-8798.0, -34458.3], [-8862.7, -34520.1], [-8802.7, -34523.7], [-8862.6, -34582.6], [-8804.0, -34583.9]];
+  const pens = S2.map(([x, y]) => TWF.from(x, y)), [bx, by] = TWF.from(-8838.9, -34646.2);
+  const mid = (a, b) => [(pens[a][0] + pens[b][0]) / 2, (pens[a][1] + pens[b][1]) / 2], m0 = mid(0, 1), m5 = mid(10, 11);
+  const len = Math.hypot(m5[0] - m0[0], m5[1] - m0[1]), ux = (m5[0] - m0[0]) / len, uy = (m5[1] - m0[1]) / len, row = len / 5;
+  const at = (u, v) => [m0[0] + ux * u + uy * v, m0[1] + uy * u - ux * v];       // u down the line of pens (south), v to the west
+  const cw = Math.hypot(pens[0][0] - pens[1][0], pens[0][1] - pens[1][1]);
+  const nodes = []; for (let k = 0; k <= 6; k++) for (const v of [-cw, 0, cw]) nodes.push(at(-row / 2 + k * row, v));
+  const B = { x: bx, y: by, ux, uy, psi: Math.atan2(ux, uy), L: 22, W: 12 };
+  const W = { x: bx + ux * (B.L / 2 + 3.4), y: by + uy * (B.L / 2 + 3.4), psi: B.psi + Math.PI / 2, L: 14, B: 6 };
+  // the feed pipes: up the middle from the barge's north end, and out to each pen at its row
+  const pipes = [[[bx - ux * B.L / 2, by - uy * B.L / 2], at(0, 0)]];
+  for (let k = 0; k < 6; k++) for (const sgn of [1, -1]) pipes.push([at(k * row, 0), at(k * row, sgn * (cw / 2 - 18.5))]);
+  const c = at(2.5 * row, 0);
+  return { pens, R: 18.5, row, cw, nodes, corners: [nodes[0], nodes[2], nodes[18], nodes[20]], barge: B, work: W, pipes, cx: c[0], cy: c[1], at };
+})();
+POIS.push({ name: 'Salmon farm', x: FARM.cx, y: FARM.cy, icon: 'farm' });
 if (GIGHA) Object.assign(GEO, { pontoon: [[-3933, 1925], [-3789, 1906]], pontoonHW: 1.35, moorings: [[-3900, -3380, 1640, 2010, 9]], moorPts: TWD.boats.map(([x, y]) => TWF.from(x, y)) });
 // Gigha's South Pier, after aerial and shore photos: a ~98 m open-piled trestle running out at 118 degrees to a solid
 // head, with a fendered berthing arm running north-east. The seaward face of head and arm (a = 14) is the berth.
@@ -2734,6 +2772,7 @@ function updateLife(dt) {
     }
   }
   if (PONTOON) PONTOON.position.y = S.tide;
+  if (FARM.group) FARM.group.position.y = S.tide;
   const SU = scene.userData.sky.material.uniforms;
   SU.uOff.value.x = (SU.uOff.value.x + S.wind.x * 0.6 * dt / 6000) % 1; SU.uOff.value.y = (SU.uOff.value.y - S.wind.y * 0.6 * dt / 6000) % 1;
   SU.uCov.value = 0.68 - 0.16 * S.wx.wave;
@@ -4572,6 +4611,12 @@ function drawChart(g, W, H, v) {
       TWIN.trace(g, TWIN.rings[k], (x, y) => { const p = TWF.from(x, y); return [tx(p[0]), ty(p[1])]; }); g.fillStyle = c; g.fill();
     }
   }
+  // the salmon farm's pens and barge
+  if (span < 12000) {
+    g.strokeStyle = 'rgba(232,236,232,.8)'; g.lineWidth = Math.max(1, 1.2 * u);
+    for (const [x, y] of FARM.pens) { g.beginPath(); g.arc(tx(x), ty(y), Math.max(1.5 * u, FARM.R * sc), 0, 7); g.stroke(); }
+    const B = FARM.barge; g.fillStyle = 'rgba(232,236,232,.9)'; g.fillRect(tx(B.x) - Math.max(2 * u, B.W * sc / 2), ty(B.y) - Math.max(2 * u, B.L * sc / 2), Math.max(4 * u, B.W * sc), Math.max(4 * u, B.L * sc));
+  }
   if (v.big && span < 6000) {
     g.strokeStyle = 'rgba(214,206,178,.75)';
     for (const Rd of ROADS) { g.lineWidth = Math.max(1.2 * u, Rd.w * sc); g.beginPath(); Rd.pts.forEach(([x, y], i) => i ? g.lineTo(tx(x), ty(y)) : g.moveTo(tx(x), ty(y))); g.stroke(); }
@@ -4612,7 +4657,10 @@ function drawChart(g, W, H, v) {
   for (const P of POIS) {
     const px = tx(P.x), py = ty(P.y), s = Math.max(4.5, 6.5 * u);
     g.strokeStyle = '#2a1d0a'; g.lineWidth = Math.max(1, 1.2 * u);
-    if (P.icon === 'beach') {
+    if (P.icon === 'farm') {
+      g.fillStyle = '#e9b44c';
+      for (const [dx, dy] of [[-0.9, -0.5], [0.9, -0.5], [-0.9, 0.9], [0.9, 0.9]]) { g.beginPath(); g.arc(px + dx * s * 0.62, py + dy * s * 0.62, s * 0.5, 0, 7); g.fill(); g.stroke(); }
+    } else if (P.icon === 'beach') {
       g.beginPath(); g.moveTo(px - s * 1.1, py - s * 0.15); g.quadraticCurveTo(px, py - s * 1.6, px + s * 1.1, py - s * 0.15); g.closePath(); g.fillStyle = '#e9b44c'; g.fill(); g.stroke();
       g.beginPath(); g.moveTo(px, py - s * 0.15); g.lineTo(px, py + s); g.stroke();
       g.beginPath(); g.moveTo(px - s * 1.1, py + s); g.lineTo(px + s * 1.1, py + s); g.stroke();
@@ -4754,6 +4802,7 @@ function trkReplay() {
 const keys = new Set();
 const CONTROL_KEYS = new Set(['KeyR', 'KeyF', 'KeyX', 'KeyK', 'KeyL', 'KeyO', 'KeyG', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyH', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract']);
 window.addEventListener('keydown', (ev) => {
+  if (FQ.open) { fqKey(ev); return; }
   if (QZ.open) { quizKey(ev); return; }
   if (ev.code === 'Escape' && MAPX.open) { mapXOpen(false); return; }
   if (ev.code === 'Escape' && !$('toolsMore').hidden) { toolsMore(false); return; }
@@ -5172,6 +5221,248 @@ $('bQuiz2').onclick = () => quizOpen(true);
 $('qzNext').onclick = qzNext;
 $('qzClose').onclick = () => quizOpen(false);
 window.addEventListener('resize', () => { if (QZ.open) qzDraw(); });
+// ---------- fish health: cases at the salmon farm's feed barge ----------
+// Five cases a round from seven, each a short history, an illustration (drawn here: no photographs) and four diagnoses.
+// The signs follow published descriptions: the Norwegian Veterinary Institute, the Scottish Government's disease pages,
+// the API/AquaTT salmonid manual, and reviews in the Journal of Fish Diseases and PLoS ONE.
+const FQ_NAME = {
+  lice: 'Sea lice (Lepeophtheirus salmonis)', agd: 'Amoebic gill disease (Neoparamoeba perurans)', wud: 'Winter ulcer (Moritella viscosa)',
+  pd: 'Pancreas disease (salmonid alphavirus)', isa: 'Infectious salmon anaemia (ISA)', cms: 'Cardiomyopathy syndrome (CMS)', mr: 'Mouthrot (Tenacibaculum maritimum)',
+};
+const FQ_CASES = [
+  { id: 'lice', alt: ['mr', 'wud', 'agd'],
+    text: 'August, sea 13 °C, salmon in their second year at sea. In a crowded sample, small brown parasites sit on the head and behind the dorsal fin, some of them trailing two long egg strings, and the skin on top of the head is grazed raw.',
+    why: 'Heavily infested fish show grazing damage at the back of the head and behind the dorsal and adipose fins, where the mobile lice and egg-bearing females are seen. Erosions start as whitish spots and become open wounds; the losses come from the fish failing to hold its salt balance. Lice are counted on samples every week and kept down with cleaner fish (wrasse and lumpfish) and freshwater, warm-water or mechanical treatments.' },
+  { id: 'agd', alt: ['pd', 'isa', 'lice'],
+    text: 'Late summer after a dry spell: the sea is 14 °C and salty. The fish are off their feed and many are at the surface, breathing fast. Lifting the gill cover shows raised white, mucous patches on the gills.',
+    why: 'The amoeba Neoparamoeba perurans makes the gill tissue thicken and pour out mucus. Gills are checked for white patches and scored from 0 to 5 over all sixteen hemibranchs; histology and PCR confirm it. A freshwater bath is the most effective treatment, hydrogen peroxide the other, and both work best given early.' },
+  { id: 'wud', alt: ['lice', 'mr', 'cms'],
+    text: 'February, sea 6 °C. Losses are creeping up. Sick fish carry round open sores on the flanks, ringed by swollen, reddened skin where the scales have come away.',
+    why: 'Moritella viscosa starts as swelling and loss of scales and goes on to open ulcers. Outbreaks come in cold water, mostly below about 7 °C, and the bacterium loses its virulence at about 12 °C. Tenacibaculum and Aliivibrio wodanis are often found with it.' },
+  { id: 'pd', alt: ['cms', 'agd', 'isa'],
+    text: 'The first summer after transfer to sea. Appetite has collapsed and mortality is rising. The sample is full of thin, slow-growing runts, and the gut holds yellow mucoid contents instead of feed.',
+    why: 'Salmonid alphavirus destroys the exocrine pancreas and damages heart and muscle: severe loss of appetite, mortality, and runts that never catch up. Confirmed by histology with a positive PCR or serology in the same fish. HSMI and CMS are the differentials, but neither touches the exocrine pancreas. It was first described in Scotland, in 1976.' },
+  { id: 'isa', alt: ['pd', 'cms', 'wud'],
+    text: 'One pen. Lethargic fish hang at the edges and will not feed. Their gills are very pale, bellies swollen and eyes bulging. At post-mortem the body cavity holds fluid and the liver is dark.',
+    why: 'Severe anaemia, ascites, bleeding in the organs and a darkened liver. ISA is notifiable in Great Britain: report it to the Fish Health Inspectorate at once. Scotland\'s outbreaks of 1998–99 and 2008–09 were both eradicated.' },
+  { id: 'cms', alt: ['pd', 'isa', 'agd'],
+    text: 'Second year at sea, fish of 4 kg and more, close to harvest. Large fish in good condition are found dead with no marks on them. At post-mortem the sac round the heart is full of clotted blood.',
+    why: 'The wall of the atrium or sinus venosus weakens and gives way: blood fills the pericardium and the fish dies suddenly. It strikes large fish more than a year after transfer, so the losses are costly. It is linked to piscine myocarditis virus.' },
+  { id: 'mr', alt: ['wud', 'lice', 'pd'],
+    text: 'Smolts put to sea two weeks ago are dying, most with few marks. Looking closely: small yellow plaques inside the mouth, and in the worst the jaw eaten away and the fins frayed.',
+    why: 'Smolts newly moved to sea water are the most susceptible, and often die with no more than small yellow plaques in the mouth; the damage runs from spots round the teeth to erosion of the upper or lower jaw. Mouth lesions are the signature of tenacibaculosis in salmon.' },
+];
+const FQ = { open: false, list: [], k: 0, right: 0, q: null, was: false, best: +(PREFS.fishBest || 0) };
+// ---- the illustrations: a sampling tray with a ruler, or the gills with the cover lifted; insets for the post-mortem
+function fqTray(g, W, H) {
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#24323b'); bg.addColorStop(1, '#31424d'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#d9d4c3'; g.fillRect(0, H - 22, W, 22); g.strokeStyle = '#3a3a33'; g.fillStyle = '#3a3a33'; g.font = '10px sans-serif'; g.lineWidth = 1;
+  for (let k = 0; k * 7 < W - 20; k++) { const x = 20 + k * 7; g.beginPath(); g.moveTo(x, H - 22); g.lineTo(x, H - (k % 5 ? 17 : 11)); g.stroke(); if (k % 10 === 0) g.fillText(k + (k ? '' : ' cm'), x + 2, H - 5); }   // 7 px a centimetre
+}
+function fqSalmon(g, o) {
+  const x0 = o.x, y0 = o.y, L = o.L, H = L * 0.24 * (o.thin ? 0.7 : 1), bel = o.belly || 1, X = (u) => x0 + u * L, Y = (v) => y0 + v * H, rnd = mulberry(o.seed || 7);
+  const body = new Path2D();
+  body.moveTo(X(0), Y(0));
+  body.bezierCurveTo(X(0.06), Y(-0.22), X(0.22), Y(-0.5), X(0.42), Y(-0.5));
+  body.bezierCurveTo(X(0.62), Y(-0.48), X(0.78), Y(-0.2), X(0.86), Y(-0.11));
+  body.lineTo(X(0.86), Y(0.11));
+  body.bezierCurveTo(X(0.76), Y(0.2), X(0.58), Y(0.42 * bel), X(0.4), Y(0.42 * bel));
+  body.bezierCurveTo(X(0.2), Y(0.4 * bel), X(0.05), Y(0.2), X(0), Y(0));
+  const fc = o.dull ? '#34424a' : '#41545f';
+  const poly = (pts, c, rag) => {
+    g.beginPath();
+    pts.forEach(([u, v], i) => { const jx = rag ? (rnd() - 0.5) * rag : 0, jy = rag ? (rnd() - 0.5) * rag : 0; i ? g.lineTo(X(u) + jx, Y(v) + jy) : g.moveTo(X(u), Y(v)); });
+    g.closePath(); g.fillStyle = c; g.fill();
+  };
+  // the tail, forked, frayed in mouthrot
+  const tail = [[0.86, -0.11], [0.99, -0.5], [1.0, -0.46], [0.95, 0], [1.0, 0.46], [0.99, 0.5], [0.86, 0.11]];
+  if (o.frayed) { const t2 = [[0.86, -0.11]]; for (let k = 0; k <= 16; k++) { const f = k / 16, v = -0.48 + f * 0.96, u = 0.95 + Math.abs(v) * 0.11; t2.push([u - (k % 2) * 0.03 - rnd() * 0.02, v]); } t2.push([0.86, 0.11]); poly(t2, fc); }
+  else poly(tail, fc);
+  poly([[0.4, -0.48], [0.47, -0.8], [0.54, -0.74], [0.56, -0.45]], fc, o.frayed ? 8 : 0);       // dorsal
+  poly([[0.74, -0.26], [0.775, -0.38], [0.8, -0.21]], fc);                                        // adipose
+  poly([[0.68, 0.3], [0.72, 0.5], [0.775, 0.44], [0.78, 0.24]], fc, o.frayed ? 6 : 0);           // anal
+  poly([[0.5, 0.41 * bel], [0.55, 0.58 * bel], [0.585, 0.38 * bel]], fc);                       // pelvic
+  // the body: dark steel back, silver flanks, white belly
+  const gr = g.createLinearGradient(0, Y(-0.5), 0, Y(0.45 * bel));
+  if (o.dull) { gr.addColorStop(0, '#2b3a43'); gr.addColorStop(0.45, '#6f7f87'); gr.addColorStop(0.7, '#a9b3b6'); gr.addColorStop(1, '#cfd6d6'); }
+  else { gr.addColorStop(0, '#2b4252'); gr.addColorStop(0.35, '#7f95a2'); gr.addColorStop(0.58, '#cbd6db'); gr.addColorStop(1, '#f0f3f3'); }
+  g.fillStyle = gr; g.fill(body);
+  g.save(); g.clip(body);
+  // a sheen along the flank, the black spots above the lateral line, the lateral line
+  const sh = g.createLinearGradient(0, Y(-0.15), 0, Y(0.12)); sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, 'rgba(255,255,255,0.22)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = sh; g.fillRect(X(0), Y(-0.15), L, H * 0.27);
+  g.strokeStyle = '#121c24'; g.lineWidth = 1.6;
+  g.strokeStyle = 'rgba(18,28,36,0.8)'; g.lineWidth = 1.3;
+  for (let k = 0; k < 40; k++) { const u = 0.13 + rnd() * 0.66, v = -0.46 + rnd() * 0.4, x = X(u), y = Y(v), d = 1.5 + rnd() * 1.4; g.beginPath(); g.moveTo(x - d, y - d); g.lineTo(x + d, y + d); g.moveTo(x + d, y - d); g.lineTo(x - d, y + d); g.stroke(); }
+  g.strokeStyle = 'rgba(40,55,65,0.55)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(0.21), Y(-0.03)); g.quadraticCurveTo(X(0.5), Y(-0.05), X(0.86), Y(0)); g.stroke();
+  // gills showing behind a lifted cover: red, or pale in anaemia
+  if (o.gill) {
+    g.beginPath(); g.moveTo(X(0.19), Y(-0.3)); g.quadraticCurveTo(X(0.235), Y(0.02), X(0.19), Y(0.33)); g.quadraticCurveTo(X(0.27), Y(0.02), X(0.19), Y(-0.3));
+    g.fillStyle = o.gill === 'pale' ? '#e8cfc9' : '#b8323c'; g.fill();
+    g.strokeStyle = o.gill === 'pale' ? 'rgba(200,160,155,0.8)' : 'rgba(120,20,30,0.8)'; g.lineWidth = 0.8;
+    for (let k = 0; k < 14; k++) { const v = -0.26 + k * 0.042; g.beginPath(); g.moveTo(X(0.205), Y(v)); g.lineTo(X(0.235), Y(v + 0.02)); g.stroke(); }
+  }
+  for (const [u, v, r] of o.ulcers || []) fqUlcer(g, X(u), Y(v), r, rnd);
+  for (const [u, v, r] of o.erode || []) fqErosion(g, X(u), Y(v), r, rnd);
+  g.restore();
+  g.strokeStyle = 'rgba(20,30,36,0.7)'; g.lineWidth = 1.4; g.stroke(body);
+  // the gill cover's edge, the pectoral fin, the mouth and eye
+  g.beginPath(); g.moveTo(X(0.19), Y(-0.3)); g.quadraticCurveTo(X(0.235), Y(0.02), X(0.19), Y(0.33)); g.stroke();
+  poly([[0.22, 0.17], [0.31, 0.4], [0.27, 0.16]], 'rgba(70,88,98,0.9)');
+  g.beginPath(); g.moveTo(X(0.0), Y(0.0)); g.lineTo(X(0.09), Y(0.07)); g.stroke();
+  const er = L * 0.021 * (o.popeye ? 1.45 : 1), ex = X(0.075), ey = Y(-0.1);
+  if (o.popeye) { g.fillStyle = 'rgba(30,20,20,0.35)'; g.beginPath(); g.arc(ex + 2, ey + 2, er * 1.25, 0, 7); g.fill(); }
+  g.fillStyle = '#cfd6d8'; g.beginPath(); g.arc(ex, ey, er, 0, 7); g.fill();
+  g.fillStyle = '#0b0e10'; g.beginPath(); g.arc(ex, ey, er * 0.62, 0, 7); g.fill();
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(ex - er * 0.25, ey - er * 0.25, er * 0.16, 0, 7); g.fill();
+  // mouthrot: the jaw's tip eaten away, yellow plaques round the teeth
+  if (o.jaw) {
+    g.fillStyle = '#c97b74'; g.beginPath(); g.moveTo(X(-0.005), Y(-0.04)); g.lineTo(X(0.05), Y(-0.1)); g.lineTo(X(0.08), Y(0.02)); g.lineTo(X(0.06), Y(0.12)); g.lineTo(X(0.0), Y(0.06)); g.closePath(); g.fill();
+    g.fillStyle = '#e8c64a'; for (const [u, v] of [[0.02, -0.03], [0.045, 0.04], [0.06, -0.06], [0.035, 0.09], [0.07, 0.07]]) { g.beginPath(); g.ellipse(X(u), Y(v), 4.6, 3.2, 0.4, 0, 7); g.fill(); }
+  }
+  for (const [u, v, a, eggs] of o.lice || []) fqLouse(g, X(u), Y(v), a, eggs);
+}
+function fqLouse(g, x, y, a, eggs) {
+  g.save(); g.translate(x, y); g.rotate(a); g.scale(1.5, 1.5);   // drawn about three times life size, to be seen
+  if (eggs) { g.strokeStyle = '#8a6a3c'; g.lineWidth = 2.4; for (const d of [-1, 1]) { g.beginPath(); g.moveTo(-7, d * 1.4); g.quadraticCurveTo(-19, d * 4, -32, d * 5.5); g.stroke(); } }
+  g.fillStyle = '#5b3d22'; g.beginPath(); g.ellipse(0, 0, 5.5, 4.4, 0, 0, 7); g.fill();
+  g.fillStyle = '#7d5c36'; g.beginPath(); g.ellipse(-7, 0, 3.4, 2.6, 0, 0, 7); g.fill();
+  g.restore();
+}
+function fqErosion(g, x, y, r, rnd) {
+  const blob = (rr) => { g.beginPath(); for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, q = rr * (0.75 + rnd() * 0.45); k ? g.lineTo(x + Math.cos(a) * q * 1.4, y + Math.sin(a) * q) : g.moveTo(x + Math.cos(a) * q * 1.4, y + Math.sin(a) * q); } g.closePath(); };
+  blob(r * 1.25); g.fillStyle = 'rgba(240,236,230,0.85)'; g.fill();
+  blob(r); g.fillStyle = '#c45a5c'; g.fill();
+  blob(r * 0.5); g.fillStyle = '#9b3038'; g.fill();
+}
+function fqUlcer(g, x, y, r, rnd) {
+  g.fillStyle = 'rgba(214,188,186,0.85)'; g.beginPath(); g.arc(x, y, r * 1.7, 0, 7); g.fill();         // the scales gone round it
+  g.fillStyle = '#d2575a'; g.beginPath(); g.arc(x, y, r * 1.18, 0, 7); g.fill();                    // swollen red rim
+  g.beginPath(); for (let k = 0; k < 18; k++) { const a = k / 18 * Math.PI * 2, q = r * (0.8 + rnd() * 0.3); k ? g.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q) : g.moveTo(x + Math.cos(a) * q, y + Math.sin(a) * q); } g.closePath();
+  g.fillStyle = '#7d1922'; g.fill(); g.strokeStyle = 'rgba(225,214,200,0.9)'; g.lineWidth = 2; g.stroke();   // the open sore, its necrotic edge
+  g.fillStyle = 'rgba(160,40,50,0.8)'; g.beginPath(); g.arc(x - r * 0.2, y - r * 0.15, r * 0.35, 0, 7); g.fill();
+}
+function fqGills(g, W, H, kind) {
+  const bg = g.createRadialGradient(W * 0.6, H * 0.5, 40, W * 0.6, H * 0.5, W * 0.7); bg.addColorStop(0, '#5a3434'); bg.addColorStop(1, '#2a1a1c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  // the gill cover lifted at the left, silver
+  g.fillStyle = '#9aa9b0'; g.beginPath(); g.moveTo(0, 0); g.lineTo(120, 0); g.quadraticCurveTo(170, H / 2, 120, H); g.lineTo(0, H); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(30,40,46,0.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(120, 0); g.quadraticCurveTo(170, H / 2, 120, H); g.stroke();
+  const rnd = mulberry(77);
+  for (let a = 0; a < 4; a++) {
+    const cx = 230 + a * 95, arch = (t) => [cx + Math.sin(t * Math.PI) * 55 - 30, 20 + t * (H - 60)];
+    for (let k = 0; k <= 70; k++) {
+      const t = k / 70, [x, y] = arch(t), len = 48 + rnd() * 14;
+      g.strokeStyle = kind === 'pale' ? (k % 2 ? '#e4c3bd' : '#d8b0aa') : (k % 2 ? '#c2303c' : '#a92633'); g.lineWidth = 3.2;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y + 6); g.stroke();
+    }
+    g.strokeStyle = '#efe6dc'; g.lineWidth = 5; g.beginPath(); for (let k = 0; k <= 30; k++) { const [x, y] = arch(k / 30); k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();   // the arch's bone
+  }
+  if (kind === 'agd') {
+    // raised white mucoid patches across the filaments
+    for (const [x, y, r] of [[300, 90, 22], [270, 210, 16], [395, 150, 26], [470, 255, 19], [520, 110, 15], [585, 205, 22], [360, 290, 14]]) {
+      g.fillStyle = 'rgba(40,10,14,0.35)'; g.beginPath(); g.ellipse(x + 3, y + 4, r * 1.25, r * 0.85, 0.2, 0, 7); g.fill();
+      g.fillStyle = '#f1ece4'; g.beginPath(); for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, q = r * (0.75 + rnd() * 0.4); k ? g.lineTo(x + Math.cos(a) * q * 1.25, y + Math.sin(a) * q * 0.85) : g.moveTo(x + Math.cos(a) * q * 1.25, y + Math.sin(a) * q * 0.85); } g.closePath(); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(x - r * 0.3, y - r * 0.25, r * 0.4, r * 0.22, 0.2, 0, 7); g.fill();
+    }
+  }
+}
+function fqInset(g, W, H, kind) {
+  const w = 210, h = 128, x = W - w - 14, y = H - h - 32;
+  g.fillStyle = 'rgba(10,16,20,0.92)'; g.strokeStyle = '#f2b33d'; g.lineWidth = 1.5; g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, 6) : g.rect(x, y, w, h); g.fill(); g.stroke();
+  g.fillStyle = '#f2b33d'; g.font = '600 11px sans-serif'; g.fillText({ heart: 'POST-MORTEM: THE HEART', liver: 'POST-MORTEM: BODY CAVITY', gut: 'POST-MORTEM: THE GUT' }[kind], x + 10, y + 17);
+  const cx = x + w / 2, cy = y + h / 2 + 10;
+  if (kind === 'heart') {
+    g.fillStyle = '#4a0b10'; g.beginPath(); g.ellipse(cx, cy, 62, 40, 0, 0, 7); g.fill();                    // the sac, full of clot
+    g.fillStyle = '#2e0508'; for (let k = 0; k < 9; k++) { g.beginPath(); g.ellipse(cx - 45 + k * 11, cy + Math.sin(k * 1.7) * 18, 9, 6, k, 0, 7); g.fill(); }
+    g.fillStyle = '#b5484b'; g.beginPath(); g.moveTo(cx - 22, cy - 18); g.lineTo(cx + 26, cy - 14); g.lineTo(cx + 2, cy + 26); g.closePath(); g.fill();   // the ventricle
+    g.strokeStyle = '#e8d8c8'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, cy, 62, 40, 0, 0, 7); g.stroke();
+    g.fillStyle = '#d8d0c8'; g.font = '10px sans-serif'; g.fillText('clotted blood in the pericardium', x + 10, y + h - 8);
+  } else if (kind === 'liver') {
+    g.fillStyle = 'rgba(232,214,150,0.55)'; g.beginPath(); g.ellipse(cx, cy, 86, 40, 0, 0, 7); g.fill();       // fluid in the cavity
+    g.fillStyle = '#2e1412'; g.beginPath(); g.ellipse(cx - 18, cy - 2, 44, 24, -0.2, 0, 7); g.fill();          // the dark liver
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.ellipse(cx - 28, cy - 10, 16, 6, -0.2, 0, 7); g.fill();
+    g.fillStyle = '#a03a3a'; for (const [dx, dy] of [[40, 8], [52, -6], [30, 18], [60, 14]]) { g.beginPath(); g.arc(cx + dx, cy + dy, 2.2, 0, 7); g.fill(); }
+    g.fillStyle = '#d8d0c8'; g.font = '10px sans-serif'; g.fillText('dark liver, fluid, small bleeds', x + 10, y + h - 8);
+  } else {
+    g.strokeStyle = '#c9a99a'; g.lineWidth = 22; g.lineCap = 'round'; g.beginPath(); g.moveTo(x + 24, cy - 6); g.bezierCurveTo(x + 80, cy - 40, x + 130, cy + 30, x + w - 24, cy - 4); g.stroke();
+    g.strokeStyle = '#e2c64e'; g.lineWidth = 10; g.beginPath(); g.moveTo(x + 30, cy - 6); g.bezierCurveTo(x + 80, cy - 38, x + 130, cy + 28, x + w - 30, cy - 4); g.stroke();
+    g.lineCap = 'butt'; g.fillStyle = '#d8d0c8'; g.font = '10px sans-serif'; g.fillText('yellow mucoid contents, no feed', x + 10, y + h - 8);
+  }
+}
+function fqDraw() {
+  const c = $('fqC'), q = FQ.q, dpr = Math.min(2, window.devicePixelRatio || 1), W = 640, H = 360;
+  c.width = Math.round((c.clientWidth || W) * dpr); c.height = Math.round(c.width * H / W);
+  const g = c.getContext('2d'); g.setTransform(c.width / W, 0, 0, c.height / H, 0, 0);
+  const id = q.c.id;
+  if (id === 'agd') fqGills(g, W, H, 'agd');
+  else {
+    fqTray(g, W, H);
+    const F = { x: 70, y: 175, L: 490, seed: 11 };
+    if (id === 'lice') fqSalmon(g, { ...F, erode: [[0.12, -0.36, 9], [0.17, -0.41, 7], [0.58, -0.36, 8]],
+      lice: [[0.13, -0.3, 0.3, true], [0.16, -0.24, -0.2, false], [0.56, -0.41, 0.1, true], [0.6, -0.34, -0.3, true], [0.63, -0.42, 0.2, false], [0.79, -0.25, 0, true]] });
+    else if (id === 'wud') fqSalmon(g, { ...F, ulcers: [[0.38, 0.05, 15], [0.55, -0.12, 11], [0.47, 0.25, 9]] });
+    else if (id === 'pd') { fqSalmon(g, { ...F, y: 120, L: 330, x: 60, seed: 5 }); fqSalmon(g, { x: 60, y: 255, L: 300, thin: true, dull: true, seed: 9 }); fqInset(g, W, H, 'gut'); }
+    else if (id === 'isa') { fqSalmon(g, { ...F, L: 430, belly: 1.75, popeye: true, gill: 'pale', dull: true }); fqInset(g, W, H, 'liver'); }
+    else if (id === 'cms') { fqSalmon(g, { ...F, L: 470, y: 160, belly: 1.08 }); fqInset(g, W, H, 'heart'); }
+    else if (id === 'mr') fqSalmon(g, { ...F, L: 440, x: 110, jaw: true, frayed: true, seed: 3 });
+  }
+  g.fillStyle = 'rgba(220,230,235,0.75)'; g.font = '11px sans-serif'; g.fillText('Illustration, not a photograph', 10, 16);
+}
+function fqShow() {
+  const c = FQ.list[FQ.k], opts = [c.id, ...c.alt].map(k => FQ_NAME[k]).sort(() => Math.random() - 0.5);
+  FQ.q = { c, opts, ans: FQ_NAME[c.id], done: false };
+  setT($('fqEye'), `Fish health · case ${FQ.k + 1} of ${FQ.list.length}`); setT($('fqTitle'), 'What is wrong with these fish?');
+  setT($('fqText'), c.text); $('fqC').hidden = false;
+  const box = $('fqOpts'); box.innerHTML = '';
+  opts.forEach((t, i) => { const b = document.createElement('button'); b.textContent = `${'ABCD'[i]}. ${t}`; b.onclick = () => fqAnswer(i); box.appendChild(b); });
+  $('fqWhy').hidden = true; $('fqNext').hidden = true;
+  setT($('fqScore'), `${FQ.right} of ${FQ.k} right`);
+  fqDraw();
+}
+function fqAnswer(i) {
+  const q = FQ.q; if (!q || q.done) return;
+  q.done = true; const ok = q.opts[i] === q.ans; if (ok) FQ.right++;
+  [...$('fqOpts').children].forEach((b, k) => { b.disabled = true; if (q.opts[k] === q.ans) b.classList.add('right'); else if (k === i) b.classList.add('wrong'); });
+  $('fqWhy').innerHTML = `<b>${ok ? 'Right' : 'Not quite'}: ${q.ans}.</b> ${q.c.why}`;
+  $('fqWhy').hidden = false; setT($('fqNext'), FQ.k < FQ.list.length - 1 ? 'Next case' : 'See your score'); $('fqNext').hidden = false; $('fqNext').focus();
+  setT($('fqScore'), `${FQ.right} of ${FQ.k + 1} right`);
+}
+function fqNext() {
+  if (FQ.q && !FQ.q.done) return;
+  if (FQ.k < FQ.list.length - 1) { FQ.k++; fqShow(); return; }
+  if (FQ.q && FQ.q.c) {
+    // the round's score
+    if (FQ.right > FQ.best) { FQ.best = FQ.right; savePrefs({ fishBest: FQ.best }); }
+    FQ.q = { done: true, end: true };
+    setT($('fqEye'), 'Fish health · round over'); setT($('fqTitle'), `${FQ.right} of ${FQ.list.length}`);
+    setT($('fqText'), FQ.right === FQ.list.length ? 'Every case right: the site vet would sign that off.' : FQ.right >= 3 ? 'A good round. The explanations are worth a second look for the ones you missed.' : 'A hard round: the farm sees most of these every year, so they come up again.');
+    $('fqC').hidden = true; $('fqOpts').innerHTML = ''; $('fqWhy').hidden = true;
+    setT($('fqNext'), 'Another round'); $('fqNext').hidden = false; setT($('fqScore'), `best ${FQ.best} of 5`);
+    log(`Fish health round: ${FQ.right} of ${FQ.list.length}`);
+    return;
+  }
+  fqStart();
+}
+function fqStart() {
+  const pool = FQ_CASES.slice().sort(() => Math.random() - 0.5); FQ.list = pool.slice(0, 5); FQ.k = 0; FQ.right = 0; fqShow();
+}
+function fqOpen(on) {
+  if (on === FQ.open) return;
+  FQ.open = on; $('fishq').hidden = !on; keys.clear();
+  if (on) { FQ.was = !!(S && S.running); if (S) S.running = false; fqStart(); }
+  else if (S && FQ.was) S.running = true;
+}
+function fqKey(ev) {
+  ev.preventDefault();
+  const q = FQ.q, k = /^Key[A-D]$/.test(ev.code) ? ev.code.charCodeAt(3) - 65 : /^Digit[1-4]$/.test(ev.code) ? +ev.code[5] - 1 : -1;
+  if (ev.code === 'Escape') fqOpen(false);
+  else if (k >= 0 && q && !q.done) fqAnswer(k);
+  else if ((ev.code === 'Enter' || ev.code === 'KeyN' || ev.code === 'Space') && q && q.done) fqNext();
+}
+$('fqNext').onclick = fqNext;
+$('fqClose').onclick = () => fqOpen(false);
+$('rFish').onclick = () => fqOpen(true);
+window.addEventListener('resize', () => { if (FQ.open && FQ.q && !FQ.q.end) fqDraw(); });
 
 // ---------- pointer: orbit / look, and operating wheelhouse controls ----------
 let drag = null;
@@ -6254,6 +6545,7 @@ function ribBoxes() {
     { const [cx, cy] = P.at((12 + P.L) / 2, 0); box(cx, cy, P.ux, P.uy, (P.L - 12) / 2, 1.35, 'the pontoon'); }
     { const [cx, cy] = P.at(P.L - 1.5, 0); box(cx, cy, P.ux, P.uy, 1.5, 4, 'the pontoon'); }
   }
+  { const F = FARM.barge, W = FARM.work; box(F.x, F.y, F.ux, F.uy, F.L / 2, F.W / 2, 'the feed barge'); box(W.x, W.y, Math.sin(W.psi), Math.cos(W.psi), W.L / 2, W.B / 2, 'the farm workboat'); }
   if (!GIGHA) return B;
   for (const T of TERMS) box(T.P.x + T.d.x * T.len / 2, T.P.y + T.d.y * T.len / 2, T.d.x, T.d.y, T.len / 2 + 1, 6, T.id === 'gig' ? 'the Gigha slip' : 'the Tayinloan slip');
   for (const b of SPIER.boxes) { const c = SPIER.toW((b.a0 + b.a1) / 2, (b.c0 + b.c1) / 2); box(c.x, c.y, SPIER.A.x, SPIER.A.y, (b.a1 - b.a0) / 2, (b.c1 - b.c0) / 2, 'the South Pier'); }
@@ -6267,6 +6559,8 @@ function ribCircles() {
   if (LIFE.moored) for (const m of LIFE.moored) { const p = m.g.position, a = m.g.rotation.y, fx = -Math.sin(a), fy = Math.cos(a); for (const k of [-0.25, 0.25]) C.push({ x: p.x + fx * k * m.len, y: -p.z + fy * k * m.len, r: m.len * 0.19, name: 'a moored boat' }); C.push({ x: m.x, y: m.y, r: 0.4, name: 'a mooring buoy' }); }
   if (LIFE.alongside) for (const b of LIFE.alongside) C.push({ x: b.x, y: b.y, r: 1.6, name: 'a boat on the pontoon' });
   for (const b of LIFE.buoys) C.push({ x: b.userData.x, y: b.userData.y, r: 1.1, name: 'a buoy' });
+  for (const [x, y] of FARM.pens) C.push({ x, y, r: FARM.R + 0.5, name: 'a salmon pen' });
+  for (const [x, y] of FARM.nodes) C.push({ x, y, r: 0.9, name: 'a mooring buoy' });
   if (GEO.rock) C.push({ x: GEO.rock[0], y: GEO.rock[1], r: 6.5, name: 'the rock off Achnamara' });
   for (const V of TRAF.list) { const hx = Math.sin(V.psi), hy = Math.cos(V.psi); for (const a of [-0.3, 0, 0.3]) C.push({ x: V.x + hx * a * V.len, y: V.y + hy * a * V.len, r: V.beam * 0.45, name: V.name }); }
   for (const p of TRAF.pots) C.push({ x: p.x, y: p.y, r: 0.45, name: 'a creel buoy' });
@@ -6419,6 +6713,20 @@ function ribLines() {
   const R = RB;
   if (R.fast) { R.fast = false; log(R.fastAt === 'mooring' ? 'Mooring slipped' : 'Lines let go'); if (R.drill.id === 'alongside' && R.drill.stage === 0) { R.drill.stage = 1; R.drill.t0 = S.t; } return; }
   const sog = Math.hypot(R.u, R.v) / KN;
+  // the salmon farm's feed barge, in either water: lie along either long side
+  {
+    const B = FARM.barge, dx = R.x - B.x, dy = R.y - B.y;
+    if (Math.hypot(dx, dy) < 45) {
+      const s = dx * B.ux + dy * B.uy, t = dx * B.uy - dy * B.ux;
+      const hd = ((R.psi - B.psi) % Math.PI + Math.PI) % Math.PI, par = Math.min(hd, Math.PI - hd) / DEG, gap = Math.abs(t) - B.W / 2 - 1.08;
+      if (Math.abs(s) < B.L / 2 - 1 && gap < 0.7 && par < 20 && sog < 0.7) {
+        R.fast = true; R.fastAt = 'barge'; R.pose = { x: R.x, y: R.y, psi: R.psi }; log('Lines made fast alongside the feed barge', 'good');
+        toast('Alongside the feed barge: the fish health team have five cases for you');
+        setTimeout(() => { if (RB.fast && RB.fastAt === 'barge') fqOpen(true); }, 1200);
+      } else msg(gap >= 0.7 ? 'Get her alongside the barge first: closer than a step' : par >= 20 ? 'Lie her parallel to the barge' : sog >= 0.7 ? 'Stop her alongside first' : 'Come alongside one of the barge\'s long sides');
+      return;
+    }
+  }
   if (GEO.mooring) {
     // the crew can reach the buoy's pick-up from the bow with the boat hook
     const [bx, by] = ribBow(), dm = Math.hypot(bx - GEO.mooring[0], by - GEO.mooring[1]);
@@ -6924,7 +7232,9 @@ function updateRibUI() {
   setT($('rEng'), R.eng === 'run' ? 'Running' : R.eng === 'crank' ? 'Cranking' : 'Start eng'); setC($('rEng'), 'on', R.eng === 'run'); setC($('rEng'), 'warn', R.eng === 'off');
   const ph = PHONE.matches;
   setT($('rKill'), (ph ? 'Kill: ' : 'Kill cord: ') + (R.kill ? 'on' : 'off')); setC($('rKill'), 'warn', !R.kill);
-  setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? (ph ? 'Slip' : 'Slip mooring') : (ph ? 'Let go' : 'Let go lines')) : GIGHA ? 'Make fast' : ph ? 'Pick up' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
+  const nearBarge = Math.hypot(R.x - FARM.barge.x, R.y - FARM.barge.y) < 45;
+  setT($('rLines'), R.fast ? (R.fastAt === 'mooring' ? (ph ? 'Slip' : 'Slip mooring') : (ph ? 'Let go' : 'Let go lines')) : GIGHA || nearBarge ? 'Make fast' : ph ? 'Pick up' : 'Pick up mooring'); setC($('rLines'), 'on', R.fast);
+  $('rFish').hidden = !(R.fast && R.fastAt === 'barge');
   setT($('rDrill'), 'Drill: ' + (ph ? DRILL_SHORT : DRILL_NAME)[R.drill.id]);
   setT($('rVent'), R.vent > 0.3 ? 'Prop ventilating' : R.grounded ? 'Aground' : ''); 
   const [title, items] = ribChecklist(), html = items.map(([t2, ok, note]) => `<li class="${ok ? 'ok' : note || ''}">${tw(t2)}</li>`).join('');
@@ -7296,6 +7606,82 @@ function buildCastlePark(g, box) {
 }
 if (GIGHA) buildLocal(); else buildSweenLocal();
 buildRib();
+// the salmon farm: the pens' black floating collars, handrails and bird nets on their centre poles, the grid's buoys and
+// its yellow corner lights (Fl Y 5s), the floating feed pipes, the feed barge and the workboat, all riding the tide
+function buildFarm() {
+  const F = FARM, g = new THREE.Group(); scene.add(g); F.group = g;
+  const dummy = new THREE.Object3D(), black = new THREE.MeshLambertMaterial({ color: 0x17191a }), n = F.pens.length;
+  const ring = (geo, mat, y) => {
+    const m = new THREE.InstancedMesh(geo, mat, n);
+    F.pens.forEach(([x, z], i) => { dummy.position.set(x, y, -z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); });
+    g.add(m); return m;
+  };
+  const R = F.R;
+  ring(new THREE.TorusGeometry(R, 0.24, 6, 64).rotateX(Math.PI / 2), black, 0.18);
+  ring(new THREE.TorusGeometry(R - 0.85, 0.2, 6, 64).rotateX(Math.PI / 2), black, 0.16);
+  ring(new THREE.TorusGeometry(R - 0.42, 0.045, 4, 64).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x2b2f31 }), 1.15);
+  ring(new THREE.CylinderGeometry(0.11, 0.14, 5.6, 6), new THREE.MeshLambertMaterial({ color: 0x3a3f42 }), 2.6);
+  // the bird net: a shallow cone of black mesh from the handrail to the top of the pole
+  {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    x.strokeStyle = 'rgba(14,16,17,0.95)'; x.lineWidth = 3; for (let k = 0; k <= 64; k += 16) { x.beginPath(); x.moveTo(k, 0); x.lineTo(k, 64); x.moveTo(0, k); x.lineTo(64, k); x.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(36, 5); t.anisotropy = 4;
+    const mat = new THREE.MeshLambertMaterial({ map: t, color: 0x2a2e30, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    ring(new THREE.ConeGeometry(R - 0.42, 4.2, 40, 1, true), mat, 1.15 + 2.1);
+  }
+  // stanchions round each handrail, every two and a half metres
+  {
+    const per = Math.round(2 * Math.PI * (R - 0.42) / 2.5), m = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.0, 0.08), black, n * per);
+    let k = 0; for (const [x, z] of F.pens) for (let a = 0; a < per; a++) {
+      const t = a / per * Math.PI * 2; dummy.position.set(x + Math.cos(t) * (R - 0.42), 0.65, -z - Math.sin(t) * (R - 0.42)); dummy.updateMatrix(); m.setMatrixAt(k++, dummy.matrix);
+    }
+    g.add(m);
+  }
+  // the grid's buoys, and its corners' yellow special marks
+  {
+    const m = new THREE.InstancedMesh(new THREE.SphereGeometry(0.75, 10, 8), new THREE.MeshLambertMaterial({ color: 0xd9dad3 }), F.nodes.length);
+    F.nodes.forEach(([x, z], i) => { dummy.position.set(x, 0.25, -z); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); }); g.add(m);
+    F.corners.forEach(([x, z], i) => {
+      const b = new THREE.Group(); b.position.set(x, 0, -z); g.add(b);
+      const y = new THREE.MeshLambertMaterial({ color: 0xf2c230 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 1.4, 10), y); body.position.y = 0.5; b.add(body);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.2, 0.8), y); top.position.y = 1.8; top.rotation.y = 0.4; b.add(top);
+      navLight(b, 0, 2.6, 0, 0xffd23a, 'all', null, 0.016, FLASH.fl(5, i * 1.3));
+    });
+  }
+  // the floating feed pipes
+  {
+    const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.2, 0.2), black, F.pipes.length);
+    F.pipes.forEach(([[x0, y0], [x1, y1]], i) => { dummy.position.set((x0 + x1) / 2, 0.08, -(y0 + y1) / 2); dummy.rotation.set(0, Math.atan2(y1 - y0, x1 - x0), 0); dummy.scale.set(Math.hypot(x1 - x0, y1 - y0), 1, 1); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); });
+    g.add(m); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0);
+  }
+  // the feed barge, after the user's photograph: a dark hull, the silo house in grey cladding over most of the deck, green
+  // containers at one end, handrails, a mast with its lights
+  {
+    const B = F.barge, b = new THREE.Group(); b.position.set(B.x, 0, -B.y); b.rotation.y = Math.PI / 2 - B.psi; g.add(b);
+    const box = (w, h, d, c, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT(c)); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; b.add(o); return o; };
+    box(B.L, 2.9, B.W, 0x3a342e, 0, -0.15, 0);                                     // hull, a metre and a half out of the water
+    box(B.L - 0.3, 0.1, B.W - 0.3, 0x63665f, 0, 1.33, 0);                          // deck
+    box(B.L * 0.7, 4.6, B.W * 0.84, 0xc3c8cb, -B.L * 0.1, 3.68, 0);               // the silo house
+    box(B.L * 0.72, 0.35, B.W * 0.88, 0x9ea4a8, -B.L * 0.1, 6.1, 0);              // its roof
+    box(B.L * 0.5, 0.9, 0.06, 0x2a3238, -B.L * 0.1, 4.6, B.W * 0.42 + 0.04);       // windows
+    box(1.1, 2.1, 0.06, 0xa83a2c, B.L * 0.2, 2.4, B.W * 0.42 + 0.04);             // door
+    for (let k = 0; k < 3; k++) box(2.4, 2.6, 2.6, 0x2f8a3c, B.L * 0.37, 2.68, -B.W * 0.3 + k * 2.75);   // the green containers
+    for (const z of [B.W / 2 - 0.1, -B.W / 2 + 0.1]) box(B.L - 0.4, 0.06, 0.06, 0xd8d8d2, 0, 2.35, z);   // handrails
+    for (const x of [B.L / 2 - 0.1, -B.L / 2 + 0.1]) box(0.06, 0.06, B.W - 0.4, 0xd8d8d2, x, 2.35, 0);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 6), MAT(0xd8d8d2)); mast.position.set(-B.L * 0.3, 7.9, 0); b.add(mast);
+    navLight(b, -B.L * 0.3, 9.6, 0, 0xfff1dc, 'all', null, 0.018);
+  }
+  // the farm's workboat, lying across the barge's south end
+  {
+    const W = F.work, w = new THREE.Group(); w.position.set(W.x, 0, -W.y); w.rotation.y = -W.psi; g.add(w);
+    const hull = boatHull(W.L, W.B, 2.2, MAT(0x2a2e33)); hull.position.y = 0.6; hull.castShadow = true; w.add(hull);
+    const wh = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.4, 3.8), MAT(0xeeeeea)); wh.position.set(0, 2.6, 1.2); w.add(wh);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(3.62, 0.8, 1.6), MAT(0x26323a)); glass.position.set(0, 3.1, -0.2); w.add(glass);
+    const crane = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.2, 0.4), MAT(0xe0b030)); crane.position.set(0, 2.9, -3.8); crane.rotation.x = 0.5; w.add(crane);
+  }
+}
+buildFarm();
 // the floating pontoon in Ardminish Bay; it rides up and down with the tide
 const PONTOON = !GEO.pontoon ? null : (() => {
   const [[x0, y0], [x1, y1]] = GEO.pontoon, L = Math.hypot(x1 - x0, y1 - y0), brg = Math.atan2(x1 - x0, y1 - y0);
@@ -7325,6 +7711,7 @@ if (!GIGHA) {
   makeLabel('Gigalum', GEO.named.Gigalum[0], GEO.named.Gigalum[1], 40);
   makeLabel('Twin Beaches', POIS[0].x, POIS[0].y, 26);
 }
+makeLabel('Salmon farm', FARM.cx, FARM.cy, 24);
 newGame('cold', 'calm', true);
 if (!GIGHA) ribNewGame('calm');
 S.running = false;
