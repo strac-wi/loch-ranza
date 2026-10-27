@@ -1062,7 +1062,7 @@ const TWIN = (() => {
   const rings = {}; for (const k of ['sand', 'flat', 'dune', 'rock', 'kelp']) rings[k] = sweenRings(TWD.tw[k]).map(r => r.map(v => v / 2));
   const trace = (ctx, rs, T) => { if (ctx.beginPath) ctx.beginPath(); for (const r of rs) { for (let k = 0; k < r.length; k += 2) k ? ctx.lineTo(...T(r[k], r[k + 1])) : ctx.moveTo(...T(r[k], r[k + 1])); ctx.closePath(); } };
   const fill = (k) => () => { trace(g, rings[k], (x, y) => [X(x), Y(y)]); g.fill(); };
-  const L = { R, RS, N, rings, trace, paths: TWD.tw.paths, sand: layer(fill('sand'), 1), flat: layer(fill('flat'), 1), dune: layer(fill('dune'), 2), rock: layer(fill('rock'), 1), kelp: layer(fill('kelp'), 1), beach: layer(() => { fill('sand')(); fill('dune')(); fill('flat')(); }, 5),
+  const L = { R, RS, N, rings, trace, paths: TWD.tw.paths, sand: layer(fill('sand'), 1), flat: layer(fill('flat'), 1), dune: layer(fill('dune'), 2), rock: layer(fill('rock'), 1), kelp: layer(fill('kelp'), 1), beach: layer(() => { fill('sand')(); fill('dune')(); fill('flat')(); }, 5), flatW: layer(fill('flat'), 8),
     path: layer(() => { g.lineCap = g.lineJoin = 'round'; for (const p of TWD.tw.paths) { g.lineWidth = p.w / 2; g.beginPath(); p.pts.forEach(([x, y], i) => i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.stroke(); } }, 0) };
   // how much of a layer covers a spot, between the cell middles
   L.at = (a, x, y) => {
@@ -1090,11 +1090,19 @@ function twinRelief(x, y, sd) {
 // the Twin Beaches in the Gigha water: Loch Sween's land heights, relief and seabed for them, read through the change of
 // frame and faded into the Gigha water's own shapes, the land over the height grid's last 120 m and the seabed over the
 // depth grid's last eight cells. Past 15 m the depth grid stops, and the open water beyond keeps its own depth.
-// the beaches' upper shore, which the depths read from the water's colour cannot see: sand at one in twenty from a metre
-// above mean sea level at the dune foot, down until it meets the bed the grid has (never lowering it)
+// what the depths read from the water's colour get wrong: the beaches' upper shore, which they cannot see (sand at one
+// in twenty from a metre above mean sea level at the dune foot, down until it meets the bed the grid has), and the
+// drying flat, whose weed reads as deeper water: its middle is set about a quarter of a metre below mean sea level, higher
+// and lower in patches, so in the Gigha water most of it dries at low water springs and patches at neaps, and its edge
+// falls away to 0.85 m below. Neither ever lowers the grid's bed.
 function twinBeach(x, y, sd, b) {
-  const T = TWIN, w = T.at(T.beach, x, y) * (1 - T.at(T.rock, x, y));
-  return w > 0 ? lerp(b, Math.max(b, 1.0 + sd / 20), w) : b;
+  const T = TWIN, w = T.at(T.beach, x, y) * (1 - T.at(T.rock, x, y)), f = T.at(T.flat, x, y);
+  if (w > 0) b = lerp(b, Math.max(b, 1.0 + sd / 20), w);
+  if (f > 0) {
+    const top = -0.85 + 0.6 * smooth(0.5, 1.0, T.at(T.flatW, x, y)) + (fbm(TWF.u(x, y) * 0.035 + 1, TWF.v(x, y) * 0.035 - 4) - 0.5) * 0.6;
+    b = lerp(b, Math.max(b, top), f);
+  }
+  return b;
 }
 function twinGigha(x, y, sd, h) {
   const u = TWF.u(x, y), v = TWF.v(x, y), F = TWD.tdom;
