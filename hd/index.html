@@ -6956,9 +6956,10 @@ function buildSweenLocal() {
     // Castle Sween, after the aerial view and photographs: a 12th-century enclosure about 27 m by 18 m outside, its walls
     // 2 m thick and 10-12 m high with flat pilaster buttresses at the corners and midway along; the round-arched gate,
     // with its iron grille, in a broad buttress on the landward wall and a sea gate in the seaward one; a later square
-    // tower on the north-east wall, the stump of a slender turret at the south corner, a low annex outside the north
-    // corner, and the well in the grass of the courtyard. The long walls run 120/300 degrees; a runs along them towards
-    // the land, b across them towards the north-east, both in metres from the middle of the courtyard.
+    // tower on the north-east wall (MacMillan's Tower), the stump of a slender turret at the south corner, the west range of
+    // three storeys outside the seaward wall with the round tower on its north side, and the well in the grass of the
+    // courtyard. The long walls run 120/300 degrees; a runs along them towards the land, b across them towards the
+    // north-east, both in metres from the middle of the courtyard.
     const K = CASTLE, rnd = mulberry(1180), cg = new THREE.Group(); g.add(cg);
     const h0 = heightAt(K.x, K.y);
     cg.position.set(K.x, h0, -K.y); cg.rotation.y = (90 - K.brg) * DEG;
@@ -7023,10 +7024,24 @@ function buildSweenLocal() {
     along(wall(3, ragged(3, 11.5, 1.0), 1.7), 13.5, 10.8);
     // the slender turret at the south corner, standing taller than the walls, a gap of fallen wall beside it
     { const m = mesh(wall(2.6, [13.4, 14.2, 13.1], 2.6)); m.position.set(12.9, 0, 11.4); }
-    // the annex outside the north corner, down to its lower courses
-    along(wall(7.5, ragged(5, 3.4, 1.6), 1.2), -21, 13);
-    along(wall(7.5, ragged(5, 2.4, 1.4), 1.2), -21, 4.7);
-    across(wall(8.3, ragged(5, 2.9, 1.5), 1.2, [[4, 1.2, 0, 2, false]]), -22.2, 4.7);
+    // the west range outside the seaward wall's northern half: added early in the 13th century and rebuilt about 1300 as
+    // a tower of three storeys, now roofless, its windows small below and larger at the top
+    along(wall(8.7, ragged(5, 12.6, 1.4, [0.4, 0.8]), 1.6, [[3, 0.5, 1.4, 1.3, false], [6.2, 0.9, 8.6, 1.7, true]]), -22.2, 14.5);   // north-north-east
+    along(wall(8.7, ragged(5, 12.2, 1.6, [0.6, 0.2]), 1.6, [[4.4, 0.5, 4.8, 1.4, false]]), -22.2, 4.7);                         // south-south-west
+    across(wall(9.8, ragged(6, 12.8, 1.2), 1.6, [[2.4, 0.45, 1.6, 1.3, false], [7.2, 0.45, 1.6, 1.3, false], [3, 0.9, 5, 1.6, true],
+      [7, 0.8, 5.2, 1.5, false], [5, 1.0, 8.8, 1.7, true]]), -22.2, 4.7);                                                        // to the sea
+    // and on its north side the round tower of the 14th century, the prison and latrines, with crosslet slits
+    {
+      const R = 2.9, H = 16.6, geo = new THREE.CylinderGeometry(R, R * 1.04, H, 28, 1, true), uv = geo.attributes.uv;
+      for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 2 * Math.PI * R, uv.getY(k) * H);   // the stone tile in metres, as on the walls
+      const m = mesh(geo); m.material = stone.clone(); m.material.side = THREE.DoubleSide; m.position.set(-19.4, H / 2 - 4, -15.6);
+      const slit = MAT(0x161513);
+      for (const [ang, y] of [[2.6, 3.2], [3.5, 6.4], [2.2, 9.4], [4.4, 3.8], [3.1, 10.2]]) {
+        const sx = -19.4 + Math.cos(ang) * (R + 0.02), sz = -15.6 - Math.sin(ang) * (R + 0.02);
+        for (const [w, h] of [[0.16, 1.3], [0.55, 0.14]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), slit); b.position.set(sx, y, sz); b.rotation.y = Math.PI / 2 + ang; cg.add(b); }
+      }
+      const cap = new THREE.Mesh(new THREE.RingGeometry(R - 1.1, R, 28).rotateX(-Math.PI / 2), stone); cap.position.set(-19.4, H - 4.02, -15.6); cg.add(cap);
+    }
     // inside: rubble footings of the hall and the well, a ring of dressed stone
     for (const [a0, b0, w, h, rot] of [[-3, -3.2, 8, 1.1, 0], [-9.8, 1.5, 4.5, 0.9, Math.PI / 2], [4.2, -6.9, 4, 1.3, -Math.PI / 2]]) {
       const m = mesh(wall(w, ragged(5, h, 0.5), 0.9)); m.rotation.y = rot; m.position.set(a0, 0, -b0);
