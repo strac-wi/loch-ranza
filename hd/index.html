@@ -623,10 +623,10 @@ const ROTOR_RPM = 110, ENG_IDLE = 650, ENG_MAX = 1800;
 const HULL_PTS = [[15.1, 0], [15.1, 3.4], [15.1, -3.4], [12.1, 5], [12.1, -5], [0, 5], [0, -5], [-12.1, 5], [-12.1, -5], [-15.1, 3.4], [-15.1, -3.4], [-15.1, 0]];
 
 const WEATHER = {
-  flat:     { label: 'Flat calm', wind: 1.5, from: 200, gust: 0.1, cur: 0.3, wave: 0.025, vis: 60000 },
-  calm:     { label: 'Calm', wind: 6, from: 200, gust: 0.15, cur: 0.4, wave: 0.08, vis: 50000 },
-  moderate: { label: 'Moderate SW', wind: 16, from: 225, gust: 0.25, cur: 0.9, wave: 0.32, vis: 30000 },
-  fresh:    { label: 'Fresh W', wind: 26, from: 255, gust: 0.35, cur: 1.4, wave: 0.62, vis: 18000 },
+  flat:     { label: 'Flat calm', wind: 1.5, from: 200, gust: 0.1, cur: 0.3, wave: 0.025, vis: 16000 },
+  calm:     { label: 'Calm', wind: 6, from: 200, gust: 0.15, cur: 0.4, wave: 0.08, vis: 14000 },
+  moderate: { label: 'Moderate SW', wind: 16, from: 225, gust: 0.25, cur: 0.9, wave: 0.32, vis: 12000 },
+  fresh:    { label: 'Fresh W', wind: 26, from: 255, gust: 0.35, cur: 1.4, wave: 0.62, vis: 9000 },
 };
 
 // ================= LOCH SWEEN =================
@@ -1418,10 +1418,10 @@ renderer.toneMapping = THREE.LinearToneMapping;   // the same as none at exposur
 renderer.toneMappingExposure = 1;                  // (toneMapped: false) stay bright
 const scene = new THREE.Scene();
 const SKY = new THREE.Color(0xb1c3cf), SKY_TOP = new THREE.Color(0x6f93ad);
-const FOG_NEAR = 2000, FOG_FAR = 60000;   // the haze; its far end is the weather's visibility (FOG_FAR the most), and what lies beyond it is not drawn
+const FOG_NEAR = 1200, FOG_FAR = 16000;   // the haze; its far end is the weather's visibility (FOG_FAR the most), and what lies beyond it is not drawn
 scene.background = SKY;
 scene.fog = new THREE.Fog(SKY, FOG_NEAR, 11000);
-const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 65000);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 42000);
 const hemi = new THREE.HemisphereLight(0xd6e2ea, 0x3e4a35, 0.72);
 hemi.layers.enableAll();
 scene.add(hemi);
@@ -2318,7 +2318,7 @@ const WATER_FOAM = { value: 0 }, TAU = Math.PI * 2, wrapA = (a, m = TAU) => ((a 
 // water's origin; the white horses' settings (the surface's standard deviation, the crest height in those that may break,
 // how few of them do, the foam streaks); the drifting patterns that pick which crests break; their mean share far off
 const WATER_CHOP = { d: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, p: { value: new Float32Array(6) }, wh: { value: new THREE.Vector4(1, 9, 1, 0) },
-  q: { value: new THREE.Vector4() }, m: { value: 0 }, wind: { value: new THREE.Vector2(0, 1) } };
+  q: { value: new THREE.Vector4() }, lq: { value: new THREE.Vector4() }, sq: { value: new THREE.Vector2() }, m: { value: 0 }, wind: { value: new THREE.Vector2(0, 1) } };
 const WATER_U = { uOrg: { value: new THREE.Vector2() }, uWPh: { value: new Float32Array(SHADE_WAVES.length) }, uRipA: { value: new THREE.Vector2() },
   uRipC: { value: new THREE.Vector3() }, uPaw: { value: new THREE.Vector4() }, uChopQ: { value: new THREE.Vector2() }, uChopR: { value: new THREE.Vector2() },
   uCamL: { value: new THREE.Vector3() }, uDomL: { value: new THREE.Vector4() }, uBayAR: { value: new THREE.Vector4() }, uBayTR: { value: new THREE.Vector4() }, uTwinWR: { value: new THREE.Vector4() }, uCswWR: { value: new THREE.Vector4() } };
@@ -2339,8 +2339,12 @@ function waterOrigin(ox, oz, t) {
     C.forEach((c, i) => { W.d.value[i].set(c.dx, -c.dy, c.k, c.a); W.p.value[i] = wrapA(c.k * (c.dx * ox - c.dy * oz) - c.w * t + c.ph); });
     const cov = Math.min(0.2, 2 * 3.84e-6 * Math.pow(U, 3.41)) * smooth(6, 9, kn);
     W.wh.value.set(Math.max(C.sig, 1e-3), 1.05, 1.02 - 0.72 * Math.pow(smooth(6, 30, kn), 0.6), smooth(17, 28, kn)); W.m.value = cov; W.wind.value.set(tx, tz);
-    const c0 = Math.sqrt(9.81 / C[1].k);   // the breaking pattern drifts downwind at about the waves' speed, the second more slowly
-    W.q.value.set(wrapA(0.09 * (ox - tx * c0 * t), 256), wrapA(0.09 * (oz - tz * c0 * t), 256), wrapA(0.23 * (ox - tx * 0.4 * c0 * t), 256), wrapA(0.23 * (oz - tz * 0.4 * c0 * t), 256));
+    // each noise layer's offset at the water's origin, at the layer's own scale (the shader adds the scale times the
+    // position from the origin, so the pattern stays put on the water when the origin jumps a cell): the breaking pattern
+    // drifts downwind at about the waves' speed and a second more slowly, the lace of the foam and the streaks slower still
+    const c0 = Math.sqrt(9.81 / C[1].k), fo = 0.035 * U, off = (f, v) => [wrapA(f * (ox - tx * v * t), 256), wrapA(f * (oz - tz * v * t), 256)];
+    W.q.value.set(...off(0.15, c0), ...off(0.37, 0.4 * c0)); W.lq.value.set(...off(1.9, fo), ...off(4.7, fo));
+    W.sq.value.set(wrapA(0.025 * (tx * ox + tz * oz - fo * t), 256), wrapA(1.1 * (-tz * ox + tx * oz), 256));
     }
   }
   U.uCamL.value.set(camera.position.x - ox, camera.position.y, camera.position.z - oz);
@@ -2370,7 +2374,7 @@ function waterMaterial(amp) {
       uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uTwinW: { value: DETAIL.twinW }, uCswW: { value: DETAIL.cswW }, ...WATER_U, uNoise: { value: NOISE_TEX },
       uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 }, uSpec: { value: WATER_SPEC },
       uRefl: REFL_U.tex, uReflMat: REFL_U.mat, uReflOn: REFL_U.on, uWaterY: REFL_U.y, uFoamPh: WATER_FOAM,
-      uChopD: WATER_CHOP.d, uChopP: WATER_CHOP.p, uWh: WATER_CHOP.wh, uWhQ: WATER_CHOP.q, uWhM: WATER_CHOP.m, uWind: WATER_CHOP.wind,
+      uChopD: WATER_CHOP.d, uChopP: WATER_CHOP.p, uWh: WATER_CHOP.wh, uWhQ: WATER_CHOP.q, uWhL: WATER_CHOP.lq, uWhS: WATER_CHOP.sq, uWhM: WATER_CHOP.m, uWind: WATER_CHOP.wind,
     },
     vertexShader: (renderer.capabilities.vertexTextures ? '#define VTF\n' : '') + WAVE_GLSL + `uniform vec2 uOrg; varying vec3 vL; varying float vH;
       uniform sampler2D uDepth; uniform vec4 uDom;
@@ -2390,7 +2394,7 @@ function waterMaterial(amp) {
       uniform sampler2D uTwinW; uniform vec4 uTwinWR; uniform sampler2D uCswW; uniform vec4 uCswWR;
       uniform vec2 uRipA; uniform vec3 uRipC; uniform vec4 uPaw; uniform vec2 uChopQ; uniform vec2 uChopR; uniform vec3 uCamL; uniform vec4 uDomL; uniform float uKelLen; uniform float uKel; uniform vec3 uSpec;
       uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn; uniform float uWaterY; uniform float uFoamPh;
-      uniform vec4 uChopD[6]; uniform float uChopP[6]; uniform vec4 uWh; uniform vec4 uWhQ; uniform float uWhM; uniform vec2 uWind;
+      uniform vec4 uChopD[6]; uniform float uChopP[6]; uniform vec4 uWh; uniform vec4 uWhQ; uniform vec4 uWhL; uniform vec2 uWhS; uniform float uWhM; uniform vec2 uWind;
       vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
       varying vec3 vL; varying float vH;
       ` + WAVE_GRAD_GLSL + `
@@ -2445,8 +2449,8 @@ function waterMaterial(amp) {
         float paws = 0.45 + 0.55*smoothstep(-0.6, 0.9, sin(l.x*0.011 + uPaw.x)*cos(l.y*0.013 + uPaw.y) + sin((l.x + l.y)*0.0071 + uPaw.z));
         vec2 rg = ripple(l, fp) * uRip * paws * 0.25;
         vec2 cg = chop(l, fp) * (0.04 + uRip * 1.3) * (0.6 + 0.4 * paws);
-        vec2 wg; float ce = chopE(l, fp, wg) / uWh.x;   // the chop's height in standard deviations
-        cg += wg * (1.0 - smoothstep(600.0, 3000.0, dist));
+        vec2 wg = vec2(0.0); float ce = 0.0;   // the chop's height in standard deviations, and its slope, within 3 km
+        if (dist < 3000.0) { ce = chopE(l, fp, wg) / uWh.x; cg += wg * (1.0 - smoothstep(600.0, 3000.0, dist)); }
         // ship-relative coordinates for the waterline and wake (uShip.xy is relative to uOrg too)
         vec2 rel = l - uShip.xy, fw = vec2(uShip.z, -uShip.w), st = vec2(uShip.w, uShip.z);
         vec2 q = abs(vec2(dot(rel, st), dot(rel, fw))) - uHullDim.xy;
@@ -2505,16 +2509,18 @@ function waterMaterial(amp) {
         // here and not there, now and not later), in blotchy foam; foam streaks lie along the wind in a fresh breeze; far
         // off, where a cap is finer than the pixel, the sea is whitened by their share instead
         if (uWhM > 0.0) {
-          float br = wn(l * 0.15 + uWhQ.xy) * 0.6 + wn(l * 0.37 + uWhQ.zw) * 0.4, m = smoothstep(uWh.z, uWh.z + 0.08, br);
-          float lace = wn(l * 1.9 + uWhQ.zw * 3.0) * 0.55 + wn(l * 4.7 - uWhQ.xy * 2.0) * 0.45;
-          float act = smoothstep(uWh.y + 0.35, uWh.y + 0.85, ce) * m;              // the crest as it breaks, bright
-          float res = smoothstep(uWh.y - 0.25, uWh.y + 0.5, ce) * m * 0.5;         // the foam it spills about itself
-          float cap = clamp(act * smoothstep(0.28, 0.5, lace) + res * smoothstep(0.48, 0.72, lace), 0.0, 1.0);
-          vec2 sl = vec2(dot(l, uWind) * 0.025, dot(l, vec2(-uWind.y, uWind.x)) * 1.1);
-          float streak = uWh.w * smoothstep(0.72, 0.88, wn(sl + uWhQ.xy * 0.2)) * smoothstep(0.38, 0.66, lace) * 0.5;
-          float nearW = 1.0 - smoothstep(0.25, 1.2, fp);
-          float white = mix(uWhM * 1.4 + uWh.w * 0.04, cap + streak, nearW) * step(0.0, hd);
-          col = mix(col, vec3(0.92, 0.95, 0.96), clamp(white, 0.0, 0.92) * (1.0 - surf * 0.5));
+          float nearW = (1.0 - smoothstep(0.25, 1.2, fp)) * step(dist, 3000.0), white = uWhM * 1.4 + uWh.w * 0.04;
+          if (nearW > 0.0) {
+            float br = wn(l * 0.15 + uWhQ.xy) * 0.6 + wn(l * 0.37 + uWhQ.zw) * 0.4, m = smoothstep(uWh.z, uWh.z + 0.08, br);
+            float lace = wn(l * 1.9 + uWhL.xy) * 0.55 + wn(l * 4.7 + uWhL.zw) * 0.45;
+            float act = smoothstep(uWh.y + 0.35, uWh.y + 0.85, ce) * m;              // the crest as it breaks, bright
+            float res = smoothstep(uWh.y - 0.25, uWh.y + 0.5, ce) * m * 0.5;         // the foam it spills about itself
+            float cap = clamp(act * smoothstep(0.28, 0.5, lace) + res * smoothstep(0.48, 0.72, lace), 0.0, 1.0);
+            vec2 sl = vec2(dot(l, uWind) * 0.025, dot(l, vec2(-uWind.y, uWind.x)) * 1.1) + uWhS;
+            float streak = uWh.w * smoothstep(0.72, 0.88, wn(sl)) * smoothstep(0.38, 0.66, lace) * 0.5;
+            white = mix(white, cap + streak, nearW);
+          }
+          col = mix(col, vec3(0.92, 0.95, 0.96), clamp(white * step(0.0, hd), 0.0, 0.92) * (1.0 - surf * 0.5));
         }
         // the hull darkens the water hard against it, with churned water at the waterline (the wake astern is its own mesh)
         col *= mix(0.62, 1.0, smoothstep(0.0, 3.0 * hs, hd));
@@ -2642,15 +2648,24 @@ function buildTerminal(T) {
   sg2.textAlign = 'center'; sg2.textBaseline = 'middle'; sg2.fillText(T.name.toUpperCase(), 256, 52);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 1.0), new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(sc) })); sign.position.set(-13, wy + 3.0, -sa + 2.4); g.add(sign);
   g.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
-  scene.add(g);
+  bakeStatic(g); scene.add(g); farCull(g, 8000);
 }
 function xyFromTerm(T, lat, al) { return [T.P.x + T.d.x * al + T.n.x * lat, T.P.y + T.d.y * al + T.n.y * lat]; }
 // Things not drawn past a distance of their own (userData.far, times CULL_K, less at low detail), on top of the renderer
 // leaving out whatever is out of view: the terrain's tiles past the fog, trees past 3 km, and so on
-const CULL = []; let CULL_K = 1;
+const CULL = [], CULLO = []; let CULL_K = 1;
 function cullFar() {
   const c = camera.position;
   for (const m of CULL) { const s = m.geometry.boundingSphere; m.visible = s.center.distanceTo(c) - s.radius < m.userData.far * CULL_K; }
+  for (const o of CULLO) o.obj.visible = o.c.distanceTo(c) - o.r < o.far * CULL_K;
+  // the wheelhouse's two hundred-odd fittings matter only from on board or close alongside
+  if (WH.group) WH.group.visible = _cv.setFromMatrixPosition(WH.group.matrixWorld).distanceTo(c) < 150;
+}
+const _cv = new THREE.Vector3();
+// a building, a pier or a farm, drawn only within far metres (its bounds worked out once, where it stands now)
+function farCull(obj, far) {
+  obj.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(obj), sp = b.getBoundingSphere(new THREE.Sphere());
+  CULLO.push({ obj, c: sp.center, r: sp.radius, far });
 }
 // An instanced batch spread over the whole map (trees, rocks, houses) is drawn whole or not at all, so it is split into
 // square tiles of the given size, each its own batch with the same shape, material and colours and its own bounds.
@@ -2676,6 +2691,24 @@ function tileInstances(im, tile, far) {
   }
   grp.visible = im.visible;
   return grp;
+}
+// fold a fixed structure's plain parts into one mesh to a colour (textured, see-through and vertex-coloured parts, and
+// whatever is under one of skip, which moves, keep their own), so a pier of three hundred parts costs a dozen draws
+function bakeStatic(root, skip = []) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), by = new Map(), drop = [];
+  const walk = (o) => {
+    if (skip.includes(o)) return;
+    for (const q of o.children) walk(q);
+    const m = o.material;
+    if (!o.isMesh || o.isInstancedMesh || o.children.length || !o.visible || Array.isArray(m) || m.map || m.vertexColors || m.transparent || !o.geometry.attributes.normal) return;
+    const key = [m.type, m.color.getHex(), m.emissive ? m.emissive.getHex() : 0, m.side, o.castShadow, o.receiveShadow].join();
+    let b = by.get(key); if (!b) by.set(key, b = { m, cast: o.castShadow, recv: o.receiveShadow, geos: [] });
+    b.geos.push(o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld))); drop.push(o);
+  };
+  walk(root);
+  for (const o of drop) o.parent.remove(o);
+  for (const { m, cast, recv, geos } of by.values()) { const mm = new THREE.Mesh(mergeGeos(geos), m); mm.castShadow = cast; mm.receiveShadow = recv; root.add(mm); }
 }
 function mergeGeos(list) {
   const parts = list.map(g => g.index ? g.toNonIndexed() : g);
@@ -2847,7 +2880,7 @@ function buildScatter() {
     for (let i = 0; i < m; i++) { wins.getMatrixAt(i, dummy.matrix); lit.setMatrixAt(i, dummy.matrix); lit.setColorAt(i, r2() < 0.55 ? col.setHSL(0.1, 0.75, 0.45 + r2() * 0.15) : col.setHex(0x05080a)); }
     lit.count = m; lit.visible = false;
     const T = (im, far) => { const g = tileInstances(im, 2400, far); scene.add(g); return g; };
-    T(walls, 5000); T(roofs, 5000); T(chims, 1500); T(doors, 1500);
+    T(walls, 4000); T(roofs, 4000); T(chims, 1500); T(doors, 1500);
     NAV.wins = [T(wins, 2500), T(lit, 5000)];
   }
 }
@@ -3538,6 +3571,9 @@ function buildShip() {
     }
     for (const o of drop) motion.remove(o);
     for (const [m, geos] of byMat) { const mm = new THREE.Mesh(mergeGeos(geos), m); mm.castShadow = mm.receiveShadow = true; motion.add(mm); }
+    // and within each moving part, its own pieces: a ramp's grip bars and stringers, a knuckle's, a flap's, a rotor's blades
+    for (const f of SHIP.flaps) { bakeStatic(f.knuckle.parent, [f.knuckle]); bakeStatic(f.knuckle, f.parts.map(q => q.g)); for (const q of f.parts) bakeStatic(q.g); }
+    for (const r of SHIP.rotors) bakeStatic(r);
   }
   scene.add(root);
   // mooring line
@@ -3742,8 +3778,7 @@ function updateEnv(dt) {
   const from = W.from + (fbm(S.t * 0.01, 9.1) - 0.5) * 24;
   const spd = Math.max(0, W.wind * g) * KN, to = (from + 180) * DEG;
   S.wind = { x: Math.sin(to) * spd, y: Math.cos(to) * spd, spd, from };
-  // how far she can see: in the Gigha water by the weather, out to Jura and Islay on a clear day; in Loch Sween, whose
-  // world has no Jura yet, the old 11 km haze
+  // how far she can see: in the Gigha water by the weather; in Loch Sween, whose world has no Jura yet, the old 11 km haze
   { const vis = GIGHA ? S.wx.vis : 11000; scene.fog.far = vis; for (const m of [waterNearMat, waterFarMat]) m.uniforms.uFogFar.value = vis; for (const m of CULL) if (m.userData.terrain) m.userData.far = vis; }
 }
 function currentAt(x, y) {
@@ -7633,7 +7668,7 @@ buildTerrain(); loadGroundPhotos();
 if (GIGHA) TERMS.forEach(buildTerminal);
 // Gigha's South Pier, modelled after the aerial and shore photos
 function buildSouthPier() {
-  const P = SPIER, g = new THREE.Group(); g.position.set(P.E.x, 0, -P.E.y); g.rotation.y = -118 * DEG; scene.add(g);
+  const P = SPIER, g = new THREE.Group(); g.position.set(P.E.x, 0, -P.E.y); g.rotation.y = -118 * DEG; scene.add(g); setTimeout(() => farCull(g, 6000));
   // in this group -z runs out along the trestle (a) and -x runs along the head to the north-east (c)
   const stone = MAT(0x8d8a80), deck = MAT(0x9f9a8e), dark = MAT(0x34383a), weed = MAT(0x3a3a24), timber = MAT(0x4a3b2c), white = MAT(0xeeefec), rail = MAT(0xb9bdbd), tyre = MAT(0x151617);
   const box = (w, h, d, m, a, c, y) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(-c, y, -a); g.add(o); o.castShadow = o.receiveShadow = true; return o; };
@@ -7715,6 +7750,7 @@ function buildSouthPier() {
     for (let z = 0.35; z < SL - 0.2; z += 0.27) { const t = new THREE.Group(); t.position.set(0, -0.04, z); st.add(t); sb(0.95, 0.04, 0.24, tm, 0, 0, 0, t); treads.push(t); }
     sb(0.9, 0.08, 0.5, galv, 0, -0.18, SL - 0.1);   // the roller foot
     SPIER_LAND = { lnd, st, treads, SL };
+    bakeStatic(lnd); bakeStatic(st, treads); setTimeout(() => { farCull(lnd, 800); farCull(st, 800); });
   }
   for (let c = -19.5; c <= 29.6; c += 2.45) box(0.36, 7.4, 0.36, timber, 14.2, c, DECK - 3.5);
   box(50, 0.3, 0.3, timber, 14.35, 5, DECK - 0.3); box(50, 0.3, 0.3, timber, 14.35, 5, 0.6);
@@ -7729,7 +7765,8 @@ function buildSouthPier() {
   // shed and parking at the root
   box(9, 3.8, 6, MAT(0x3c3f3e), -P.L - 8, 9, heightAt(P.R.x, P.R.y) + 1.9); box(9.6, 0.5, 6.6, MAT(0x2a2d2e), -P.L - 8, 9, heightAt(P.R.x, P.R.y) + 4.0);
   const rnd = mulberry(5150);
-  for (const [a, c] of [[-P.L - 18, 3], [-P.L - 24, 5], [-P.L - 15, 14]]) { const car = makeCar(rnd), w = P.toW(a, c); car.position.set(w.x, heightAt(w.x, w.y) + 0.02, -w.y); car.rotation.y = -(118 + 80) * DEG; scene.add(car); }
+  for (const [a, c] of [[-P.L - 18, 3], [-P.L - 24, 5], [-P.L - 15, 14]]) { const car = makeCar(rnd), w = P.toW(a, c); car.position.set(w.x, heightAt(w.x, w.y) + 0.02, -w.y); car.rotation.y = -(118 + 80) * DEG; scene.add(car); farCull(car, 2500); }
+  bakeStatic(g, [SPIER_LAND.lnd, SPIER_LAND.st]);
 }
 let SPIER_LAND = null;
 if (GIGHA) buildSouthPier();
@@ -7761,17 +7798,25 @@ function buildFarLand() {
       if (h > 380) { const t = smooth(380, 620, h) * (0.75 + 0.25 * fbm(x * 0.004, y * 0.004)); cl = [lerp(cl[0], 0.6, t), lerp(cl[1], 0.58, t), lerp(cl[2], 0.54, t)]; }
       map[k] = pos.length / 3; pos.push(x, h, -y); col.push(...cl); return map[k];
     };
+    const tiles = new Map(), TC = 16;   // quads in tiles of 16 cells, each its own mesh, drawn only within the visibility
     for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
       const a = j * nx + i, b = a + 1, d = a + nx, e = d + 1;
       if (skip && skip(i, j)) continue;
       if (!(land(a) || land(b) || land(d) || land(e))) continue;
-      const va = vert(a), vb = vert(b), vd = vert(d), ve = vert(e);
-      idx.push(va, ve, vd, va, vb, ve);
+      const va = vert(a), vb = vert(b), vd = vert(d), ve = vert(e), key = Math.floor(i / TC) * 10000 + Math.floor(j / TC);
+      if (!tiles.has(key)) tiles.set(key, []); tiles.get(key).push(va, ve, vd, va, vb, ve);
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
-    scene.add(new THREE.Mesh(g, mat));
+    g.setIndex([].concat(...tiles.values())); g.computeVertexNormals();
+    for (const t of tiles.values()) {
+      const tg = new THREE.BufferGeometry(); tg.setAttribute('position', g.attributes.position); tg.setAttribute('normal', g.attributes.normal); tg.setAttribute('color', g.attributes.color);
+      tg.setIndex(t);
+      const box = new THREE.Box3(), v = new THREE.Vector3();   // its own bounds (the shared vertices span the whole grid)
+      for (let k = 0; k < t.length; k++) box.expandByPoint(v.fromArray(pos, t[k] * 3));
+      box.min.y -= 400; tg.boundingBox = box; tg.boundingSphere = box.getBoundingSphere(new THREE.Sphere());   // and below, for the earth's curve
+      const m = new THREE.Mesh(tg, mat); m.userData.far = scene.fog.far; m.userData.terrain = true; scene.add(m); CULL.push(m);
+    }
     return hAt;
   };
   const hW = grid(W, 4, null, (i, j) => i >= i0 && i < i1 && j >= j0 && j < j1);   // the Paps' square is left to their patch
@@ -7876,7 +7921,7 @@ function buildSpierSite() {
       add(new THREE.CylinderGeometry(r * 0.96, r, 0.25, 20), 0xc4c4be, x, h0 + 2.5, y);
     }
   }
-  for (const [c, geos] of parts) { const m = new THREE.Mesh(mergeGeos(geos), MAT(c)); m.castShadow = m.receiveShadow = true; scene.add(m); }
+  for (const [c, geos] of parts) { const m = new THREE.Mesh(mergeGeos(geos), MAT(c)); m.castShadow = m.receiveShadow = true; m.geometry.computeBoundingSphere(); m.userData.far = 3500; scene.add(m); CULL.push(m); }
 }
 if (GIGHA) buildSpierSite();
 // the named buildings, after the photos: the Boathouse at the root of the pontoon, the hotel, the shop, the ferry
@@ -7900,7 +7945,7 @@ function buildLocal() {
   const place = (x, y, footprint, extra = 0) => {
     const g = new THREE.Group(), near = nearestRoad(x, y), rot = Math.atan2(near.dx, -near.dy) + extra;
     let base = -1e9; for (const [a, b] of footprint) base = Math.max(base, heightAt(x + a, y + b, true));
-    g.position.set(x, base - 0.15, -y); g.rotation.y = rot; g.userData.local = true; scene.add(g); return g;
+    g.position.set(x, base - 0.15, -y); g.rotation.y = rot; g.userData.local = true; scene.add(g); setTimeout(() => farCull(g, 4000)); return g;
   };
   const fp = (r) => [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0]];
   // fold each building's parts into one mesh per colour, so a building costs a handful of draw calls
@@ -7962,7 +8007,7 @@ function buildLocal() {
 }
 // Loch Sween: the ruin of Castle Sween on the shore near the mouth and the caravan park beside it
 function buildSweenLocal() {
-  const g = new THREE.Group(); scene.add(g);
+  const g = new THREE.Group(); scene.add(g); setTimeout(() => farCull(g, 6000));
   {
     // the rock: grey knuckles above a skirt of brown wrack that covers and uncovers with the tide, and an isolated danger
     // perch (black, red band, two black balls) with its light
@@ -8152,7 +8197,7 @@ buildRib();
 // the salmon farm: the pens' black floating collars, handrails and bird nets on their centre poles, the grid's buoys and
 // its yellow corner lights (Fl Y 5s), the floating feed pipes, the feed barge and the workboat, all riding the tide
 function buildFarm() {
-  const F = FARM, g = new THREE.Group(); scene.add(g); F.group = g;
+  const F = FARM, g = new THREE.Group(); scene.add(g); F.group = g; setTimeout(() => farCull(g, 6000));
   const dummy = new THREE.Object3D(), black = new THREE.MeshLambertMaterial({ color: 0x17191a }), n = F.pens.length;
   const ring = (geo, mat, y) => {
     const m = new THREE.InstancedMesh(geo, mat, n);
@@ -8310,7 +8355,7 @@ const PONTOON = !GEO.pontoon ? null : (() => {
   b(8, 0.45, 3, 0x6f6a60, 0, 0.12, -L + 1.5);                     // landing stage at the end
   b(1.4, 0.12, 14, 0x8a8f90, 0, 1.0, -6);                          // gangway down from the shore
   for (let z = 14; z < L - 2; z += 12) for (const x of [-1.4, 1.4]) b(0.18, 0.3, 0.18, 0x2a2c2d, x, 0.5, -z);
-  return g;
+  bakeStatic(g); return g;
 })();
 buildScatter();
 buildShip();
