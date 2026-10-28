@@ -7994,7 +7994,7 @@ buildFarm();
 // salmon leaping in the pens when anyone is near: now and then a fish clears the water inside one of the rings, nose up,
 // and falls back on its side or nose first, with a ring of white water and a spatter of spray where it went in and came out
 const FISH = (() => {
-  const F = FARM, g = F.group, n = 8;
+  const F = FARM, g = F.group, n = 16;
   const body = new THREE.SphereGeometry(1, 12, 8); body.scale(0.075, 0.1, 0.36);
   const cols = new Float32Array(body.attributes.position.count * 3), P = body.attributes.position;
   for (let k = 0; k < P.count; k++) { const y = P.getY(k), back = smooth(-0.02, 0.06, y), c = [lerp(0.78, 0.26, back), lerp(0.8, 0.33, back), lerp(0.82, 0.4, back)]; cols.set(c, k * 3); }
@@ -8009,6 +8009,8 @@ const FISH = (() => {
   for (let k = 0; k < n; k++) {
     const f = new THREE.Group(); f.add(new THREE.Mesh(body, bodyM), new THREE.Mesh(tail, tailM)); f.visible = false; g.add(f);
     fish.push({ g: f, t: 1e9 });
+  }
+  for (let k = 0; k < 2 * n; k++) {
     const r = new THREE.Mesh(ringG, new THREE.MeshBasicMaterial({ color: 0xf2f6f8, transparent: true, depthWrite: false })); r.visible = false; g.add(r);
     const sp = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(14 * 3), 3)),
       new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, map: dot, transparent: true, depthWrite: false }));
@@ -8029,13 +8031,14 @@ function farmFish(dt) {
   const g = 9.81;
   if (near < 260 && S.t >= Q.next) {
     // the pen nearest the onlooker most often, otherwise any within reach
-    const rnd = Q.rnd, cand = F.pens.filter(p => Math.hypot(p[0] - cx, p[1] - cy) < 320), pen = rnd() < 0.5 ? pn : cand[Math.floor(rnd() * cand.length)];
+    const rnd = Q.rnd, cand = F.pens.filter(p => Math.hypot(p[0] - cx, p[1] - cy) < 320), pen = Q.pen && rnd() < 0.25 ? Q.pen : rnd() < 0.45 ? pn : cand[Math.floor(rnd() * cand.length)];
     const f = Q.fish.reduce((a, b) => (b.t > a.t ? b : a));
-    if (f.t > 3) {
+    if (f.t > 2) {
       const a = rnd() * 6.283, r = Math.sqrt(rnd()) * (F.R - 2.5), vz = 3.0 + rnd() * 1.4, vh = 0.9 + rnd() * 1.4, hd = rnd() * 6.283;
       Object.assign(f, { t: 0, x: pen[0] + Math.cos(a) * r, y: pen[1] + Math.sin(a) * r, vz, vh, hd, T: 2 * vz / g, roll: rnd() < 0.55 ? (rnd() < 0.5 ? -1 : 1) * (1.2 + rnd() * 0.5) : 0, spin: (rnd() - 0.5) * 2, out: false });
     }
-    Q.next = S.t + 0.7 + Q.rnd() * 2.6 * (0.4 + near / 260);
+    Q.pen = pen;
+    Q.next = S.t + (rnd() < 0.25 ? 0.12 + rnd() * 0.2 : 0.12 + rnd() * 0.7 * (0.4 + near / 260));
   }
   for (const f of Q.fish) {
     if (f.t > 50) continue;
