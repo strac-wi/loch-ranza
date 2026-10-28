@@ -4665,7 +4665,82 @@ const TOUCH_WORDS = [
   ['X to start, L to let go, W for ahead.', 'Start eng, Let go, then the lever up for ahead.'], ['X to start, L to slip, W for ahead.', 'Start eng, Slip, then the lever up for ahead.'],
   ['W ahead, A/D turn, Q/E sideways.', 'Stick up for ahead, steer to turn, stick sideways to crab.'],
 ];
-const tw = (t) => { if (!TOUCH.on) return t; for (const [a, b] of TOUCH_WORDS) t = t.split(a).join(b); return t; };
+// and with a game controller, its buttons (PlayStation's, which the browser's standard layout follows)
+const PAD_WORDS = [
+  [' (X)', ' (✕)'], ['Lines let go (L)', 'Lines let go (○)'], ['Mooring slipped (L)', 'Mooring slipped (○)'], ['Slip the mooring (L)', 'Slip the mooring (○)'],
+  ['Stop with the buoy at the bow, then L', 'Stop with the buoy at the bow, then ○'], ['Stop, then make fast (L)', 'Stop, then make fast (○)'],
+  ['W/S lever: ahead, neutral, astern', 'R2 ahead, L2 astern, both off for neutral'],
+  ['R/F trim: in to plane, out once she is up', 'L1 trims in to get her on the plane, R1 out once she is up'],
+  ['O: man overboard drill at any time', 'D-pad ◀: man overboard drill at any time'], ['Pull away: W for ahead, A/D to turn', 'Pull away: R2 for ahead, left stick to turn'],
+  ['X to start, L to let go, W for ahead.', '✕ to start, ○ to let go, R2 for ahead.'], ['X to start, L to slip, W for ahead.', '✕ to start, ○ to slip, R2 for ahead.'],
+];
+const tw = (t) => { const W = GP.on ? PAD_WORDS : TOUCH.on ? TOUCH_WORDS : null; if (!W) return t; for (const [a, b] of W) t = t.split(a).join(b); return t; };
+// ---------- game controller ----------
+// A PlayStation pad (or any in the browser's standard layout) for the RIB: R2 ahead and L2 astern, how far pressed is how far
+// the lever goes, and both let off is neutral; the D-pad's up and down instead set a lever that stays where it is put, a
+// tenth at a time, until a trigger is touched; the left stick is the wheel (finer near the middle, back to centre when let
+// go); R1 trims out and L1 in; the right stick looks about (R3 looks ahead again). ✕ starts the engine, ○ makes fast or lets
+// go, □ is the horn, △ changes the view, Create clips the kill cord on or off, Options opens the menu, D-pad left is a man
+// overboard, D-pad right the time. On the start screen ✕ starts. A slam or a knock comes through as a rumble.
+const GP = { idx: null, on: false, prev: [], cruise: null, trig: false, steer: false, slamN: 0, contactT: -99, told: false };
+window.addEventListener('gamepadconnected', (e) => {
+  GP.idx = e.gamepad.index; GP.on = true;
+  if (!GP.told) { GP.told = true; toast('Controller connected. RIB: R2 ahead, L2 astern, left stick steers, ✕ starts the engine, ○ makes fast, △ changes the view', 'good'); }
+});
+window.addEventListener('gamepaddisconnected', (e) => { if (GP.idx === e.gamepad.index) { GP.idx = null; GP.on = false; } });
+function gpPad() {
+  const ps = navigator.getGamepads ? navigator.getGamepads() : [];
+  if (GP.idx !== null && ps[GP.idx]) return ps[GP.idx];
+  for (const q of ps) if (q) { GP.idx = q.index; return q; }
+  return null;
+}
+function gpRumble(p, ms, strong, weak) {
+  try { if (p.vibrationActuator) p.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) {}
+}
+function gpPoll(dt) {
+  const p = gpPad(); if (!p) return;
+  const bt = p.buttons, v = (i) => (bt[i] ? (bt[i].value || (bt[i].pressed ? 1 : 0)) : 0), down = (i) => v(i) > 0.5;
+  const now = bt.map((x, i) => v(i) > 0.5), edge = (i) => now[i] && !GP.prev[i];
+  const done = () => { GP.prev = now; };
+  if (now.some(Boolean) || p.axes.some(a => Math.abs(a) > 0.3)) GP.on = true;
+  if (FQ.open || QZ.open) return done();
+  if (!$('menu').hidden) { if (edge(0) || edge(9)) $('bGo').click(); return done(); }
+  if (!S || !S.running) return done();
+  if (GAME !== 'rib') { if (edge(0) && !GP.ferryTold) { GP.ferryTold = true; msg('The controller drives the RIB; the ferry is on the keyboard and mouse for now'); } return done(); }
+  const R = RB;
+  // the lever
+  const r2 = v(7), l2 = v(6), trig = r2 > 0.05 || l2 > 0.05;
+  if (edge(12) || edge(13)) { GP.cruise = clamp(Math.round(((GP.cruise === null ? R.lever : GP.cruise) + (edge(12) ? 0.1 : -0.1)) * 10) / 10, -1, 1); }
+  if (trig) { GP.cruise = null; GP.trig = true; const t = r2 - l2; R.lever = Math.abs(t) < 0.05 ? 0 : clamp(t, -1, 1); }
+  else { if (GP.trig) { GP.trig = false; R.lever = 0; } if (GP.cruise !== null) R.lever = GP.cruise; }
+  // the wheel
+  const sx = p.axes[0] || 0, dz = 0.12;
+  if (Math.abs(sx) > dz) { const w = Math.sign(sx) * Math.pow((Math.abs(sx) - dz) / (1 - dz), 1.4); R.wheel = approach(R.wheel, w, 2.4 * dt); TOUCH.springRW = false; GP.steer = true; }
+  else if (GP.steer) { GP.steer = false; TOUCH.springRW = true; }   // let go: she centres as the touch wheel does
+  // trim, horn
+  if (down(5)) R.trim = clamp(R.trim + 3 * dt, -4, 16);
+  if (down(4)) R.trim = clamp(R.trim - 3 * dt, -4, 16);
+  S.horn = S.horn || down(2);
+  // buttons
+  if (edge(0)) ribEngine();
+  if (edge(1)) ribLines();
+  if (edge(3)) cycleCam();
+  if (edge(8)) ribKill();
+  if (edge(9)) $('bMenu').click();
+  if (edge(14)) ribMOB();
+  if (edge(15)) cycleWarp();
+  // looking about
+  const rx = p.axes[2] || 0, ry = p.axes[3] || 0, lx = Math.abs(rx) > 0.15 ? rx : 0, ly = Math.abs(ry) > 0.15 ? ry : 0;
+  if (lx || ly) {
+    if (cam.mode === 'helm') { WH.yaw -= lx * 1.6 * dt; WH.pitch = clamp(WH.pitch - ly * 1.0 * dt, -1.2, 0.8); }
+    else { cam.az -= lx * 1.8 * dt; cam.el = clamp(cam.el + ly * 1.2 * dt, 0.03, 1.45); }
+  }
+  if (edge(11)) { cam.az = 0; WH.yaw = 0; WH.pitch = -0.3; }
+  // a rumble for a slam (harder the harder she lands) or a knock against something
+  if (R.slamN !== GP.slamN) { GP.slamN = R.slamN; gpRumble(p, 160, clamp(R.slamV / 4, 0.25, 1), 0.4); }
+  if (R.contactT !== GP.contactT) { GP.contactT = R.contactT; gpRumble(p, 90, 0.15, 0.6); }
+  done();
+}
 function simpleChecklist() {
   const sog = Math.hypot(S.u, S.v) / KN;
   if (S.leg.state === 'alongside') {
@@ -6567,9 +6642,11 @@ function frame(now) {
   requestAnimationFrame(frame);
   const raw = (now - last) / 1000, rdt = clamp(raw, 0, 0.05); last = now;   // the first frame's timestamp can predate the end of loading
   perfGovern(raw); fadeLabels(); cullFar();
+  if (!(S && S.running && GAME === 'rib')) gpPoll(rdt);   // the RIB's is read with her keys, below
   if (!S) { renderer.render(scene, camera); return; }
   if (S.running && GAME === 'rib') {
     ribHandleKeys(rdt);
+    gpPoll(rdt);
     const sdt = rdt * S.warp; S.t += sdt;
     updateEnv(sdt);
     ribUpdate(sdt);
@@ -6660,7 +6737,7 @@ function ferryAP() {
     // are up and pinned: off the slip the crew no longer call it, and she would wait there for ever
     const T0 = TERM(L.at), want0 = OTHER(L.at).endIdx === 0 ? 1 : -1;
     const ready = S.crewMsg.startsWith('Ramp up and pinned') || (!workLeft(T0) && !S.movs.length && S.ends.every(E => E.ramp.pins && E.ramp.ang >= RAMP_STOW - 0.5));
-    if (!AP.going) { if (!ready) AP.readyAt = null; else if (AP.readyAt === null) AP.readyAt = S.t + 30 + S.rnd() * 60; }
+    if (!AP.going) { if (!ready) AP.readyAt = null; else if (AP.readyAt === null) AP.readyAt = S.t + 2 + S.rnd() * 3; }   // away a few seconds after the ramp is pinned
     if (ready && AP.readyAt !== null && S.t > AP.readyAt) { AP.going = true; if (S.dir !== want0) S.dir = want0; }   // the other end leads her away
     if (AP.going) { lS = 0.5; lW = clamp(-S.r * 30, -1, 1); }   // off the slip, holding her head, until she is clear
     else {
