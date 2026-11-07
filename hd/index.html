@@ -11,6 +11,7 @@
 /* Layout: full-bleed low-poly Sound of Gigha above a docked ship's console; nav readouts top-left, chart + checklist top-right.
    Deliberately single dark theme: a wheelhouse console at sea. */
 :root{
+  --levH:clamp(232px,44vh,330px);
   --bg:#0a1115;
   --console:#0c151a;
   --panel:#111d23;
@@ -176,7 +177,7 @@ fieldset input{accent-color:var(--amber);margin-top:3px}
 #ribHud{display:none;position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;z-index:3;padding:8px 10px;width:300px;box-sizing:border-box;pointer-events:auto}
 body.rib #ribHud{display:block}
 /* tablets: the touch lever has the bottom-left corner, so the panel sits above it (phones put the panel at the top instead) */
-@media (min-width:701px){body.touchon #ribHud{bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + 250px)}}
+@media (min-width:701px){body.touchon #ribHud{bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + var(--levH) + 18px)}}
 body.rib #console,body.rib #bConsole,body.rib #bSimple,body.rib #bPA,body.rib #bPALoad,body.rib #layup,body.rib #alarmbar{display:none!important}
 .rg{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .rlev{position:relative;width:12px;height:52px;border:1px solid var(--line-hi);border-radius:3px;background:rgba(0,0,0,.25)}
@@ -243,9 +244,13 @@ body:not(.rib) #fishCall{display:none!important}
 .tsteer{width:200px;height:66px;border-radius:33px}
 .tknob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(242,179,61,.92);box-shadow:0 2px 10px rgba(0,0,0,.45);pointer-events:none}
 .tright{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
-/* the RIB's single lever: a narrow slot with a neutral notch, dragged rather than tapped so a stray touch cannot open the throttle */
-.tlev{display:none;pointer-events:auto;touch-action:none;position:relative;flex:none;width:56px;height:232px;border-radius:28px;background-color:rgba(10,18,22,.5);border:2px solid rgba(219,230,235,.3);-webkit-user-select:none;user-select:none;
+/* the RIB's single lever: a narrow slot with a neutral notch and a tick-over notch either side, dragged rather than tapped so a
+   stray touch cannot open the throttle; as tall as the screen allows, so the detents leave the throttle room */
+.tlev{display:none;pointer-events:auto;touch-action:none;position:relative;flex:none;width:56px;height:var(--levH);border-radius:28px;background-color:rgba(10,18,22,.5);border:2px solid rgba(219,230,235,.3);-webkit-user-select:none;user-select:none;
   background-image:linear-gradient(rgba(219,230,235,.55),rgba(219,230,235,.55)),linear-gradient(90deg,rgba(219,230,235,.22),rgba(219,230,235,.22));background-size:52px 2px,4px calc(100% - 64px);background-position:center;background-repeat:no-repeat}
+.tlev-n{position:absolute;left:9px;right:9px;height:2px;margin-top:-1px;background:rgba(242,179,61,.6);pointer-events:none}
+.tlev-n.up{top:calc(50% - 0.17 * ((var(--levH) - 4px) / 2 - 40px))}.tlev-n.dn{top:calc(50% + 0.17 * ((var(--levH) - 4px) / 2 - 40px))}
+.tlev-n::after{content:'Idle';position:absolute;left:calc(100% + 17px);top:-7px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(219,230,235,.75);text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .tlev-k{position:absolute;left:50%;top:50%;width:46px;height:24px;margin:-12px 0 0 -23px;border-radius:7px;background:rgba(242,179,61,.92);box-shadow:0 2px 10px rgba(0,0,0,.45);pointer-events:none}
 body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{width:min(300px,calc(100vw - 116px))}
 .trow{display:flex;gap:8px;pointer-events:auto}
@@ -368,7 +373,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
     <p id="mNext"></p>
     <div id="touch" hidden>
       <div class="tjoy" id="tJoy" aria-label="Joystick: ahead, astern and sideways"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><span class="tl t-l">P</span><span class="tl t-r">S</span><div class="tknob" id="tJoyK"></div></div>
-      <div class="tlev" id="tLev" aria-label="Throttle and gear lever: ahead, neutral, astern"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><div class="tlev-k" id="tLevK"></div></div>
+      <div class="tlev" id="tLev" aria-label="Throttle and gear lever: ahead, neutral, astern, with a tick-over notch either side of neutral"><span class="tl t-top">Ahead</span><span class="tl t-bot">Astern</span><i class="tlev-n up"></i><i class="tlev-n dn"></i><div class="tlev-k" id="tLevK"></div></div>
       <div class="tright">
         <div class="trow"><button id="tStop">Stop</button><button id="tHorn">Horn</button><button id="tWarp" title="Time compression">×1</button><button id="tDir" title="Change direction: the other end leads">Change dir</button><button id="tCam" title="Change camera view">View</button><button id="tPA" title="Passenger announcement">PA</button></div>
         <div class="tsteer" id="tSteer" aria-label="Steer"><span class="tl t-l">Port</span><span class="tl t-mid">Steer</span><span class="tl t-r">Stbd</span><div class="tknob" id="tSteerK"></div></div>
@@ -509,7 +514,7 @@ body.rib .tlev{display:block} body.rib .tjoy{display:none} body.rib .tsteer{widt
         <h3>Simple controls</h3>
         <p>Pick Simple on the start screen, or switch with Controls, under Settings, at any time. You only steer: W and S set the speed, and A, D, Q and E turn and crab sideways, springing back to centre when you let go. The crew runs the engines, puts the ramp down once you are square on the slip, works the traffic, holds her on, then raises and pins the ramp and tells you when you are clear to sail. Once the ramp is pinned and you are stopped, the crew also changes direction for you, so the end facing the next slip leads; to change direction yourself press C, tap Change dir on the touch overlay, or use No.1 leads / No.2 leads on the console or the wheelhouse desk. Landing too hard, grounding and leaving early still cost points.</p>
         <h3>The RIB: Gala Viking V500 with a Suzuki 100</h3>
-        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral (it stops in the detent), astern, with throttle beyond each gear. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen, which remembers your last choices. Off the north-east of Gigha is a salmon farm: come alongside one of the feed barge's long sides, stopped and parallel, and make fast (L) for five fish health cases to diagnose.</p>
+        <p>Choose the RIB on the start screen. She lies alongside the Boathouse pontoon with the kill cord on. X starts the engine (lever in neutral), L lets go the lines or makes fast when you are alongside, stopped and parallel. W and S move the single lever: forward gear, neutral, astern, with throttle beyond each gear. It stops in neutral and again at tick-over either side, in gear with the engine idling; press again to go on. A and D turn the wheel and it stays where you leave it; C centres it. R and F trim the engine out and in. K pulls the kill cord, O throws someone over the side, G picks a drill: coming alongside, man overboard or a high-speed slalom through six buoys in a line, weaving from west to east. On a phone, the thin slot on the left is the lever: drag it up for ahead or down for astern, it parks in the neutral notch on the way through, clicks into the Idle notch either side (in gear, the engine ticking over) and stays where you leave it. The long bar is the wheel and springs back to centre when you let go. Neutral snaps the lever to the notch and the Trim buttons work while held. New game takes you back to the start screen, which remembers your last choices. Off the north-east of Gigha is a salmon farm: come alongside one of the feed barge's long sides, stopped and parallel, and make fast (L) for five fish health cases to diagnose.</p>
         <p>In a sea she pitches and slams: driving hard into a short chop costs speed and can launch her, so trim in and ease off, or take the waves at an angle. In the Sound of Gigha the ferry keeps crossing while you practise; she will not alter course for you, and if you are close under her bow she slows and gives five short blasts. At dusk and night she shows a white masthead light, red and green sidelights and a stern light; read which way she is heading from them. After a drill, Show track on the report opens the chart with your track coloured by speed and plays it back.</p>
         <p>How she handles: the engine steers by pointing its thrust, so with no drive there is little steering, and astern the stern goes where the leg points. At rest the bow blows off downwind. Trim in to get over the hump onto the plane, then trim out to lift the bow and pick up speed; too far out and she porpoises, and in a hard turn a trimmed-out leg blows out and loses grip. Full lock at speed scrubs off speed violently. Figures are estimates: 640 kg all up with two aboard, idling at about 2.5 kn in gear and topping out near 37 kn at about 5,900 rpm.</p>
         <h3>Other traffic</h3>
@@ -4704,7 +4709,7 @@ function updateUI(force) {
 const TOUCH_WORDS = [
   [' (X)', ' (Start eng)'], ['Lines let go (L)', 'Lines let go (Let go)'], ['Mooring slipped (L)', 'Mooring slipped (Slip)'], ['Slip the mooring (L)', 'Slip the mooring (Slip)'],
   ['Stop with the buoy at the bow, then L', 'Stop with the buoy at the bow, then Pick up'], ['Stop, then make fast (L)', 'Stop, then Make fast'],
-  ['W/S lever: ahead, neutral, astern', 'Lever: up for ahead, down for astern, the notch for neutral'],
+  ['W/S lever: ahead, neutral, astern', 'Lever: up for ahead, down for astern, the middle notch for neutral, Idle for tick-over'],
   ['R/F trim: in to plane, out once she is up', 'Trim ▼ to get her on the plane, Trim ▲ once she is up'],
   ['O: man overboard drill at any time', 'MOB: man overboard drill at any time'], ['Pull away: W for ahead, A/D to turn', 'Pull away: stick up for ahead, steer to turn'],
   ['X to start, L to let go, W for ahead.', 'Start eng, Let go, then the lever up for ahead.'], ['X to start, L to slip, W for ahead.', 'Start eng, Slip, then the lever up for ahead.'],
@@ -4714,7 +4719,7 @@ const TOUCH_WORDS = [
 const PAD_WORDS = [
   [' (X)', ' (✕)'], ['Lines let go (L)', 'Lines let go (○)'], ['Mooring slipped (L)', 'Mooring slipped (○)'], ['Slip the mooring (L)', 'Slip the mooring (○)'],
   ['Stop with the buoy at the bow, then L', 'Stop with the buoy at the bow, then ○'], ['Stop, then make fast (L)', 'Stop, then make fast (○)'],
-  ['W/S lever: ahead, neutral, astern', 'R2 ahead, L2 astern, both off for neutral'],
+  ['W/S lever: ahead, neutral, astern', 'R2 ahead, L2 astern (a light pull for tick-over), both off for neutral'],
   ['R/F trim: in to plane, out once she is up', 'L1 trims in to get her on the plane, R1 out once she is up'],
   ['O: man overboard drill at any time', 'D-pad ◀: man overboard drill at any time'], ['Pull away: W for ahead, A/D to turn', 'Pull away: R2 for ahead, left stick to turn'],
   ['X to start, L to let go, W for ahead.', '✕ to start, ○ to let go, R2 for ahead.'], ['X to start, L to slip, W for ahead.', '✕ to start, ○ to slip, R2 for ahead.'],
@@ -4755,9 +4760,9 @@ function gpPoll(dt) {
   const R = RB;
   // the lever
   const r2 = v(7), l2 = v(6), trig = r2 > 0.05 || l2 > 0.05;
-  if (edge(12) || edge(13)) { GP.cruise = clamp(Math.round(((GP.cruise === null ? R.lever : GP.cruise) + (edge(12) ? 0.1 : -0.1)) * 10) / 10, -1, 1); }
-  if (trig) { GP.cruise = null; GP.trig = true; const t = r2 - l2; R.lever = Math.abs(t) < 0.05 ? 0 : clamp(t, -1, 1); }
-  else { if (GP.trig) { GP.trig = false; R.lever = 0; } if (GP.cruise !== null) R.lever = GP.cruise; }
+  if (edge(12) || edge(13)) { GP.cruise = clamp(Math.round(((GP.cruise === null ? sOfLev(R.lever) : GP.cruise) + (edge(12) ? 0.1 : -0.1)) * 10) / 10, -1, 1); }
+  if (trig) { GP.cruise = null; GP.trig = true; R.lever = levOfS(clamp(r2 - l2, -1, 1)); }   // a light pull holds her at tick-over
+  else { if (GP.trig) { GP.trig = false; R.lever = 0; } if (GP.cruise !== null) R.lever = levOfS(GP.cruise); }
   // the wheel
   const sx = p.axes[0] || 0, dz = 0.12;
   if (Math.abs(sx) > dz) { const w = Math.sign(sx) * Math.pow((Math.abs(sx) - dz) / (1 - dz), 1.4); R.wheel = approach(R.wheel, w, 2.4 * dt); TOUCH.springRW = false; GP.steer = true; }
@@ -5204,24 +5209,33 @@ const KNOB = 29;
 bindPad($('tJoy'), (ev) => {
   if (GAME === 'rib') {   // the left pad is the throttle and gear lever: up ahead, down astern, and it stays where you leave it
     const r = $('tJoy').getBoundingClientRect(), R = r.width / 2 - KNOB, y = -clamp((ev.clientY - r.top - r.height / 2) / R, -1, 1);
-    RB.lever = Math.abs(y) < 0.1 ? 0 : y; TOUCH.joy = true; return;
+    RB.lever = levOfS(y); TOUCH.joy = true; return;
   }
   if (S.mode !== 'combined') setMode('combined');
   const r = $('tJoy').getBoundingClientRect(), R = r.width / 2 - KNOB;
   let x = (ev.clientX - r.left - r.width / 2) / R, y = (ev.clientY - r.top - r.height / 2) / R; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
   S.lev.S = -y; S.lev.Y = x; TOUCH.joy = true;
 }, () => { TOUCH.joy = false; TOUCH.springY = GAME !== 'rib'; });
-// the RIB lever moves with the finger from wherever it was, and parks in neutral as it passes through
+// The RIB lever's travel as the hand feels it (s, -1 to 1: the finger on the slot, a trigger's pull, the D-pad's steps)
+// against where the lever is (RB.lever, which the engine reads: in gear past 0.12, throttle from 0.16): the neutral notch,
+// then tick-over (in gear, the engine idling) held over a fifth of the travel either side so it can be found and left
+// there, then the throttle over the rest
+const LEV_IDLE = 0.14, S_N = 0.07, S_I = 0.27;
+function levOfS(s) { const a = Math.abs(s); return Math.sign(s) * (a < S_N ? 0 : a < S_I ? LEV_IDLE : 0.16 + (a - S_I) / (1 - S_I) * 0.84); }
+function sOfLev(v) { const a = Math.abs(v); return Math.sign(v) * (a <= 0.12 ? 0 : a < 0.16 ? (S_N + S_I) / 2 : S_I + (a - 0.16) / 0.84 * (1 - S_I)); }
+// the RIB lever moves with the finger from wherever it was, parks in neutral as it passes through, and clicks into
+// tick-over (a buzz, where the phone can) on the way to the throttle
 const levTravel = () => $('tLev').clientHeight / 2 - 40;
 {
-  let grab = null;
+  let grab = null, was = null;
   bindPad($('tLev'), (ev) => {
-    if (!grab) grab = { y: ev.clientY, lev: RB.lever };
-    let v = clamp(grab.lev + (grab.y - ev.clientY) / levTravel(), -1, 1);
-    if (grab.lev !== 0 && Math.sign(v) !== Math.sign(grab.lev)) { grab = { y: ev.clientY, lev: 0 }; v = 0; }   // it stops in neutral; drag on to go through
-    else if (Math.abs(v) < 0.15) v = 0;
-    RB.lever = v; TOUCH.joy = true;
-  }, () => { grab = null; TOUCH.joy = false; });
+    if (!grab) grab = { y: ev.clientY, s: sOfLev(RB.lever) };
+    let s = clamp(grab.s + (grab.y - ev.clientY) / levTravel(), -1, 1);
+    if (grab.s !== 0 && Math.sign(s) !== Math.sign(grab.s)) { grab = { y: ev.clientY, s: 0 }; s = 0; }   // it stops in neutral; drag on to go through
+    const v = levOfS(s), at = v === 0 ? 'n' : Math.abs(v) === LEV_IDLE ? 'idle' : '';
+    if (at && was !== null && at !== was) try { navigator.vibrate && navigator.vibrate(12); } catch (e) { }
+    was = at; RB.lever = v; TOUCH.joy = true;
+  }, () => { grab = null; was = null; TOUCH.joy = false; });
 }
 bindPad($('tSteer'), (ev) => {
   if (GAME === 'rib') { const r = $('tSteer').getBoundingClientRect(), R = r.width / 2 - KNOB - 4; RB.wheel = clamp((ev.clientX - r.left - r.width / 2) / R, -1, 1); TOUCH.steer = true; TOUCH.springRW = false; return; }
@@ -5241,7 +5255,7 @@ function updateTouch() {
   const jx = GAME === 'rib' ? 0 : S.lev.Y, jy = GAME === 'rib' ? RB.lever : S.lev.S, sw = GAME === 'rib' ? RB.wheel : S.lev.W;
   $('tJoyK').style.transform = `translate(${(jx * R).toFixed(1)}px, ${(-jy * R).toFixed(1)}px)`;
   $('tSteerK').style.transform = `translate(${(sw * R2).toFixed(1)}px, 0)`;
-  if (GAME === 'rib') $('tLevK').style.transform = `translate(0, ${(-RB.lever * levTravel()).toFixed(1)}px)`;
+  if (GAME === 'rib') $('tLevK').style.transform = `translate(0, ${(-sOfLev(RB.lever) * levTravel()).toFixed(1)}px)`;   // sitting in a notch while it is held there
 }
 $('bMenu').onclick = () => { const o = $('hudL').classList.toggle('open'); $('bMenu').setAttribute('aria-expanded', String(o)); setT($('bMenu'), o ? 'Close' : 'Menu'); };
 function zeroPitch() { S.lev = { S: 0, W: 0, Y: 0 }; S.pad = [{ up: 0, right: 0 }, { up: 0, right: 0 }]; }
@@ -7511,7 +7525,9 @@ function ribHandleKeys(dt) {
   if (lv) {
     if (R.detent !== lv) {
       const nl = clamp(R.lever + lv * 0.65 * dt, -1, 1);
+      const a = Math.abs(R.lever), b = Math.abs(nl);
       if ((R.lever > 0 && nl <= 0) || (R.lever < 0 && nl >= 0)) { R.lever = 0; R.detent = lv; }   // the lever stops in the neutral detent
+      else if (a !== LEV_IDLE && (a - LEV_IDLE) * (b - LEV_IDLE) <= 0) { R.lever = Math.sign(nl) * LEV_IDLE; R.detent = lv; }   // and at tick-over
       else R.lever = nl;
     }
   } else R.detent = 0;
