@@ -1473,7 +1473,7 @@ scene.add(sun, sun.target);
 const LIGHTS = {
   day:   { exp: 1, hemi: [0xd6e2ea, 0x3e4a35, 0.72], sun: [0xffedd0, 0.95], dir: [-3000, 4200, 2600], hor: 0xb1c3cf, top: 0x6f93ad, glow: [1, 0.88, 0.68], cloud: [1, 1, 1], spec: [0.75, 0.71, 0.64], clock: 8 * 3600 + 40 * 60, sky: [1, 0.5, 1.5] },
   dusk:  { exp: 0.62, hemi: [0x9aa0c0, 0x2e2a28, 0.75], sun: [0xff8a50, 0.45], dir: [-0.93, 0.03, 0.34], hor: 0xe0a27a, top: 0x41587e, glow: [1.6, 0.75, 0.35], cloud: [0.95, 0.66, 0.6], spec: [1.2, 0.6, 0.3], clock: 17 * 3600 + 55 * 60, sky: [0.55, 1.2, 1.1] },
-  night: { exp: 0.42, hemi: [0x4a5c80, 0x0b0d10, 0.75], sun: [0xb4c4e6, 0.7], dir: [0.45, 0.55, 0.62], hor: 0x2a3a58, top: 0x0b1428, glow: [2.4, 2.5, 2.7], cloud: [0.22, 0.25, 0.32], spec: [1.4, 1.5, 1.7], clock: 21 * 3600 + 30 * 60, sky: [0, 1, 1] },
+  night: { exp: 0.42, sheen: 0.16, hemi: [0x5a6c92, 0x0d1014, 0.95], sun: [0xb4c4e6, 0.7], dir: [0.45, 0.55, 0.62], hor: 0x2a3a58, top: 0x0b1428, glow: [2.4, 2.5, 2.7], cloud: [0.22, 0.25, 0.32], spec: [1.4, 1.5, 1.7], clock: 21 * 3600 + 30 * 60, sky: [0, 1, 1] },
 };
 const NAV = { list: [], on: false, wins: null, rockLight: null, tex: (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -1487,7 +1487,7 @@ function setLight(mode) {
   sun.color.setHex(L.sun[0]); sun.intensity = L.sun[1]; SUN_DIR.set(...L.dir).normalize();
   SKY.setHex(L.hor); SKY_TOP.setHex(L.top); scene.fog.color.setHex(L.hor);
   const su = scene.userData.sky.material.uniforms; su.uGlow.value.setRGB(...L.glow); su.uCloudCol.value.setRGB(...L.cloud); su.uDay.value = L.sky[0]; su.uSkyExp.value = L.sky[1]; su.uSkySat.value = L.sky[2];
-  WATER_SPEC.setRGB(...L.spec);
+  WATER_SPEC.setRGB(...L.spec); WATER_SHEEN.value = L.sheen || 0;
   NAV.on = mode !== 'day';
   if (NAV.wins) { NAV.wins[0].visible = !NAV.on; NAV.wins[1].visible = NAV.on; }
   if (NAV.deck) { NAV.deck.visible = NAV.on; NAV.deck.material.opacity = mode === 'night' ? 0.55 : 0.35; }
@@ -2407,7 +2407,7 @@ const WAVE_GRAD_GLSL = `uniform float uWPh[${SHADE_WAVES.length}];\nvec2 waveGra
 // kilometres out, a graphics chip working at reduced precision cannot place a pixel to the metre, its sines of large
 // angles go wrong, and the sea breaks into flat blocks. Everything that depends on where the point is, or on the time,
 // becomes a phase worked out here once a frame in double precision.
-const WATER_FOAM = { value: 0 }, TAU = Math.PI * 2, wrapA = (a, m = TAU) => ((a % m) + m) % m;
+const WATER_SHEEN = { value: 0 }, WATER_FOAM = { value: 0 }, TAU = Math.PI * 2, wrapA = (a, m = TAU) => ((a % m) + m) % m;
 // the wind's chop as the water draws it: each train's direction (east, south), wavenumber and height; its phase at the
 // water's origin and its frequency; the white horses' settings (the surface's standard deviation, the crest height in
 // those that may break, how few of them do, the slope of a steep face); the pattern running with the waves that picks
@@ -2479,7 +2479,7 @@ function waterMaterial(near) {
       uFog: { value: SKY }, uSun: { value: SUN_DIR }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
       uShip: { value: new THREE.Vector4(0, 0, 1, 0) }, uVel: { value: new THREE.Vector2() }, uRip: { value: 0.1 },
       uBayA: { value: DETAIL.bayA }, uBayT: { value: DETAIL.bayT }, uTwinW: { value: DETAIL.twinW }, uCswW: { value: DETAIL.cswW }, ...WATER_U, uNoise: { value: NOISE_TEX },
-      uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 }, uSpec: { value: WATER_SPEC },
+      uHullDim: { value: new THREE.Vector4(3.2, 13.3, 1.8, 14) }, uKelLen: { value: 0 }, uKel: { value: 1 }, uSpec: { value: WATER_SPEC }, uSheen: WATER_SHEEN,
       uRefl: REFL_U.tex, uReflMat: REFL_U.mat, uReflOn: REFL_U.on, uWaterY: REFL_U.y, uFoamPh: WATER_FOAM,
       uChopD: WATER_CHOP.d, uChopP: WATER_CHOP.p, uChopW: WATER_CHOP.w, uWh: WATER_CHOP.wh, uWhQ: WATER_CHOP.q, uWhL: WATER_CHOP.lq, uWhA: WATER_CHOP.la, uWhM: WATER_CHOP.m, uWind: WATER_CHOP.wind,
     },
@@ -2491,7 +2491,7 @@ function waterMaterial(near) {
       uniform float uFogNear; uniform float uFogFar; uniform float uTime; uniform float uAmp; uniform sampler2D uDepth; uniform vec4 uDom;
       uniform vec4 uShip; uniform vec2 uVel; uniform float uRip; uniform sampler2D uBayA; uniform sampler2D uBayT; uniform vec4 uBayAR; uniform vec4 uBayTR; uniform vec4 uHullDim;
       uniform sampler2D uTwinW; uniform vec4 uTwinWR; uniform sampler2D uCswW; uniform vec4 uCswWR;
-      uniform vec2 uRipA; uniform vec3 uRipC; uniform vec4 uPaw; uniform vec2 uChopQ; uniform vec2 uChopR; uniform vec3 uCamL; uniform vec4 uDomL; uniform float uKelLen; uniform float uKel; uniform vec3 uSpec;
+      uniform vec2 uRipA; uniform vec3 uRipC; uniform vec4 uPaw; uniform vec2 uChopQ; uniform vec2 uChopR; uniform vec3 uCamL; uniform vec4 uDomL; uniform float uKelLen; uniform float uKel; uniform vec3 uSpec; uniform float uSheen;
       uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn; uniform float uWaterY; uniform float uFoamPh;
       uniform vec4 uChopD[6]; uniform float uChopP[6]; uniform float uChopW[6]; uniform vec4 uWh; uniform vec4 uWhQ; uniform vec4 uWhL; uniform vec4 uWhA; uniform float uWhM; uniform vec2 uWind;
       vec4 bayAt(sampler2D t, vec4 R, vec2 p){ vec2 uv = (p - R.xy) / R.zw; float e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y)); return e < 0.0 ? vec4(0.0) : texture2D(t, uv) * smoothstep(0.0, 0.12, e); }
@@ -2600,6 +2600,7 @@ function waterMaterial(near) {
         col = mix(col, sky*0.9, clamp(fres*0.8, 0.0, fmax));
         vec3 H = normalize(V + uSun);
         col += uSpec*pow(max(dot(n, H), 0.0), 140.0);
+        if (uSheen > 0.0) col += uSpec*uSheen*pow(max(dot(n, H), 0.0), 9.0);   // by night the moon lays a broad pale sheen on the sea, not only its glitter
         float surf = (1.0 - smoothstep(0.15, 1.5, depth))*(0.55 + 0.45*sin(uPaw.w - depth*5.0 + l.x*0.03 - l.y*0.02));
         col = mix(col, vec3(0.93, 0.96, 0.96), clamp(surf*0.7, 0.0, 0.85));
         // White horses. A crest high enough breaks where a pattern running with the waves says so (so a crest breaks here
